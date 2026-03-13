@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ───────────────────────────────────────────
+
+enum UserRole {
+  customer
+  business
+  admin
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole  @default(customer)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  business Business?
+
+  @@map("users")
+}
+
+// ─── Business ───────────────────────────────────────────────
+
+enum BusinessStatus {
+  pending
+  approved
+  rejected
+}
+
+model Business {
+  id          String         @id @default(cuid())
+  userId      String         @unique @map("user_id")
+  name        String
+  slug        String         @unique
+  description String?
+  logoUrl     String?        @map("logo_url")
+  address     String
+  phone       String
+  status      BusinessStatus @default(pending)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories Category[]
+  menuItems  MenuItem[]
+  tables     Table[]
+  qrCodes    QrCode[]
+  orders     Order[]
+
+  @@map("businesses")
+}
+
+// ─── Menu ───────────────────────────────────────────────────
+
+model Category {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  name       String
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business  Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  menuItems MenuItem[]
+
+  @@unique([businessId, name])
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  categoryId  String   @map("category_id")
+  businessId  String   @map("business_id")
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?  @map("image_url")
+  isAvailable Boolean  @default(true) @map("is_available")
+  dietaryTags String[] @map("dietary_tags")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  business   Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("menu_items")
+}
+
+// ─── Tables & QR ────────────────────────────────────────────
+
+model Table {
+  id          String   @id @default(cuid())
+  businessId  String   @map("business_id")
+  tableNumber Int      @map("table_number")
+  label       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  qrCode   QrCode?
+  orders   Order[]
+
+  @@unique([businessId, tableNumber])
+  @@map("tables")
+}
+
+model QrCode {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  tableId    String   @unique @map("table_id")
+  uniqueCode String   @unique @map("unique_code")
+  qrImageUrl String?  @map("qr_image_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  table    Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@map("qr_codes")
+}
+
+// ─── Orders ─────────────────────────────────────────────────
+
+enum OrderStatus {
+  pending
+  confirmed
+  preparing
+  ready
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  businessId      String        @map("business_id")
+  tableId         String        @map("table_id")
+  status          OrderStatus   @default(pending)
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
+  stripePaymentId String?       @map("stripe_payment_id")
+  paymentStatus   PaymentStatus @default(pending) @map("payment_status")
+  customerName    String        @map("customer_name")
+  customerPhone   String?       @map("customer_phone")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  business Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  table    Table       @relation(fields: [tableId], references: [id])
+  items    OrderItem[]
+
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String  @id @default(cuid())
+  orderId             String  @map("order_id")
+  menuItemId          String  @map("menu_item_id")
+  quantity            Int
+  unitPrice           Decimal @map("unit_price") @db.Decimal(10, 2)
+  specialInstructions String? @map("special_instructions")
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@map("order_items")
+}
