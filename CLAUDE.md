@@ -2,9 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Startup
+
+**Every new session MUST start by:**
+1. Read the **"Last Session"** section of `STATUS.md` — this tells you exactly where to pick up
+2. Read the relevant CLAUDE.md files in the folders you'll be working in (e.g., `apps/api/CLAUDE.md`)
+3. If you need deeper history, read the **"Timeline"** section of `STATUS.md`
+
+**Every session MUST end by updating `STATUS.md`:**
+1. **Overwrite** the "Last Session" section with: what you did, what's not done, next step, build progress
+2. **Append** a new entry to the "Timeline" section (never delete or modify past entries)
+3. **Append** any new ADRs to the "Decisions Log" (never delete past entries)
+
 ## Workflow Rules
 
 - **ADR First:** Before implementing any feature or creating any PR, always create an Architecture Decision Record (ADR) documenting context, decision, and consequences. Present the ADR to the user and get explicit approval before writing any code.
+- **Explain Decisions:** When building features or making structural choices, explain the reasoning, technical cost, and technical debt trade-offs.
+- **Update STATUS.md:** At the end of every work session, update `STATUS.md` with current state, next steps, and any ADRs made.
+- **Local CLAUDE.md:** Create a CLAUDE.md in each major feature folder for local context.
 
 ## Project Overview
 
