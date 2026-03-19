@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -34,6 +35,14 @@ const profileUpdateSchema = z.object({
   logoUrl: z.string().url().max(500).optional().nullable(),
   address: z.string().min(5).optional(),
   phone: z.string().min(6).max(32).optional(),
+});
+
+const qrRotateSchema = z.object({
+  reason: z.string().max(250).optional(),
+});
+
+const qrRotationListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
 type RawBusiness = {
@@ -98,6 +107,12 @@ const isUniqueConstraintError = (error: unknown): boolean =>
   "code" in error &&
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (error as any).code === "P2002";
+
+const generateQrToken = () => crypto.randomBytes(16).toString("hex");
+const qrOldTokenGraceSec = Math.max(
+  0,
+  Number(process.env.QR_OLD_TOKEN_GRACE_SEC || 0)
+);
 
 router.use(requireAuth, requireRole("business"));
 
@@ -254,6 +269,142 @@ router.get(
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
     sendSuccess(res, { tables: [], businessId: req.business!.id });
+  })
+);
+
+router.post(
+  "/tables/:tableId/qr/regenerate",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    const parsed = qrRotateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const tableId = req.params.tableId;
+    if (!tableId) {
+      sendError(res, "Table id is required", 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const table = await prisma.table.findFirst({
+      where: { id: tableId, businessId: req.business!.id },
+    });
+
+    if (!table) {
+      sendError(res, "Table not found for business", 404, "TABLE_NOT_FOUND");
+      return;
+    }
+
+    const existingQr = await prisma.qrCode.findUnique({
+      where: { tableId: table.id },
+    });
+
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const nextToken = generateQrToken();
+      try {
+        const qrCode = existingQr
+          ? await prisma.qrCode.update({
+              where: { id: existingQr.id },
+              data: { uniqueCode: nextToken, qrImageUrl: null },
+            })
+          : await prisma.qrCode.create({
+              data: {
+                businessId: req.business!.id,
+                tableId: table.id,
+                uniqueCode: nextToken,
+                qrImageUrl: null,
+              },
+            });
+
+        if (existingQr && existingQr.uniqueCode !== nextToken) {
+          const graceExpiresAt =
+            qrOldTokenGraceSec > 0
+              ? new Date(Date.now() + qrOldTokenGraceSec * 1000)
+              : null;
+          await prisma.qrCodeRotation.create({
+            data: {
+              qrCodeId: qrCode.id,
+              oldToken: existingQr.uniqueCode,
+              newToken: nextToken,
+              rotatedByUserId: req.user!.id,
+              reason: parsed.data.reason ?? null,
+              graceExpiresAt,
+            },
+          });
+        }
+
+        sendSuccess(res, {
+          qrCode: {
+            id: qrCode.id,
+            tableId: qrCode.tableId,
+            businessId: qrCode.businessId,
+            uniqueCode: qrCode.uniqueCode,
+            createdAt: qrCode.createdAt.toISOString(),
+          },
+          graceExpiresAt:
+            qrOldTokenGraceSec > 0
+              ? new Date(Date.now() + qrOldTokenGraceSec * 1000).toISOString()
+              : null,
+        });
+        return;
+      } catch (error) {
+        if (isUniqueConstraintError(error)) continue;
+        throw error;
+      }
+    }
+
+    sendError(res, "Failed to rotate QR token", 500, "QR_ROTATION_FAILED");
+  })
+);
+
+router.get(
+  "/tables/:tableId/qr/rotations",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    const parsedQuery = qrRotationListQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      sendError(res, parsedQuery.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+    const limit = parsedQuery.data.limit ?? 20;
+    const tableId = req.params.tableId;
+    if (!tableId) {
+      sendError(res, "Table id is required", 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const qrCode = await prisma.qrCode.findFirst({
+      where: {
+        tableId,
+        businessId: req.business!.id,
+      },
+    });
+
+    if (!qrCode) {
+      sendError(res, "QR code not found for table", 404, "QR_CODE_NOT_FOUND");
+      return;
+    }
+
+    const rows = await prisma.qrCodeRotation.findMany({
+      where: { qrCodeId: qrCode.id },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+
+    sendSuccess(res, {
+      rotations: rows.map((row: any) => ({
+        id: row.id,
+        oldToken: row.oldToken,
+        newToken: row.newToken,
+        rotatedByUserId: row.rotatedByUserId,
+        reason: row.reason,
+        graceExpiresAt: row.graceExpiresAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    });
   })
 );
 

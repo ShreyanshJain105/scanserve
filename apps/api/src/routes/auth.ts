@@ -51,11 +51,29 @@ const customerQrAuthEnabled =
     ? process.env.ENABLE_CUSTOMER_QR_AUTH === "true"
     : process.env.NODE_ENV !== "production";
 
+const qrTokenMaxAgeDays = Math.max(
+  0,
+  Number(process.env.QR_TOKEN_MAX_AGE_DAYS || 0)
+);
+
 const resolveQrContext = async (qrToken?: string) => {
   if (!qrToken) return null;
   return prisma.qrCode.findUnique({
     where: { uniqueCode: qrToken },
-    select: { id: true, businessId: true, tableId: true },
+    include: {
+      business: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+      table: {
+        select: {
+          id: true,
+          isActive: true,
+        },
+      },
+    },
   });
 };
 
@@ -68,6 +86,22 @@ const assertCustomerQrAccess = async (res: express.Response, qrToken?: string) =
   if (!qrContext) {
     sendError(res, "Customer auth is only allowed in QR flow", 403, "CUSTOMER_AUTH_QR_ONLY");
     return null;
+  }
+  if (qrContext.business.status !== "approved") {
+    sendError(res, "Business is not available", 403, "BUSINESS_NOT_AVAILABLE");
+    return null;
+  }
+  if (!qrContext.table.isActive) {
+    sendError(res, "Table is inactive", 403, "TABLE_INACTIVE");
+    return null;
+  }
+  if (qrTokenMaxAgeDays > 0) {
+    const ageMs = Date.now() - qrContext.createdAt.getTime();
+    const maxAgeMs = qrTokenMaxAgeDays * 24 * 60 * 60 * 1000;
+    if (ageMs > maxAgeMs) {
+      sendError(res, "QR token expired", 403, "QR_TOKEN_EXPIRED");
+      return null;
+    }
   }
   return qrContext;
 };
@@ -184,9 +218,17 @@ router.post(
 router.post(
   "/refresh",
   asyncHandler(async (req, res) => {
-    const incoming =
-      (req.cookies?.refresh_token as string | undefined) ||
-      (req.cookies?.qr_customer_refresh as string | undefined);
+    const standard = req.cookies?.refresh_token as string | undefined;
+    const qr = req.cookies?.qr_customer_refresh as string | undefined;
+    if (standard && qr) {
+      return sendError(
+        res,
+        "Ambiguous refresh cookies",
+        400,
+        "MIXED_REFRESH_COOKIES"
+      );
+    }
+    const incoming = standard || qr;
     if (!incoming) return sendError(res, "Missing refresh token", 401, "NO_REFRESH_TOKEN");
 
     try {
@@ -228,10 +270,10 @@ router.post(
 router.post(
   "/logout",
   asyncHandler(async (req, res) => {
-    const incoming =
-      (req.cookies?.refresh_token as string | undefined) ||
-      (req.cookies?.qr_customer_refresh as string | undefined);
-    await revokeRefreshToken(incoming);
+    const standard = req.cookies?.refresh_token as string | undefined;
+    const qr = req.cookies?.qr_customer_refresh as string | undefined;
+    if (standard) await revokeRefreshToken(standard);
+    if (qr) await revokeRefreshToken(qr);
     res.clearCookie("access_token", accessCookieOptions);
     res.clearCookie("refresh_token", refreshCookieOptions);
     res.clearCookie("qr_customer_access", qrAccessCookieOptions);

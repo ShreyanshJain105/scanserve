@@ -136,10 +136,28 @@ model QrCode {
   qrImageUrl String?  @map("qr_image_url")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  table    Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  business  Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  table     Table             @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  rotations QrCodeRotation[]
 
   @@map("qr_codes")
+}
+
+model QrCodeRotation {
+  id              String    @id @default(cuid())
+  qrCodeId        String    @map("qr_code_id")
+  oldToken        String    @unique @map("old_token")
+  newToken        String    @map("new_token")
+  rotatedByUserId String?   @map("rotated_by_user_id")
+  reason          String?
+  graceExpiresAt  DateTime? @map("grace_expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  qrCode QrCode @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+
+  @@index([qrCodeId, createdAt])
+  @@index([graceExpiresAt])
+  @@map("qr_code_rotations")
 }
 
 // ─── Orders ─────────────────────────────────────────────────

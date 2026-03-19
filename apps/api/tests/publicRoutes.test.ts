@@ -4,12 +4,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import publicRouter from "../src/routes/public";
 
 const qrCodes: any[] = [];
+const qrRotations: any[] = [];
 
 vi.mock("../src/prisma", () => ({
   prisma: {
     qrCode: {
       findUnique: vi.fn(async ({ where: { uniqueCode } }) =>
         qrCodes.find((q) => q.uniqueCode === uniqueCode) || null
+      ),
+    },
+    qrCodeRotation: {
+      findFirst: vi.fn(async ({ where: { oldToken } }) =>
+        qrRotations
+          .filter((r) => r.oldToken === oldToken && (!r.graceExpiresAt || r.graceExpiresAt > new Date()))
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] || null
       ),
     },
   },
@@ -56,6 +64,7 @@ const run = async (path: string, params?: Record<string, string>) => {
 describe("public routes", () => {
   beforeEach(() => {
     qrCodes.length = 0;
+    qrRotations.length = 0;
   });
 
   it("returns qr context for valid token", async () => {
@@ -75,5 +84,25 @@ describe("public routes", () => {
     const res = await run("/qr/nope", { qrToken: "nope" });
     expect(res._getStatusCode()).toBe(400);
     expect(res._getJSONData().error.code).toBe("INVALID_QR_TOKEN");
+  });
+
+  it("accepts rotated old token during grace window", async () => {
+    const activeQr = {
+      uniqueCode: "new-qr-token-123",
+      business: { id: "b1", slug: "seed-qr-biz", name: "Seed", status: "approved" },
+      table: { id: "t1", tableNumber: 2, isActive: true },
+    };
+    qrCodes.push(activeQr);
+    qrRotations.push({
+      oldToken: "old-qr-token-123",
+      createdAt: new Date(),
+      graceExpiresAt: new Date(Date.now() + 60_000),
+      qrCode: activeQr,
+    });
+
+    const res = await run("/qr/old-qr-token-123", { qrToken: "old-qr-token-123" });
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().data.qr.isGraceToken).toBe(true);
+    expect(res._getJSONData().data.qr.business.slug).toBe("seed-qr-biz");
   });
 });

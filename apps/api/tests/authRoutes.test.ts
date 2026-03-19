@@ -6,7 +6,17 @@ import { __resetQrAuthRateLimitForTests } from "../src/middleware/qrAuthRateLimi
 
 const users: any[] = [];
 const refreshTokens: any[] = [];
-const qrCodes: any[] = [{ id: "qr1", uniqueCode: "valid-qr-token-123", businessId: "b1", tableId: "t1" }];
+const qrCodes: any[] = [
+  {
+    id: "qr1",
+    uniqueCode: "valid-qr-token-123",
+    businessId: "b1",
+    tableId: "t1",
+    createdAt: new Date(),
+    business: { id: "b1", status: "approved" },
+    table: { id: "t1", isActive: true },
+  },
+];
 
 vi.mock("../src/prisma", () => ({
   prisma: {
@@ -117,9 +127,23 @@ describe("auth routes", () => {
   beforeEach(() => {
     users.length = 0;
     refreshTokens.length = 0;
+    qrCodes.splice(
+      0,
+      qrCodes.length,
+      {
+        id: "qr1",
+        uniqueCode: "valid-qr-token-123",
+        businessId: "b1",
+        tableId: "t1",
+        createdAt: new Date(),
+        business: { id: "b1", status: "approved" },
+        table: { id: "t1", isActive: true },
+      }
+    );
     __resetQrAuthRateLimitForTests();
     vi.stubEnv("QR_AUTH_RATE_LIMIT_WINDOW_SEC", "60");
     vi.stubEnv("QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS", "10");
+    vi.stubEnv("QR_TOKEN_MAX_AGE_DAYS", "0");
   });
 
   it("registers and logs in a user, issues cookies", async () => {
@@ -209,5 +233,28 @@ describe("auth routes", () => {
     });
     expect(third._getStatusCode()).toBe(429);
     expect(third._getJSONData().error?.code).toBe("QR_AUTH_RATE_LIMITED");
+  });
+
+  it("rejects customer registration when QR table is inactive", async () => {
+    qrCodes[0].table.isActive = false;
+    const res = await run("post", "/register", {
+      email: "inactive-table@y.com",
+      password: "password123",
+      role: "customer",
+      qrToken: "valid-qr-token-123",
+    });
+    expect(res._getStatusCode()).toBe(403);
+    expect(res._getJSONData().error?.code).toBe("TABLE_INACTIVE");
+  });
+
+  it("rejects refresh when both customer and business refresh cookies are sent", async () => {
+    const res = await run(
+      "post",
+      "/refresh",
+      undefined,
+      "refresh_token=business-token; qr_customer_refresh=customer-token"
+    );
+    expect(res._getStatusCode()).toBe(400);
+    expect(res._getJSONData().error?.code).toBe("MIXED_REFRESH_COOKIES");
   });
 });

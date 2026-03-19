@@ -56,3 +56,12 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added in-memory QR customer-auth rate limiting (`src/middleware/qrAuthRateLimit.ts`) and applied it to customer register/login paths in `src/routes/auth.ts`.
 - Added QR auth rate-limit env knobs in `.env.example` (`QR_AUTH_RATE_LIMIT_WINDOW_SEC`, `QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS`).
 - Added API test coverage for rate-limit behavior on repeated bad QR customer-auth attempts.
+- Added mixed refresh-cookie hardening in `src/routes/auth.ts`: reject ambiguous requests with `MIXED_REFRESH_COOKIES` and revoke both refresh cookies on logout when present.
+- Strengthened QR auth guard checks in `src/routes/auth.ts` to enforce approved business + active table state and optional token age cap (`QR_TOKEN_MAX_AGE_DAYS`).
+- Extended auth route tests for inactive-table rejection and mixed refresh-cookie rejection.
+- Added QR token lifecycle rotation endpoint for approved businesses: `POST /api/business/tables/:tableId/qr/regenerate` in `src/routes/business.ts`.
+- Rotation flow updates existing table QR token or creates one if missing; previous token becomes invalid by replacement.
+- Added onboarding/business-route test coverage for QR regeneration and token change behavior.
+- Added QR rotation audit model in Prisma (`QrCodeRotation`) with migration `20260319230000_qr_rotation_audit`.
+- Extended regeneration flow to persist rotation history (`oldToken`, `newToken`, actor, reason) and optional grace expiry via `QR_OLD_TOKEN_GRACE_SEC`.
+- Added rotation-history endpoint `GET /tables/:tableId/qr/rotations` and public QR grace-token resolution support in `src/routes/public.ts`.

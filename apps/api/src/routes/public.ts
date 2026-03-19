@@ -14,7 +14,7 @@ router.get(
       return;
     }
 
-    const qrCode = await prisma.qrCode.findUnique({
+    let qrCode = await prisma.qrCode.findUnique({
       where: { uniqueCode: qrToken },
       include: {
         business: {
@@ -34,6 +34,42 @@ router.get(
         },
       },
     });
+
+    let isGraceToken = false;
+    if (!qrCode) {
+      const rotation = await prisma.qrCodeRotation.findFirst({
+        where: {
+          oldToken: qrToken,
+          graceExpiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          qrCode: {
+            include: {
+              business: {
+                select: {
+                  id: true,
+                  slug: true,
+                  name: true,
+                  status: true,
+                },
+              },
+              table: {
+                select: {
+                  id: true,
+                  tableNumber: true,
+                  isActive: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      if (rotation) {
+        qrCode = rotation.qrCode;
+        isGraceToken = true;
+      }
+    }
 
     if (!qrCode) {
       sendError(res, "QR token not found", 404, "QR_NOT_FOUND");
@@ -62,6 +98,7 @@ router.get(
           id: qrCode.table.id,
           number: qrCode.table.tableNumber,
         },
+        isGraceToken,
       },
     });
   })

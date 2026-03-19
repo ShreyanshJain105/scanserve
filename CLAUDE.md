@@ -320,3 +320,6 @@ Build features in this order. Each layer depends on the layers above it.
 - Runtime docker note: if Next starts returning 500 with missing `.next/server/*` chunks in container, isolate `.next` using compose volume (`/app/apps/web/.next`) to avoid bind-mount artifact corruption.
 - For server-side web fetches in docker, use `API_INTERNAL_URL` (e.g., `http://api:4000`) instead of browser-facing `NEXT_PUBLIC_API_URL` to avoid container-localhost routing failures.
 - ADR-006 hardening update: QR customer-auth attempts are now rate-limited server-side; thresholds are env-configurable and covered by API tests.
+- Additional ADR-006 auth hardening: mixed refresh-cookie requests are explicitly rejected and QR auth now enforces business/table availability before allowing customer auth.
+- ADR-006 lifecycle step added: business-side QR token regeneration endpoint now rotates table QR tokens, invalidating previous tokens by replacement.
+- ADR-006 optional lifecycle enhancements implemented: QR rotation audit records + table rotation-history endpoint + optional old-token grace-window resolution in public QR lookup.

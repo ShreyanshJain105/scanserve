@@ -28,10 +28,28 @@ type RejectionRecord = {
   reason: string | null;
   createdAt: Date;
 };
+type TableRecord = {
+  id: string;
+  businessId: string;
+  tableNumber: number;
+  label: string | null;
+  isActive: boolean;
+  createdAt: Date;
+};
+type QrCodeRecord = {
+  id: string;
+  businessId: string;
+  tableId: string;
+  uniqueCode: string;
+  qrImageUrl: string | null;
+  createdAt: Date;
+};
 
 const users: UserRecord[] = [];
 const businesses: BusinessRecord[] = [];
 const rejections: RejectionRecord[] = [];
+const tables: TableRecord[] = [];
+const qrCodes: QrCodeRecord[] = [];
 
 const withRejections = (business: BusinessRecord) => ({
   ...business,
@@ -119,6 +137,95 @@ vi.mock("../src/prisma", () => ({
         return created;
       }),
     },
+    table: {
+      findFirst: vi.fn(async ({ where }) => {
+        let list = [...tables];
+        if (where?.id) list = list.filter((item) => item.id === where.id);
+        if (where?.businessId) list = list.filter((item) => item.businessId === where.businessId);
+        return list[0] ?? null;
+      }),
+    },
+    qrCode: {
+      findUnique: vi.fn(async ({ where }) => {
+        if (where?.tableId) {
+          return qrCodes.find((item) => item.tableId === where.tableId) ?? null;
+        }
+        if (where?.id) {
+          return qrCodes.find((item) => item.id === where.id) ?? null;
+        }
+        return null;
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        let list = [...qrCodes];
+        if (where?.tableId) list = list.filter((item) => item.tableId === where.tableId);
+        if (where?.businessId) list = list.filter((item) => item.businessId === where.businessId);
+        return list[0] ?? null;
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        const index = qrCodes.findIndex((item) => item.id === where.id);
+        if (index < 0) throw new Error("QrCode not found");
+        qrCodes[index] = {
+          ...qrCodes[index],
+          uniqueCode: data.uniqueCode,
+          qrImageUrl: data.qrImageUrl ?? null,
+        };
+        return qrCodes[index];
+      }),
+      create: vi.fn(async ({ data }) => {
+        const created: QrCodeRecord = {
+          id: `q_${qrCodes.length + 1}`,
+          businessId: data.businessId,
+          tableId: data.tableId,
+          uniqueCode: data.uniqueCode,
+          qrImageUrl: data.qrImageUrl ?? null,
+          createdAt: new Date(),
+        };
+        qrCodes.push(created);
+        return created;
+      }),
+      upsert: vi.fn(async ({ where, update, create }) => {
+        const index = qrCodes.findIndex((item) => item.tableId === where.tableId);
+        if (index >= 0) {
+          qrCodes[index] = {
+            ...qrCodes[index],
+            uniqueCode: update.uniqueCode,
+            qrImageUrl: update.qrImageUrl ?? null,
+          };
+          return qrCodes[index];
+        }
+        const created: QrCodeRecord = {
+          id: `q_${qrCodes.length + 1}`,
+          businessId: create.businessId,
+          tableId: create.tableId,
+          uniqueCode: create.uniqueCode,
+          qrImageUrl: create.qrImageUrl ?? null,
+          createdAt: new Date(),
+        };
+        qrCodes.push(created);
+        return created;
+      }),
+    },
+    qrCodeRotation: {
+      create: vi.fn(async ({ data }) => ({
+        id: `rot_${Date.now()}`,
+        ...data,
+        createdAt: new Date(),
+      })),
+      findMany: vi.fn(async ({ where, take }) =>
+        [
+          {
+            id: "rot_1",
+            qrCodeId: where.qrCodeId,
+            oldToken: "old-token",
+            newToken: "new-token",
+            rotatedByUserId: "u_business",
+            reason: "rotation",
+            graceExpiresAt: new Date(Date.now() + 60_000),
+            createdAt: new Date(),
+          },
+        ].slice(0, take ?? 20)
+      ),
+    },
     $transaction: vi.fn(async (operations) => {
       const result = [];
       for (const operation of operations) {
@@ -187,6 +294,8 @@ describe("Layer 3 onboarding routes", () => {
     users.length = 0;
     businesses.length = 0;
     rejections.length = 0;
+    tables.length = 0;
+    qrCodes.length = 0;
 
     users.push({ id: "u_business", email: "biz@example.com", role: "business" });
     users.push({ id: "u_admin", email: "admin@example.com", role: "admin" });
@@ -345,5 +454,107 @@ describe("Layer 3 onboarding routes", () => {
     });
     expect(approved._getStatusCode()).toBe(200);
     expect(approved._getJSONData().status).toBe(1);
+  });
+
+  it("regenerates QR token for an approved business table", async () => {
+    const businessUser = users[0];
+    businesses.push({
+      id: "b_qr",
+      userId: users[0].id,
+      name: "QR Bistro",
+      slug: "qr-bistro",
+      description: null,
+      logoUrl: null,
+      address: "A",
+      phone: "1234567",
+      status: "approved",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    tables.push({
+      id: "t_qr",
+      businessId: "b_qr",
+      tableNumber: 1,
+      label: "Table 1",
+      isActive: true,
+      createdAt: new Date(),
+    });
+
+    const first = await run(
+      businessRouter,
+      "POST",
+      "/tables/t_qr/qr/regenerate",
+      {
+        user: businessUser,
+        headers: { "x-business-id": "b_qr" },
+      }
+    );
+    expect(first._getStatusCode()).toBe(200);
+    const tokenOne = first._getJSONData().data.qrCode.uniqueCode;
+    expect(typeof tokenOne).toBe("string");
+    expect(tokenOne.length).toBeGreaterThan(20);
+
+    const second = await run(
+      businessRouter,
+      "POST",
+      "/tables/t_qr/qr/regenerate",
+      {
+        user: businessUser,
+        headers: { "x-business-id": "b_qr" },
+      }
+    );
+    expect(second._getStatusCode()).toBe(200);
+    const tokenTwo = second._getJSONData().data.qrCode.uniqueCode;
+    expect(tokenTwo).not.toBe(tokenOne);
+  });
+
+  it("lists QR rotation history for table", async () => {
+    const businessUser = users[0];
+    businesses.push({
+      id: "b_hist",
+      userId: users[0].id,
+      name: "QR Hist",
+      slug: "qr-hist",
+      description: null,
+      logoUrl: null,
+      address: "A",
+      phone: "1234567",
+      status: "approved",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    tables.push({
+      id: "t_hist",
+      businessId: "b_hist",
+      tableNumber: 2,
+      label: "Table 2",
+      isActive: true,
+      createdAt: new Date(),
+    });
+
+    qrCodes.push({
+      id: "q_hist",
+      businessId: "b_hist",
+      tableId: "t_hist",
+      uniqueCode: "active-token",
+      qrImageUrl: null,
+      createdAt: new Date(),
+    });
+
+    const listed = await run(
+      businessRouter,
+      "GET",
+      "/tables/t_hist/qr/rotations?limit=5",
+      {
+        user: businessUser,
+        headers: { "x-business-id": "b_hist" },
+      }
+    );
+
+    expect(listed._getStatusCode()).toBe(200);
+    expect(listed._getJSONData().status).toBe(1);
+    expect(Array.isArray(listed._getJSONData().data.rotations)).toBe(true);
   });
 });

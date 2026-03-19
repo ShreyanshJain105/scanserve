@@ -11,15 +11,14 @@
 
 **Date:** 2026-03-19
 **What was done:**
-- Hardened ADR-006 customer QR auth protections:
-  - Added in-memory QR auth rate limiter middleware (`apps/api/src/middleware/qrAuthRateLimit.ts`).
-  - Applied rate limit checks to customer register/login paths in `apps/api/src/routes/auth.ts`.
-  - Added env controls in `apps/api/.env.example`: `QR_AUTH_RATE_LIMIT_WINDOW_SEC`, `QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS`.
-- Extended API test coverage:
-  - Added repeated-attempt rate-limit test in `apps/api/tests/authRoutes.test.ts` (expects `429 QR_AUTH_RATE_LIMITED`).
-  - Existing QR/public/auth tests still pass.
+- Completed optional ADR-006 lifecycle enhancements (except shared rate-limit backend):
+  - Added `QrCodeRotation` audit model and migration (`20260319230000_qr_rotation_audit`).
+  - Extended QR regeneration to persist rotation history with reason/actor and optional grace expiry (`QR_OLD_TOKEN_GRACE_SEC`).
+  - Added rotation history endpoint: `GET /api/business/tables/:tableId/qr/rotations`.
+  - Added public QR grace support: old token can still resolve during configured grace window.
+- Regenerated Prisma client after schema update.
 - Validation completed:
-  - `pnpm --filter @scan2serve/api test` passes (14 tests).
+  - `pnpm --filter @scan2serve/api test` passes (19 tests).
   - `pnpm --filter @scan2serve/web test` passes.
   - `pnpm --filter @scan2serve/api build` passes.
   - `pnpm --filter @scan2serve/web build` passes.
@@ -27,15 +26,14 @@
 **What's NOT done yet:**
 - ADR-006 remains partial:
   - `/menu/[slug]` is still placeholder UI (Layer 6 real public menu not implemented).
-  - QR token hardening lifecycle (rotation/revocation mechanics) is still pending.
-  - More negative/tamper cases are still pending around refresh and mixed-role cookie edge cases.
+  - Distributed/persistent rate limiting (beyond in-memory process scope) is still pending (explicitly deferred by user).
 - Layer 4+ features (menu/table/order/payment flows) are still pending implementation.
 - Production cookie/CORS hardening review still pending once deploy targets are fixed.
 
 **Next step:** Complete ADR-006 enforcement before Layer 4
-1. Expand auth negative tests (especially refresh + cookie-mixing edge cases).
-2. Finalize QR token lifecycle policy implementation (rotation/revocation mechanics).
-3. After ADR-006 hardening, start Layer 4 ADR and menu-management implementation.
+1. Keep current in-memory limiter as-is (per user decision) and move to Layer 4 planning.
+2. Draft Layer 4 ADR for menu management contracts and scope.
+3. Implement category/menu-item CRUD APIs + dashboard menu UI + tests.
 
 **Build progress:**
 ```
@@ -154,6 +152,22 @@ Layer 11: Polish & Deploy
 - Added QR customer-auth rate limiter middleware and wired it into customer register/login handlers.
 - Added env-configurable thresholds and API tests that validate `QR_AUTH_RATE_LIMITED` behavior.
 - Revalidated full API/web test and build suites after hardening changes.
+
+### 2026-03-19 — Session 17: ADR-006 tamper + state guard hardening
+- Added mixed refresh-cookie protection (`MIXED_REFRESH_COOKIES`) and dual-token logout revocation behavior.
+- Strengthened QR auth guard to enforce approved business and active table checks plus optional token age cap.
+- Expanded auth route tests for mixed-cookie and inactive-table rejection paths; full test/build suites remain green.
+
+### 2026-03-19 — Session 18: ADR-006 QR rotation endpoint
+- Added approved-business QR regeneration endpoint for table tokens and integrated token replacement behavior.
+- Added API test coverage validating token regeneration updates for a table.
+- Revalidated full API/web test and build suites.
+
+### 2026-03-19 — Session 19: ADR-006 optional lifecycle enhancements
+- Added Prisma `QrCodeRotation` model + migration for QR token rotation audit trail.
+- Added rotation history endpoint and grace-window resolution path for old QR tokens in public lookup.
+- Added tests for rotation listing and grace-token public resolution.
+- Regenerated Prisma client and revalidated full API/web test + build suite.
 
 ---
 
