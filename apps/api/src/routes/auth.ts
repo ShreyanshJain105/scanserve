@@ -11,6 +11,7 @@ import {
 import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { requireAuth } from "../middleware/auth";
+import { consumeQrAuthAttempt } from "../middleware/qrAuthRateLimit";
 import { sendError, sendSuccess } from "../utils/response";
 import type { UserRole } from "@scan2serve/shared";
 
@@ -35,10 +36,67 @@ const refreshCookieOptions = {
   domain: COOKIE_DOMAIN,
 };
 
+const qrAccessCookieOptions = {
+  ...accessCookieOptions,
+  path: "/qr",
+};
+
+const qrRefreshCookieOptions = {
+  ...refreshCookieOptions,
+  path: "/api/auth/refresh",
+};
+
+const customerQrAuthEnabled =
+  process.env.ENABLE_CUSTOMER_QR_AUTH !== undefined
+    ? process.env.ENABLE_CUSTOMER_QR_AUTH === "true"
+    : process.env.NODE_ENV !== "production";
+
+const resolveQrContext = async (qrToken?: string) => {
+  if (!qrToken) return null;
+  return prisma.qrCode.findUnique({
+    where: { uniqueCode: qrToken },
+    select: { id: true, businessId: true, tableId: true },
+  });
+};
+
+const assertCustomerQrAccess = async (res: express.Response, qrToken?: string) => {
+  if (!customerQrAuthEnabled) {
+    sendError(res, "Customer QR auth is disabled", 403, "CUSTOMER_QR_AUTH_DISABLED");
+    return null;
+  }
+  const qrContext = await resolveQrContext(qrToken);
+  if (!qrContext) {
+    sendError(res, "Customer auth is only allowed in QR flow", 403, "CUSTOMER_AUTH_QR_ONLY");
+    return null;
+  }
+  return qrContext;
+};
+
+const assertQrRateLimit = (
+  req: express.Request,
+  res: express.Response,
+  qrToken?: string,
+  email?: string
+) => {
+  const rate = consumeQrAuthAttempt(req, qrToken, email);
+  if (!rate.allowed) {
+    res.setHeader("Retry-After", String(rate.retryAfterSec));
+    sendError(
+      res,
+      "Too many QR auth attempts. Please retry later.",
+      429,
+      "QR_AUTH_RATE_LIMITED"
+    );
+    return false;
+  }
+  return true;
+};
+
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(["customer", "business", "admin"] as [UserRole, ...UserRole[]]),
+  role: z.enum(["customer", "business"] as [UserRole, ...UserRole[]]),
+  qrToken: z.string().min(12).optional(),
 });
 
 router.post(
@@ -48,7 +106,12 @@ router.post(
     if (!parse.success) {
       return sendError(res, parse.error.message, 400, "VALIDATION_ERROR");
     }
-    const { email, password, role } = parse.data;
+    const { email, password, role, qrToken } = parse.data;
+    if (role === "customer") {
+      if (!assertQrRateLimit(req, res, qrToken, email)) return;
+      const qrContext = await assertCustomerQrAccess(res, qrToken);
+      if (!qrContext) return;
+    }
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return sendError(res, "Email already registered", 400, "EMAIL_EXISTS");
@@ -66,6 +129,7 @@ router.post(
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  qrToken: z.string().min(12).optional(),
 });
 
 router.post(
@@ -75,13 +139,20 @@ router.post(
     if (!parse.success) {
       return sendError(res, parse.error.message, 400, "VALIDATION_ERROR");
     }
-    const { email, password } = parse.data;
+    const { email, password, qrToken } = parse.data;
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid)
       return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
+
+    const isCustomer = user.role === "customer";
+    if (isCustomer) {
+      if (!assertQrRateLimit(req, res, qrToken, email)) return;
+      const qrContext = await assertCustomerQrAccess(res, qrToken);
+      if (!qrContext) return;
+    }
 
     const accessToken = signAccessToken({
       id: user.id,
@@ -90,12 +161,17 @@ router.post(
     });
     const refreshToken = await mintRefreshToken(user.id);
 
-    res.cookie("access_token", accessToken, {
-      ...accessCookieOptions,
+    const accessCookieName = isCustomer ? "qr_customer_access" : "access_token";
+    const refreshCookieName = isCustomer ? "qr_customer_refresh" : "refresh_token";
+    const accessOptions = isCustomer ? qrAccessCookieOptions : accessCookieOptions;
+    const refreshOptions = isCustomer ? qrRefreshCookieOptions : refreshCookieOptions;
+
+    res.cookie(accessCookieName, accessToken, {
+      ...accessOptions,
       maxAge: 1000 * 60 * Number(process.env.ACCESS_TOKEN_TTL_MINUTES || 15),
     });
-    res.cookie("refresh_token", refreshToken.plain, {
-      ...refreshCookieOptions,
+    res.cookie(refreshCookieName, refreshToken.plain, {
+      ...refreshOptions,
       expires: refreshToken.record.expiresAt,
     });
 
@@ -108,7 +184,9 @@ router.post(
 router.post(
   "/refresh",
   asyncHandler(async (req, res) => {
-    const incoming = req.cookies?.refresh_token as string | undefined;
+    const incoming =
+      (req.cookies?.refresh_token as string | undefined) ||
+      (req.cookies?.qr_customer_refresh as string | undefined);
     if (!incoming) return sendError(res, "Missing refresh token", 401, "NO_REFRESH_TOKEN");
 
     try {
@@ -123,12 +201,18 @@ router.post(
         role: user.role,
       });
 
-      res.cookie("access_token", accessToken, {
-        ...accessCookieOptions,
+      const isCustomer = user.role === "customer";
+      const accessCookieName = isCustomer ? "qr_customer_access" : "access_token";
+      const refreshCookieName = isCustomer ? "qr_customer_refresh" : "refresh_token";
+      const accessOptions = isCustomer ? qrAccessCookieOptions : accessCookieOptions;
+      const refreshOptions = isCustomer ? qrRefreshCookieOptions : refreshCookieOptions;
+
+      res.cookie(accessCookieName, accessToken, {
+        ...accessOptions,
         maxAge: 1000 * 60 * Number(process.env.ACCESS_TOKEN_TTL_MINUTES || 15),
       });
-      res.cookie("refresh_token", rotated.plain, {
-        ...refreshCookieOptions,
+      res.cookie(refreshCookieName, rotated.plain, {
+        ...refreshOptions,
         expires: rotated.record.expiresAt,
       });
 
@@ -144,10 +228,14 @@ router.post(
 router.post(
   "/logout",
   asyncHandler(async (req, res) => {
-    const incoming = req.cookies?.refresh_token as string | undefined;
+    const incoming =
+      (req.cookies?.refresh_token as string | undefined) ||
+      (req.cookies?.qr_customer_refresh as string | undefined);
     await revokeRefreshToken(incoming);
     res.clearCookie("access_token", accessCookieOptions);
     res.clearCookie("refresh_token", refreshCookieOptions);
+    res.clearCookie("qr_customer_access", qrAccessCookieOptions);
+    res.clearCookie("qr_customer_refresh", qrRefreshCookieOptions);
     return sendSuccess(res, { message: "Logged out" });
   })
 );

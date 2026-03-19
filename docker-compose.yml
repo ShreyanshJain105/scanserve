@@ -57,11 +57,13 @@ services:
     volumes:
       - ./:/app
       - web-node-modules:/app/node_modules
+      - web-next-cache:/app/apps/web/.next
     environment:
       NODE_ENV: development
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
       NEXT_PUBLIC_API_URL: http://localhost:4000
+      API_INTERNAL_URL: http://api:4000
       PORT: 3000
     command: >
       sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/web exec next dev --hostname 0.0.0.0 --port 3000"
@@ -81,3 +83,4 @@ volumes:
   db-data:
   api-node-modules:
   web-node-modules:
+  web-next-cache:

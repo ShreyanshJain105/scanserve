@@ -2,9 +2,11 @@ import { EventEmitter } from "events";
 import { createMocks } from "node-mocks-http";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import authRouter from "../src/routes/auth";
+import { __resetQrAuthRateLimitForTests } from "../src/middleware/qrAuthRateLimit";
 
 const users: any[] = [];
 const refreshTokens: any[] = [];
+const qrCodes: any[] = [{ id: "qr1", uniqueCode: "valid-qr-token-123", businessId: "b1", tableId: "t1" }];
 
 vi.mock("../src/prisma", () => ({
   prisma: {
@@ -19,6 +21,11 @@ vi.mock("../src/prisma", () => ({
         users.push(user);
         return user;
       }),
+    },
+    qrCode: {
+      findUnique: vi.fn(async ({ where: { uniqueCode } }) =>
+        qrCodes.find((q) => q.uniqueCode === uniqueCode) || null
+      ),
     },
     refreshToken: {
       create: vi.fn(async ({ data }) => {
@@ -110,13 +117,16 @@ describe("auth routes", () => {
   beforeEach(() => {
     users.length = 0;
     refreshTokens.length = 0;
+    __resetQrAuthRateLimitForTests();
+    vi.stubEnv("QR_AUTH_RATE_LIMIT_WINDOW_SEC", "60");
+    vi.stubEnv("QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS", "10");
   });
 
   it("registers and logs in a user, issues cookies", async () => {
     const registerRes = await run("post", "/register", {
       email: "a@b.com",
       password: "password123",
-      role: "customer",
+      role: "business",
     });
     expect(registerRes._getStatusCode()).toBe(201);
     expect(registerRes._getJSONData().status).toBe(1);
@@ -134,7 +144,7 @@ describe("auth routes", () => {
     await run("post", "/register", {
       email: "x@y.com",
       password: "password123",
-      role: "customer",
+      role: "business",
     });
 
     const res = await run("post", "/login", {
@@ -143,5 +153,61 @@ describe("auth routes", () => {
     });
     expect(res._getStatusCode()).toBe(401);
     expect(res._getJSONData().status).toBe(0);
+  });
+
+  it("rejects customer registration outside QR context", async () => {
+    const res = await run("post", "/register", {
+      email: "c@y.com",
+      password: "password123",
+      role: "customer",
+    });
+    expect(res._getStatusCode()).toBe(403);
+    expect(res._getJSONData().error?.code).toBe("CUSTOMER_AUTH_QR_ONLY");
+  });
+
+  it("rejects customer login outside QR context", async () => {
+    await run("post", "/register", {
+      email: "qr-user@y.com",
+      password: "password123",
+      role: "customer",
+      qrToken: "valid-qr-token-123",
+    });
+
+    const res = await run("post", "/login", {
+      email: "qr-user@y.com",
+      password: "password123",
+    });
+    expect(res._getStatusCode()).toBe(403);
+    expect(res._getJSONData().error?.code).toBe("CUSTOMER_AUTH_QR_ONLY");
+  });
+
+  it("rate limits repeated customer QR auth attempts", async () => {
+    vi.stubEnv("QR_AUTH_RATE_LIMIT_WINDOW_SEC", "120");
+    vi.stubEnv("QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS", "2");
+
+    const first = await run("post", "/register", {
+      email: "rl-user@y.com",
+      password: "password123",
+      role: "customer",
+      qrToken: "bad-qr-token-123",
+    });
+    expect(first._getStatusCode()).toBe(403);
+
+    const second = await run("post", "/register", {
+      email: "rl-user@y.com",
+      password: "password123",
+      role: "customer",
+      qrToken: "bad-qr-token-123",
+    });
+    expect(second._getStatusCode()).toBe(403);
+
+    const third = await run("post", "/register", {
+      email: "rl-user@y.com",
+      password: "password123",
+      role: "customer",
+      qrToken: "bad-qr-token-123",
+    });
+    expect(third._getStatusCode()).toBe(429);
+    expect(third._getJSONData().error?.code).toBe("QR_AUTH_RATE_LIMITED");
   });
 });

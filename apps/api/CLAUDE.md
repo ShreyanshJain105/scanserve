@@ -47,3 +47,12 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added migration baseline files for current schema (`prisma/migrations/20260319190000_init/migration.sql`, `prisma/migration_lock.toml`) and regenerated Prisma client.
 - Fixed API build typing blockers (`src/utils/asyncHandler.ts`, `src/index.ts`, `src/routes/auth.ts`, `src/prisma.ts`) so `pnpm --filter @scan2serve/api build` now succeeds.
 - Compose healthcheck probe updated to `http://127.0.0.1:4000/api/health` to avoid IPv6 localhost false negatives.
+- ADR-006 baseline implemented in `src/routes/auth.ts`: shared auth endpoints now require `qrToken` context for `role=customer` and reject non-QR customer auth with `CUSTOMER_AUTH_QR_ONLY`.
+- Added QR customer cookie isolation (`qr_customer_access`, `qr_customer_refresh`) so business auth middleware remains bound to existing business cookies.
+- Added `ENABLE_CUSTOMER_QR_AUTH` in `.env.example` for environment-level QR customer auth toggling.
+- Added public QR resolve route `GET /api/public/qr/:qrToken` in `src/routes/public.ts` and mounted it from `src/index.ts` for token -> business/table context resolution.
+- Extended auth route tests with customer-login tamper blocking and added public-route tests (`tests/publicRoutes.test.ts`).
+- Expanded Prisma seed (`prisma/seed.ts`) to create reproducible QR smoke-test context (`seed-qr-biz`, table 1, `valid-qr-live-token-123456`).
+- Added in-memory QR customer-auth rate limiting (`src/middleware/qrAuthRateLimit.ts`) and applied it to customer register/login paths in `src/routes/auth.ts`.
+- Added QR auth rate-limit env knobs in `.env.example` (`QR_AUTH_RATE_LIMIT_WINDOW_SEC`, `QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS`).
+- Added API test coverage for rate-limit behavior on repeated bad QR customer-auth attempts.

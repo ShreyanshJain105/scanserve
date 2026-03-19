@@ -21,3 +21,4 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 ## Updates 2026-03-19
 - Updated API response types to include `status: 1|0` and structured `error`; added `UserProfile` type for auth responses.
 - Extended shared business types to include `updatedAt` and `BusinessRejection[]` on `BusinessProfile`.
+- Extended auth request payload types with optional `qrToken` on login/register to support ADR-006 shared-endpoint QR customer auth context.

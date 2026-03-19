@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth";
 import businessRoutes from "./routes/business";
 import adminRoutes from "./routes/admin";
+import publicRoutes from "./routes/public";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -37,6 +38,7 @@ app.use("/api/business", businessRoutes);
 // app.use("/api/orders", orderRoutes);
 // app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/public", publicRoutes);
 
 // ─── Error Handler ──────────────────────────────────────────
 app.use(

@@ -46,3 +46,9 @@ pnpm lint   # run Next.js ESLint
 - Improved onboarding/dashboard UX for rejection visibility and wrapped onboarding page with `Suspense` for `useSearchParams` build compatibility.
 - Removed unsupported Vitest coverage typing from `vitest.config.ts`; `pnpm --filter @scan2serve/web build` and tests now pass.
 - Compose healthcheck probe updated to `http://127.0.0.1:3000` to avoid IPv6 localhost false negatives.
+- Main-site registration scope changed to business-only: `src/app/(auth)/register/page.tsx` now redirects to `/register/business`.
+- Added QR-scoped customer auth pages: `src/app/qr/[qrToken]/page.tsx`, `src/app/qr/login/page.tsx`, and `src/app/qr/register/page.tsx`.
+- Extended auth context with QR customer auth helpers that call shared auth endpoints with `qrToken` (`src/lib/auth-context.tsx`).
+- `/qr/[qrToken]` now performs server-side QR resolution via API and redirects to `/menu/[slug]?table=...&token=...` on success.
+- Added `/menu/[slug]` placeholder page as the QR-resolved public destination until full Layer 6 menu UI is built.
+- Runtime note: in docker, server components must use `API_INTERNAL_URL` (container-to-container URL) for API fetches.

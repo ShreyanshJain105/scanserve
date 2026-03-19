@@ -31,6 +31,8 @@ type AuthContextType = {
   error: string | null;
   login: (input: LoginRequest) => Promise<void>;
   register: (input: RegisterRequest) => Promise<void>;
+  loginCustomerFromQr: (input: LoginRequest & { qrToken: string }) => Promise<void>;
+  registerCustomerFromQr: (input: RegisterRequest & { role: "customer"; qrToken: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshBusinessProfiles: () => Promise<void>;
@@ -137,6 +139,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const loginCustomerFromQr = async (input: LoginRequest & { qrToken: string }) => {
+    setError(null);
+    try {
+      const data = await apiFetch<{ user: UserProfile }>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+      setUser(data.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+      throw err;
+    }
+  };
+
+  const registerCustomerFromQr = async (
+    input: RegisterRequest & { role: "customer"; qrToken: string }
+  ) => {
+    setError(null);
+    try {
+      await apiFetch<{ user: UserProfile }>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+      await loginCustomerFromQr({
+        email: input.email,
+        password: input.password,
+        qrToken: input.qrToken,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Register failed");
+      throw err;
+    }
+  };
+
   const logout = async () => {
     await apiFetch("/api/auth/logout", { method: "POST" });
     setUser(null);
@@ -172,6 +208,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     error,
     login,
     register,
+    loginCustomerFromQr,
+    registerCustomerFromQr,
     logout,
     refreshProfile,
     refreshBusinessProfiles,

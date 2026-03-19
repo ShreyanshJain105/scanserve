@@ -315,3 +315,8 @@ Build features in this order. Each layer depends on the layers above it.
 - Docker compose stabilization completed: removed obsolete compose `version`, added service healthchecks/depends_on conditions, added container-safe pnpm env (`CI=true`), fixed web startup command, and verified `db`/`api`/`web` boot from clean `down -v && up --build`.
 - Stabilization follow-up completed: added Prisma migration baseline, resolved remaining API/web build blockers, and verified both app test suites + build pipelines pass.
 - Compose healthcheck fix: use `127.0.0.1` (not `localhost`) for API/web probes to avoid IPv6 loopback false negatives; `docker-compose ps` now reports all services healthy.
+- ADR-006 is now the accepted auth-scope policy: main website auth is business-only; customer auth is QR-scoped and must carry `qrToken` context.
+- Non-QR customer auth paths are frozen by policy; do not add customer login/register pathways outside QR flows without a new ADR.
+- Runtime docker note: if Next starts returning 500 with missing `.next/server/*` chunks in container, isolate `.next` using compose volume (`/app/apps/web/.next`) to avoid bind-mount artifact corruption.
+- For server-side web fetches in docker, use `API_INTERNAL_URL` (e.g., `http://api:4000`) instead of browser-facing `NEXT_PUBLIC_API_URL` to avoid container-localhost routing failures.
+- ADR-006 hardening update: QR customer-auth attempts are now rate-limited server-side; thresholds are env-configurable and covered by API tests.

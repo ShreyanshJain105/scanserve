@@ -38,12 +38,14 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 export interface LoginRequest {
   email: string;
   password: string;
+  qrToken?: string;
 }
 
 export interface RegisterRequest {
   email: string;
   password: string;
   role: "customer" | "business";
+  qrToken?: string;
 }
 
 export interface UserProfile {

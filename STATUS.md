@@ -11,31 +11,31 @@
 
 **Date:** 2026-03-19
 **What was done:**
-- Completed ADR-004 implementation stabilization across API, web, and compose:
-  - Added Prisma migration baseline for current schema (`apps/api/prisma/migrations/20260319190000_init/migration.sql`) and lock file.
-  - Regenerated Prisma client and fixed baseline API/web type issues blocking builds.
-  - Added admin moderation page (`/admin`) and improved dashboard/onboarding rejection visibility UX.
-  - Wrapped onboarding page in `Suspense` for `useSearchParams` build compatibility.
-- Completed verification:
-  - `pnpm --filter @scan2serve/api test` passes.
+- Hardened ADR-006 customer QR auth protections:
+  - Added in-memory QR auth rate limiter middleware (`apps/api/src/middleware/qrAuthRateLimit.ts`).
+  - Applied rate limit checks to customer register/login paths in `apps/api/src/routes/auth.ts`.
+  - Added env controls in `apps/api/.env.example`: `QR_AUTH_RATE_LIMIT_WINDOW_SEC`, `QR_AUTH_RATE_LIMIT_MAX_ATTEMPTS`.
+- Extended API test coverage:
+  - Added repeated-attempt rate-limit test in `apps/api/tests/authRoutes.test.ts` (expects `429 QR_AUTH_RATE_LIMITED`).
+  - Existing QR/public/auth tests still pass.
+- Validation completed:
+  - `pnpm --filter @scan2serve/api test` passes (14 tests).
   - `pnpm --filter @scan2serve/web test` passes.
   - `pnpm --filter @scan2serve/api build` passes.
   - `pnpm --filter @scan2serve/web build` passes.
-- Finalized docker-compose reliability:
-  - Kept non-interactive pnpm env fixes (`CI=true`, purge confirm disable) and corrected Next.js startup command.
-  - Fixed healthcheck IPv6/localhost issue by using `127.0.0.1` for API/web probes.
-  - Verified `docker-compose ps` shows `db`, `api`, and `web` all `healthy`.
 
 **What's NOT done yet:**
+- ADR-006 remains partial:
+  - `/menu/[slug]` is still placeholder UI (Layer 6 real public menu not implemented).
+  - QR token hardening lifecycle (rotation/revocation mechanics) is still pending.
+  - More negative/tamper cases are still pending around refresh and mixed-role cookie edge cases.
 - Layer 4+ features (menu/table/order/payment flows) are still pending implementation.
-- Business gate middleware is only wired to current probe/placeholder routes; keep applying it to new business operation routes as they are added.
 - Production cookie/CORS hardening review still pending once deploy targets are fixed.
 
-**Next step:** Start Layer 4 (Menu Management) implementation
-1. Define/confirm Layer 4 ADR scope and endpoint contracts (categories, items, ordering, availability).
-2. Implement API CRUD for categories/menu items behind `requireApprovedBusiness`.
-3. Build dashboard menu-management UI and connect to API.
-4. Add API + web tests for menu CRUD and business-approval gate behavior.
+**Next step:** Complete ADR-006 enforcement before Layer 4
+1. Expand auth negative tests (especially refresh + cookie-mixing edge cases).
+2. Finalize QR token lifecycle policy implementation (rotation/revocation mechanics).
+3. After ADR-006 hardening, start Layer 4 ADR and menu-management implementation.
 
 **Build progress:**
 ```
@@ -130,6 +130,31 @@ Layer 11: Polish & Deploy
 - Diagnosed compose false-unhealthy web status as IPv6 localhost probe failure (`::1`) and switched API/web healthcheck URLs to `127.0.0.1`.
 - Reverified compose stack health via `docker-compose ps`: `db`, `api`, and `web` all healthy.
 
+### 2026-03-19 — Session 13: ADR-006 accepted + QR-scoped customer auth baseline
+- Replaced ADR-005 with ADR-006 as accepted source of truth for customer-auth policy.
+- Implemented shared-endpoint QR enforcement in auth routes: `role=customer` now requires valid `qrToken` context.
+- Added QR-scoped customer cookie names and kept business auth cookie path unchanged.
+- Converted `/register` to business-only redirect and added QR auth route pages (`/qr/[qrToken]`, `/qr/login`, `/qr/register`).
+- Updated shared request types and auth-context helpers for QR customer auth payloads.
+- Verified API/web tests and builds pass after changes.
+
+### 2026-03-19 — Session 14: Full runtime smoke test + web main-page fix
+- Reproduced runtime 500s on web main route and diagnosed Next chunk resolution failures in container logs.
+- Fixed by isolating Next build artifacts in docker-compose (`web-next-cache` volume for `/app/apps/web/.next`), then recreating web service.
+- Re-ran full live smoke matrix for web/API/auth/QR flows; all requested checks pass after fix.
+
+### 2026-03-19 — Session 15: QR resolve endpoint + container SSR routing fix
+- Added public QR resolve API route and wired web `/qr/[qrToken]` to server-side resolve + redirect into `/menu/[slug]`.
+- Added minimal `/menu/[slug]` placeholder page for resolved QR destination.
+- Expanded API tests with public QR route coverage and customer login tamper-case coverage.
+- Extended DB seed with deterministic QR context for reproducible local runtime checks.
+- Fixed docker SSR API routing by adding `API_INTERNAL_URL` for web container server-side fetches; verified `/qr/:token` redirect works in compose.
+
+### 2026-03-19 — Session 16: ADR-006 rate-limit hardening
+- Added QR customer-auth rate limiter middleware and wired it into customer register/login handlers.
+- Added env-configurable thresholds and API tests that validate `QR_AUTH_RATE_LIMITED` behavior.
+- Revalidated full API/web test and build suites after hardening changes.
+
 ---
 
 ## Decisions Log
@@ -139,6 +164,7 @@ Layer 11: Polish & Deploy
 | ADR-001 | pnpm workspaces (not npm/Nx) | Strict dep isolation without overhead; Nx overkill for 2 apps at MVP | 2026-03-14 |
 | ADR-003 | Testing strategy (Vitest, supertest, testing-library; status field enforcement) | Establish unified test stack and coverage expectations across API & web | 2026-03-19 |
 | ADR-004 | Business onboarding flow and admin approval gate | Define Layer 3 boundaries before implementation (business profile lifecycle + admin moderation) | 2026-03-19 |
+| ADR-006 | QR-scoped customer auth with business-only website auth | Remove non-QR customer pathways, keep shared auth endpoints, and enforce QR token context for customer auth | 2026-03-19 |
 
 ---
 
