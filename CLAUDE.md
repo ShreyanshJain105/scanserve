@@ -352,3 +352,15 @@ Build features in this order. Each layer depends on the layers above it.
 - ADR-012 accepted and applied as UI-first scope: category cards use explicit color accents, and each menu item now exposes image placeholder/preview plus `Upload` and `Generate AI` entry points (without backend persistence yet).
 - ADR-013 accepted and implemented: menu item descriptions are now authorable in dashboard (manual + AI-generated via `/api/ai/menu/item-description`) with deterministic fallback on AI failures.
 - UX policy update: all user-facing notifications/errors should be delivered as toasts (not inline text messages on pages/components).
+- ADR-014 accepted: menu-item images now persist S3 object paths (`image_path`) in DB; do not persist raw image URLs in database records.
+- Local storage baseline now includes MinIO in `docker-compose.yml`; API uses S3-compatible envs (`S3_*`) and returns derived `imageUrl` for rendering from stored path.
+- Dashboard image actions are now live-backed (`/api/business/menu-items/:id/image/upload` and `/api/business/menu-items/:id/image/generate`) rather than placeholder toasts.
+- Compose runtime fix: MinIO image does not ship with `wget`/`curl`; use file-based healthcheck (`[ -f /data/.minio.sys/format.json ]`) instead of HTTP probe commands to avoid false-unhealthy startup blocks.
+- ADR-015 accepted and implemented: image-path cleanup now uses DB-backed queue (`deleted_asset_cleanups`) plus periodic worker; delete/replace flows enqueue old image paths for deferred S3 deletion.
+- ADR-016 accepted and implemented: onboarding slugs are now server-generated/immutable, currency is collected and persisted, and onboarding logo input is now drag-drop upload instead of raw URL entry.
+- Onboarding stability fix: avoid repeated `/api/business/profiles` activity by keying onboarding refresh effect to stable user identity fields (`user.id`, `user.role`) instead of callback reference churn.
+- Onboarding currency UX update: use searchable dropdown-style entry (`input + datalist`) for currency codes while preserving strict uppercase 3-letter normalization.
+- Onboarding currency control follow-up: avoid native `datalist` for this field (inconsistent browser rendering); use app-styled searchable combobox interaction for consistent UX.
+- Onboarding currency UX requirement: keep currency search and display in one input row; typed query is temporary and must only commit to saved value on explicit option selection.
+- Onboarding currency interaction requirement: on option selection, close the dropdown immediately and render committed value in the input.
+- Currency combobox implementation guard: do not wrap dropdown trigger/input + options list inside a parent `<label>`; use `label htmlFor` to avoid implicit refocus reopening behavior.

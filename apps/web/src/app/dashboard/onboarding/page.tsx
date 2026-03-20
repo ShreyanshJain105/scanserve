@@ -1,27 +1,67 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import React from "react";
+import { DragEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth-context";
 import { showToast } from "../../../lib/toast";
+import { apiFetch } from "../../../lib/api";
 
 type FormState = {
   name: string;
-  slug: string;
+  currencyCode: string;
   description: string;
-  logoUrl: string;
   address: string;
   phone: string;
 };
 
 const emptyForm: FormState = {
   name: "",
-  slug: "",
+  currencyCode: "USD",
   description: "",
-  logoUrl: "",
   address: "",
   phone: "",
 };
+
+const CURRENCY_OPTIONS = [
+  "USD",
+  "EUR",
+  "GBP",
+  "INR",
+  "AED",
+  "AUD",
+  "CAD",
+  "CHF",
+  "CNY",
+  "DKK",
+  "HKD",
+  "IDR",
+  "JPY",
+  "KRW",
+  "MYR",
+  "NOK",
+  "NZD",
+  "PHP",
+  "PLN",
+  "SAR",
+  "SEK",
+  "SGD",
+  "THB",
+  "TRY",
+  "ZAR",
+];
+
+const normalizeCurrencyCode = (value: string) =>
+  value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+
+const toSlugPreview = (name: string) =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 64) || "business";
 
 function BusinessOnboardingPageContent() {
   const {
@@ -44,6 +84,22 @@ function BusinessOnboardingPageContent() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string>("");
+  const [dragOver, setDragOver] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const currencyInputRef = useRef<HTMLInputElement | null>(null);
+  const currencyDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
+  const [currencyQuery, setCurrencyQuery] = useState("");
+  const filteredCurrencyOptions = useMemo(() => {
+    const normalizedQuery = normalizeCurrencyCode(currencyQuery);
+    if (!normalizedQuery) {
+      return CURRENCY_OPTIONS;
+    }
+
+    return CURRENCY_OPTIONS.filter((code) => code.includes(normalizedQuery));
+  }, [currencyQuery]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -57,8 +113,9 @@ function BusinessOnboardingPageContent() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    refreshBusinessProfiles();
-  }, [refreshBusinessProfiles]);
+    if (user?.role !== "business") return;
+    void refreshBusinessProfiles();
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (!existing) {
@@ -68,18 +125,44 @@ function BusinessOnboardingPageContent() {
 
     setForm({
       name: existing.name,
-      slug: existing.slug,
+      currencyCode: existing.currencyCode,
       description: existing.description ?? "",
-      logoUrl: existing.logoUrl ?? "",
       address: existing.address,
       phone: existing.phone,
     });
+    setLogoPreviewUrl(existing.logoUrl ?? "");
+    setLogoFile(null);
   }, [existing]);
 
   useEffect(() => {
     if (!error) return;
     showToast({ variant: "error", message: error });
   }, [error]);
+
+  useEffect(() => {
+    if (!isCurrencyOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!currencyDropdownRef.current?.contains(event.target as Node)) {
+        setCurrencyQuery("");
+        setIsCurrencyOpen(false);
+      }
+    };
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setCurrencyQuery("");
+        setIsCurrencyOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [isCurrencyOpen]);
 
   if (loading || !user || user.role !== "business") {
     return (
@@ -89,6 +172,24 @@ function BusinessOnboardingPageContent() {
     );
   }
 
+  const applyLogoFile = (file: File) => {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError("Unsupported image type. Use PNG, JPEG, or WEBP.");
+      return;
+    }
+    setLogoFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setLogoPreviewUrl(objectUrl);
+  };
+
+  const handleLogoDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    applyLogoFile(file);
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
@@ -97,19 +198,31 @@ function BusinessOnboardingPageContent() {
     try {
       const payload = {
         name: form.name,
-        slug: form.slug,
+        currencyCode: form.currencyCode,
         description: form.description || null,
-        logoUrl: form.logoUrl || null,
         address: form.address,
         phone: form.phone,
       };
 
+      let businessId: string;
       if (existing) {
-        await updateBusinessProfile({ businessId: existing.id, ...payload });
+        const updated = await updateBusinessProfile({ businessId: existing.id, ...payload });
+        businessId = updated.id;
         showToast({ variant: "success", message: "Business profile updated." });
       } else {
-        await createBusinessProfile(payload);
+        const created = await createBusinessProfile(payload);
+        businessId = created.id;
         showToast({ variant: "success", message: "Business profile created." });
+      }
+
+      if (logoFile) {
+        const formData = new FormData();
+        formData.append("logo", logoFile);
+        formData.append("businessId", businessId);
+        await apiFetch("/api/business/profile/logo", {
+          method: "POST",
+          body: formData,
+        });
       }
 
       router.push("/dashboard");
@@ -158,21 +271,78 @@ function BusinessOnboardingPageContent() {
           </label>
 
           <label className="grid gap-1 text-sm">
-            <span>Business URL slug</span>
+            <span>Business URL slug (auto-generated)</span>
             <input
-              value={form.slug}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, slug: event.target.value }))
-              }
-              className="rounded-md border px-3 py-2"
-              placeholder="example: green-leaf-cafe"
-              required
-              pattern="[a-z0-9-]+"
+              value={existing?.slug || toSlugPreview(form.name)}
+              className="cursor-not-allowed rounded-md border bg-gray-100 px-3 py-2 text-gray-600"
+              disabled
+              readOnly
             />
             <span className="text-xs text-gray-500">
-              Use lowercase letters, numbers, and hyphens only.
+              Generated from business name and locked to avoid URL conflicts.
             </span>
           </label>
+
+          <div className="grid gap-1 text-sm">
+            <label htmlFor="currency-code">Currency code</label>
+            <div className="relative" ref={currencyDropdownRef}>
+              <input
+                ref={currencyInputRef}
+                id="currency-code"
+                value={isCurrencyOpen ? currencyQuery : form.currencyCode}
+                onFocus={() => {
+                  setCurrencyQuery("");
+                  setIsCurrencyOpen(true);
+                }}
+                onChange={(event) => {
+                  setIsCurrencyOpen(true);
+                  setCurrencyQuery(normalizeCurrencyCode(event.target.value));
+                }}
+                className="w-full rounded-md border px-3 py-2 pr-10"
+                placeholder="Search currency code"
+                aria-label="Currency code"
+                aria-haspopup="listbox"
+                aria-expanded={isCurrencyOpen}
+                autoComplete="off"
+                required
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" aria-hidden>
+                ▾
+              </span>
+              {isCurrencyOpen ? (
+                <div className="absolute z-20 mt-1 w-full rounded-md border bg-white p-2 shadow-lg">
+                  <div className="max-h-44 overflow-y-auto" role="listbox">
+                    {filteredCurrencyOptions.length ? (
+                      filteredCurrencyOptions.map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          className={`block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+                            code === form.currencyCode ? "bg-gray-100 font-medium" : ""
+                          }`}
+                          role="option"
+                          aria-selected={code === form.currencyCode}
+                          onClick={() => {
+                            setForm((current) => ({ ...current, currencyCode: code }));
+                            setCurrencyQuery("");
+                            setIsCurrencyOpen(false);
+                            currencyInputRef.current?.blur();
+                          }}
+                        >
+                          {code}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-2 py-1.5 text-sm text-gray-500">No matching currency codes.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+              <span className="text-xs text-gray-500">
+              Type to search. Currency changes only when you select an option.
+            </span>
+          </div>
 
           <label className="grid gap-1 text-sm">
             <span>Business address</span>
@@ -212,18 +382,55 @@ function BusinessOnboardingPageContent() {
             />
           </label>
 
-          <label className="grid gap-1 text-sm">
-            <span>Logo URL (optional)</span>
+          <div className="grid gap-2 text-sm">
+            <span>Business logo (optional)</span>
             <input
-              type="url"
-              value={form.logoUrl}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, logoUrl: event.target.value }))
-              }
-              className="rounded-md border px-3 py-2"
-              placeholder="https://..."
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) applyLogoFile(file);
+              }}
             />
-          </label>
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleLogoDrop}
+              onClick={() => logoInputRef.current?.click()}
+              className={`cursor-pointer rounded-md border-2 border-dashed p-4 text-center ${
+                dragOver ? "border-black bg-gray-50" : "border-gray-300"
+              }`}
+            >
+              <p className="text-sm text-gray-700">
+                Drag and drop logo image here, or click to select
+              </p>
+              <p className="mt-1 text-xs text-gray-500">PNG, JPEG, WEBP</p>
+            </div>
+            {logoPreviewUrl ? (
+              <div className="mt-1 flex items-center gap-3">
+                <img
+                  src={logoPreviewUrl}
+                  alt="Business logo preview"
+                  className="h-16 w-16 rounded-md border object-cover"
+                />
+                <button
+                  type="button"
+                  className="rounded-md border px-3 py-1.5 text-xs"
+                  onClick={() => {
+                    setLogoFile(null);
+                    setLogoPreviewUrl(existing?.logoUrl ?? "");
+                  }}
+                >
+                  Remove selection
+                </button>
+              </div>
+            ) : null}
+          </div>
 
           <div className="mt-2 flex gap-3">
             <button

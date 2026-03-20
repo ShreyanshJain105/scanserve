@@ -11,9 +11,8 @@ import { apiFetch } from "./api";
 
 type CreateBusinessProfileInput = {
   name: string;
-  slug: string;
+  currencyCode: string;
   description?: string | null;
-  logoUrl?: string | null;
   address: string;
   phone: string;
 };
@@ -37,8 +36,8 @@ type AuthContextType = {
   refreshProfile: () => Promise<void>;
   refreshBusinessProfiles: () => Promise<void>;
   selectBusiness: (businessId: string) => void;
-  createBusinessProfile: (input: CreateBusinessProfileInput) => Promise<void>;
-  updateBusinessProfile: (input: UpdateBusinessProfileInput) => Promise<void>;
+  createBusinessProfile: (input: CreateBusinessProfileInput) => Promise<BusinessProfile>;
+  updateBusinessProfile: (input: UpdateBusinessProfileInput) => Promise<BusinessProfile>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -182,19 +181,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const createBusinessProfile = async (input: CreateBusinessProfileInput) => {
-    await apiFetch("/api/business/profile", {
+    const data = await apiFetch<{ business: BusinessProfile }>("/api/business/profile", {
       method: "POST",
       body: JSON.stringify(input),
     });
     await refreshBusinessProfiles();
+    return data.business;
   };
 
   const updateBusinessProfile = async (input: UpdateBusinessProfileInput) => {
-    await apiFetch("/api/business/profile", {
+    const data = await apiFetch<{ business: BusinessProfile }>("/api/business/profile", {
       method: "PATCH",
       body: JSON.stringify(input),
     });
     await refreshBusinessProfiles();
+    return data.business;
   };
 
   const selectedBusiness =

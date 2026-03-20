@@ -11,34 +11,24 @@
 
 **Date:** 2026-03-20
 **What was done:**
-- Implemented a global web toast system:
-  - added `apps/web/src/lib/toast.ts` (toast emitter utility),
-  - added `apps/web/src/components/ui/toast-viewport.tsx` (toast renderer),
-  - mounted toast viewport in `apps/web/src/app/layout.tsx`.
-- Replaced inline error/notification text with toasts in major web flows:
-  - `apps/web/src/app/(auth)/login/page.tsx`,
-  - `apps/web/src/app/(auth)/register/business/page.tsx`,
-  - `apps/web/src/app/qr/login/page.tsx`,
-  - `apps/web/src/app/qr/register/page.tsx`,
-  - `apps/web/src/app/admin/page.tsx`,
-  - `apps/web/src/app/dashboard/onboarding/page.tsx`,
-  - `apps/web/src/app/dashboard/menu/page.tsx`.
-- Added toast success/info feedback for moderation actions, onboarding save success, and menu image-placeholder actions.
-- Verified web quality gates:
-  - `pnpm --filter @scan2serve/web test` (passes),
+- Fixed persistent currency dropdown reopening issue by removing nested interactive controls from wrapping `<label>` in onboarding currency field.
+- Refactored currency field markup in `apps/web/src/app/dashboard/onboarding/page.tsx` to use `label htmlFor` + container div, preventing browser label-refocus reopening after option click.
+- Kept close-on-select behavior and selection-only commit behavior intact.
+- Revalidated web quality gates:
+  - `pnpm --filter @scan2serve/web test` (passes, 26 tests),
   - `pnpm --filter @scan2serve/web build` (passes).
 
 **What's NOT done yet:**
-- Layer 4 remaining work:
-  - optional UI polish for inline edit UX and bulk actions.
-  - no backend image upload/generation persistence yet (ADR-012 is UI entry-point only).
-- Layer 5+ features (tables/QR advanced flows, ordering/payments, dashboards) are still pending.
+- Local runtime validation with real Nano-Banana credentials is still pending (env placeholders are set, provider key/url not configured).
+- Image moderation/quality guardrails for generated images are still minimal and should be hardened.
+- Cleanup queue monitoring endpoint/dashboard is not implemented yet (logs-only observability).
+- Layer 5+ features (tables/QR advanced flows, ordering/payments, dashboards) remain pending.
 - Production cookie/CORS hardening review still pending once deploy targets are fixed.
 
-**Next step:** Continue menu authoring completion
-1. Add upload API contract and storage path (local/S3) for item image persistence.
-2. Add AI image generation endpoint contract and connect `Generate AI` UI action.
-3. Add description tone controls and moderation/length guardrails for AI-generated copy.
+**Next step:** Cleanup observability + onboarding media lifecycle validation
+1. Add read-only admin/debug endpoint for deleted-asset cleanup queue health and recent failures.
+2. Decide whether onboarding logos should persist `logo_path` (for deferred cleanup symmetry) in addition to derived URL.
+3. Run compose smoke test with real Nano-Banana credentials and onboarding/logo upload flows.
 
 **Build progress:**
 ```
@@ -347,6 +337,70 @@ Layer 11: Polish & Deploy
 - Removed inline menu error text rendering and kept blocked/helper content intact; action feedback now emits toast events.
 - Revalidated `@scan2serve/web` with full tests and production build.
 
+### 2026-03-20 — Session 47: ADR-014 accepted + MinIO image persistence and AI image hooks
+- Marked `docs/adr/ADR-014-menu-item-image-storage-local-s3-filepath.md` as `Accepted`.
+- Replaced persisted menu-item image field with S3 object path (`image_path`) in Prisma and added migration `20260320043000_menu_item_image_path`.
+- Added API object-storage service (`src/services/objectStorage.ts`) using S3-compatible config and MinIO-first local defaults.
+- Added provider-backed image generation service (`src/services/aiImageProvider.ts`) using Nano-Banana-style API contract + timeout/error handling.
+- Added business image endpoints:
+  - `POST /api/business/menu-items/:id/image/upload` (multipart upload),
+  - `POST /api/business/menu-items/:id/image/generate` (AI generation + store).
+- Updated menu-item route serialization to return derived `imageUrl` from stored `imagePath` while persisting only path.
+- Wired dashboard image buttons to real endpoints and added multipart `FormData` support in web API client.
+- Added MinIO service + env wiring in `docker-compose.yml`; expanded API env config for S3 and AI image provider keys/model/timeouts.
+- Expanded API/web tests for image upload/generate flows and revalidated API/web tests + builds successfully.
+
+### 2026-03-20 — Session 48: Environment build fix for MinIO healthcheck
+- Reproduced user-reported compose startup failure where `scan2serve-minio` stayed unhealthy and blocked dependent services.
+- Confirmed MinIO image lacks `wget`/`curl`, causing the previous HTTP healthcheck command to fail despite successful server boot.
+- Updated MinIO healthcheck in `docker-compose.yml` to file-based readiness check (`/data/.minio.sys/format.json`).
+- Re-ran `docker-compose up --build -d`; verified all services healthy via `docker-compose ps`.
+- Verified API and web health endpoints return `{"status":"ok"}`.
+
+### 2026-03-20 — Session 49: ADR-015 accepted + deleted-asset cron cleanup queue
+- Marked `docs/adr/ADR-015-s3-deletion-queue-and-cron-cleanup.md` as `Accepted`.
+- Added cleanup queue persistence model/migration (`DeletedAssetCleanup`) for S3 object deletion tasks.
+- Added `deleteImageObject` to object storage service and implemented scheduled cleanup worker (`src/services/deletedAssetCleanup.ts`) with retry/backoff.
+- Wired enqueue logic into menu image replacement and menu-item delete flows so old image paths are persisted for deferred cleanup.
+- Added env-driven cleanup controls and enabled them in compose API service.
+- Added worker tests (`tests/deletedAssetCleanup.test.ts`) and extended menu route tests for queue-enqueue behavior.
+- Revalidated API/web tests and builds successfully.
+
+### 2026-03-20 — Session 50: ADR-016 accepted + onboarding auto-slug/currency/logo-upload
+- Marked `docs/adr/ADR-016-onboarding-auto-slug-currency-and-logo-upload.md` as `Accepted`.
+- Added `currency_code` to business model with migration (`20260320070000_business_currency_code`) and propagated `currencyCode` through API serializers/shared types.
+- Updated business onboarding API to auto-generate unique immutable slugs from business names and to reject manual slug updates.
+- Added multipart onboarding logo upload endpoint (`POST /api/business/profile/logo`) backed by S3-compatible storage.
+- Reworked onboarding UI to show read-only slug preview, collect currency code, and use drag-drop logo upload (with preview + upload on submit).
+- Added/updated API and web tests for slug generation/immutability, currency normalization, and logo upload flow.
+- Revalidated API/web tests and builds successfully.
+
+### 2026-03-20 — Session 51: Onboarding refresh-loop fix + searchable currency dropdown
+- Fixed onboarding repeated activity/log issue by changing profile refresh effect dependencies to stable user identity fields in `apps/web/src/app/dashboard/onboarding/page.tsx`.
+- Replaced plain currency text input UX with searchable currency picker (`datalist`) while preserving strict uppercase ISO-like 3-letter input constraints.
+- Revalidated web test/build pipelines: `pnpm --filter @scan2serve/web test` and `pnpm --filter @scan2serve/web build` both pass.
+
+### 2026-03-20 — Session 52: Onboarding currency dropdown consistency fix
+- Replaced native browser `datalist` currency control with a fully app-styled searchable combobox to ensure consistent UI across browsers/devices.
+- Added dropdown keyboard/interaction affordances (`Escape` close, outside-click close) and kept filtered search over allowed currency codes.
+- Updated `apps/web/tests/onboarding-page.test.tsx` selectors to target the new combobox flow and revalidated web tests/build successfully.
+
+### 2026-03-20 — Session 53: Onboarding currency field merged into single-row search/display input
+- Merged currency display and search into one input field so there is no separate second-row search box.
+- Preserved value safety: typing does not overwrite saved currency until an explicit option selection is made.
+- Added close/revert behavior so leaving search restores display of current saved currency value.
+- Revalidated `@scan2serve/web` test and build pipelines successfully.
+
+### 2026-03-20 — Session 54: Currency select now auto-closes on option pick
+- Enforced close-on-select behavior by blurring the currency input after option click so dropdown never remains open after commit.
+- Added regression assertions that option list is removed and selected value is rendered immediately after selection.
+- Revalidated onboarding/web tests and web build.
+
+### 2026-03-20 — Session 55: Currency dropdown collapse regression fixed via markup structure
+- Diagnosed real-browser reopen behavior as label-driven refocus caused by placing combobox interactive elements inside a wrapping `<label>`.
+- Updated onboarding currency section to explicit `label htmlFor="currency-code"` plus non-label wrapper so option click no longer triggers implicit refocus/reopen.
+- Revalidated `@scan2serve/web` tests and production build.
+
 ---
 
 ## Decisions Log
@@ -364,6 +418,9 @@ Layer 11: Polish & Deploy
 | ADR-011 | LLM-driven menu suggestions with typed autocomplete | Improve relevance of top-5 suggestions using category context + typed text while preserving deterministic fallback | 2026-03-20 |
 | ADR-012 | Menu UI color refresh + item image entry points | Improve dashboard menu aesthetics and add item image placeholder plus Upload/Generate AI entry controls via UI-first incremental rollout | 2026-03-20 |
 | ADR-013 | Item description authoring + AI description generation | Support manual item descriptions and add AI-generated copy with fallback via `/api/ai/menu/item-description` | 2026-03-20 |
+| ADR-014 | Menu item image persistence via local S3 + DB file path | Persist only S3 object path (`image_path`) for menu items, add MinIO local storage flow, and wire upload/AI image generation endpoints into dashboard actions | 2026-03-20 |
+| ADR-015 | S3 deletion queue + periodic cleanup worker | Track deleted/replaced image paths in DB and run scheduled retryable cleanup to remove orphaned S3 objects safely | 2026-03-20 |
+| ADR-016 | Onboarding auto-slug, currency input, and drag-drop logo upload | Remove manual slug edits, enforce server-side unique slug generation, collect currency, and replace logo URL field with uploaded image flow | 2026-03-20 |
 
 ---
 

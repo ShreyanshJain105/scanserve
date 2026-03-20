@@ -68,6 +68,7 @@ export interface BusinessProfile {
   userId: string;
   name: string;
   slug: string;
+  currencyCode: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -100,6 +101,7 @@ export interface MenuItem {
   name: string;
   description: string | null;
   price: string;
+  imagePath: string | null;
   imageUrl: string | null;
   isAvailable: boolean;
   dietaryTags: string[];

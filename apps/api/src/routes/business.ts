@@ -1,26 +1,72 @@
 import express from "express";
 import crypto from "crypto";
+import multer from "multer";
 import { z } from "zod";
 import { DIETARY_TAGS } from "@scan2serve/shared";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendError, sendSuccess } from "../utils/response";
+import { logger } from "../utils/logger";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { requireApprovedBusiness, resolveBusinessForUser } from "../middleware/businessApproval";
 import { suggestCategories } from "../services/menuSuggestions";
 import { getMenuItemSuggestions } from "../services/llmMenuSuggestions";
+import { generateMenuItemImage } from "../services/aiImageProvider";
+import { resolveImageUrl, uploadImageObject } from "../services/objectStorage";
+import { enqueueDeletedMenuItemImage } from "../services/deletedAssetCleanup";
 
 const router: express.Router = express.Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: Number(process.env.MENU_IMAGE_MAX_BYTES || 5 * 1024 * 1024) },
+});
+const allowedImageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const uploadBusinessLogo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: Number(process.env.BUSINESS_LOGO_MAX_BYTES || 3 * 1024 * 1024) },
+});
+const uploadImageMiddleware: express.RequestHandler = (req, res, next) => {
+  // Enables route tests to inject req.file directly while keeping multipart parsing in runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((req as any).file) {
+    next();
+    return;
+  }
+  upload.single("image")(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      sendError(res, "Image file is too large", 400, "IMAGE_FILE_TOO_LARGE");
+      return;
+    }
+    sendError(res, "Invalid image upload request", 400, "IMAGE_UPLOAD_INVALID");
+  });
+};
+const uploadBusinessLogoMiddleware: express.RequestHandler = (req, res, next) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((req as any).file) {
+    next();
+    return;
+  }
+  uploadBusinessLogo.single("logo")(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      sendError(res, "Logo image is too large", 400, "IMAGE_FILE_TOO_LARGE");
+      return;
+    }
+    sendError(res, "Invalid logo upload request", 400, "IMAGE_UPLOAD_INVALID");
+  });
+};
 
 const profileCreateSchema = z.object({
   name: z.string().min(2),
-  slug: z
-    .string()
-    .min(2)
-    .max(64)
-    .regex(/^[a-z0-9-]+$/),
+  currencyCode: z.string().trim().regex(/^[A-Za-z]{3}$/),
   description: z.string().max(2000).optional().nullable(),
-  logoUrl: z.string().url().max(500).optional().nullable(),
   address: z.string().min(5),
   phone: z.string().min(6).max(32),
 });
@@ -28,14 +74,8 @@ const profileCreateSchema = z.object({
 const profileUpdateSchema = z.object({
   businessId: z.string().optional(),
   name: z.string().min(2).optional(),
-  slug: z
-    .string()
-    .min(2)
-    .max(64)
-    .regex(/^[a-z0-9-]+$/)
-    .optional(),
+  currencyCode: z.string().trim().regex(/^[A-Za-z]{3}$/).optional(),
   description: z.string().max(2000).optional().nullable(),
-  logoUrl: z.string().url().max(500).optional().nullable(),
   address: z.string().min(5).optional(),
   phone: z.string().min(6).max(32).optional(),
 });
@@ -67,7 +107,6 @@ const menuItemCreateSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().max(2000).optional().nullable(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Price must be a decimal string"),
-  imageUrl: z.string().url().max(500).optional().nullable(),
   dietaryTags: z.array(z.enum(DIETARY_TAGS)).optional(),
   isAvailable: z.boolean().optional(),
 });
@@ -76,7 +115,6 @@ const menuItemUpdateSchema = z.object({
   name: z.string().min(2).max(120).optional(),
   description: z.string().max(2000).optional().nullable(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Price must be a decimal string").optional(),
-  imageUrl: z.string().url().max(500).optional().nullable(),
   dietaryTags: z.array(z.enum(DIETARY_TAGS)).optional(),
   isAvailable: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
@@ -101,12 +139,16 @@ const menuItemSuggestionQuerySchema = z.object({
   q: z.string().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(10).optional(),
 });
+const generateItemImageSchema = z.object({
+  prompt: z.string().min(4).max(500).optional(),
+});
 
 type RawBusiness = {
   id: string;
   userId: string;
   name: string;
   slug: string;
+  currencyCode: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -122,6 +164,7 @@ type SerializedBusiness = {
   userId: string;
   name: string;
   slug: string;
+  currencyCode: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -138,6 +181,7 @@ const serializeBusiness = (business: RawBusiness): SerializedBusiness => {
     userId: business.userId,
     name: business.name,
     slug: business.slug,
+    currencyCode: business.currencyCode,
     description: business.description,
     logoUrl: business.logoUrl,
     address: business.address,
@@ -158,6 +202,122 @@ const serializeBusiness = (business: RawBusiness): SerializedBusiness => {
   return serialized;
 };
 
+const normalizeCurrencyCode = (value: string) => value.trim().toUpperCase();
+
+const slugifyBusinessName = (name: string) =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 64) || "business";
+
+const generateUniqueBusinessSlug = async (name: string) => {
+  const base = slugifyBusinessName(name);
+  for (let idx = 0; idx < 10_000; idx += 1) {
+    const suffix = idx === 0 ? "" : `-${idx + 1}`;
+    const candidate = `${base.slice(0, 64 - suffix.length)}${suffix}`;
+    const existing = await prisma.business.findFirst({
+      where: { slug: candidate },
+      select: { id: true },
+    });
+    if (!existing) return candidate;
+  }
+  return `${base.slice(0, 58)}-${Date.now().toString().slice(-5)}`;
+};
+
+const sanitizeFilename = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+const getExtensionForMimeType = (mimeType: string) => {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+};
+
+const buildObjectPath = ({
+  businessId,
+  itemId,
+  filename,
+}: {
+  businessId: string;
+  itemId: string;
+  filename: string;
+}) => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeName = sanitizeFilename(filename) || "image";
+  return `business/${businessId}/menu-items/${itemId}/${stamp}-${safeName}`;
+};
+
+const buildBusinessLogoObjectPath = ({
+  businessId,
+  filename,
+}: {
+  businessId: string;
+  filename: string;
+}) => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeName = sanitizeFilename(filename) || "logo";
+  return `business/${businessId}/profile/logo/${stamp}-${safeName}`;
+};
+
+const serializeMenuItem = (item: {
+  id: string;
+  categoryId: string;
+  businessId: string;
+  name: string;
+  description: string | null;
+  price: { toString(): string } | string;
+  imagePath: string | null;
+  dietaryTags: string[];
+  isAvailable: boolean;
+  sortOrder: number;
+}) => ({
+  ...item,
+  price: typeof item.price === "string" ? item.price : item.price.toString(),
+  imagePath: item.imagePath,
+  imageUrl: resolveImageUrl(item.imagePath),
+});
+
+const enqueuePreviousImagePath = async ({
+  entityId,
+  previousImagePath,
+}: {
+  entityId: string;
+  previousImagePath: string | null;
+}) => {
+  if (!previousImagePath) return;
+  await enqueueDeletedMenuItemImage({
+    entityId,
+    s3Path: previousImagePath,
+  });
+};
+
+const enqueuePreviousImagePathBestEffort = async ({
+  entityId,
+  previousImagePath,
+}: {
+  entityId: string;
+  previousImagePath: string | null;
+}) => {
+  if (!previousImagePath) return;
+  try {
+    await enqueuePreviousImagePath({ entityId, previousImagePath });
+  } catch (error) {
+    logger.warn("cleanup.deleted_assets.enqueue_failed", {
+      entityId,
+      s3Path: previousImagePath,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 const isUniqueConstraintError = (error: unknown): boolean =>
   typeof error === "object" &&
   error !== null &&
@@ -176,20 +336,26 @@ router.use(requireAuth, requireRole("business"));
 router.post(
   "/profile",
   asyncHandler(async (req, res) => {
+    if (req.body && typeof req.body === "object" && "slug" in req.body) {
+      sendError(res, "Slug is auto-generated from business name", 400, "SLUG_AUTO_GENERATED");
+      return;
+    }
     const parsed = profileCreateSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
       return;
     }
 
+    const slug = await generateUniqueBusinessSlug(parsed.data.name);
     try {
       const created = await prisma.business.create({
         data: {
           userId: req.user!.id,
           name: parsed.data.name,
-          slug: parsed.data.slug,
+          slug,
+          currencyCode: normalizeCurrencyCode(parsed.data.currencyCode),
           description: parsed.data.description ?? null,
-          logoUrl: parsed.data.logoUrl ?? null,
+          logoUrl: null,
           address: parsed.data.address,
           phone: parsed.data.phone,
           status: "pending",
@@ -256,6 +422,10 @@ router.get(
 router.patch(
   "/profile",
   asyncHandler(async (req, res) => {
+    if (req.body && typeof req.body === "object" && "slug" in req.body) {
+      sendError(res, "Slug cannot be modified", 400, "SLUG_IMMUTABLE");
+      return;
+    }
     const parsed = profileUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -275,9 +445,10 @@ router.patch(
 
     const data = {
       ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
-      ...(parsed.data.slug !== undefined ? { slug: parsed.data.slug } : {}),
+      ...(parsed.data.currencyCode !== undefined
+        ? { currencyCode: normalizeCurrencyCode(parsed.data.currencyCode) }
+        : {}),
       ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
-      ...(parsed.data.logoUrl !== undefined ? { logoUrl: parsed.data.logoUrl } : {}),
       ...(parsed.data.address !== undefined ? { address: parsed.data.address } : {}),
       ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}),
       ...(business.status === "rejected" ? { status: "pending" as const } : {}),
@@ -308,6 +479,66 @@ router.patch(
         return;
       }
       throw error;
+    }
+  })
+);
+
+router.post(
+  "/profile/logo",
+  uploadBusinessLogoMiddleware,
+  asyncHandler(async (req, res) => {
+    const businessId =
+      typeof req.body?.businessId === "string" && req.body.businessId.trim()
+        ? req.body.businessId.trim()
+        : undefined;
+    const business = businessId
+      ? await prisma.business.findFirst({
+          where: { id: businessId, userId: req.user!.id },
+        })
+      : await resolveBusinessForUser(req);
+
+    if (!business) {
+      sendError(res, "Business profile not found", 404, "BUSINESS_PROFILE_REQUIRED");
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      sendError(res, "Logo image is required", 400, "IMAGE_FILE_REQUIRED");
+      return;
+    }
+    if (!allowedImageMimeTypes.has(file.mimetype)) {
+      sendError(res, "Unsupported image type", 400, "IMAGE_TYPE_UNSUPPORTED");
+      return;
+    }
+
+    const extension = getExtensionForMimeType(file.mimetype);
+    const objectPath = buildBusinessLogoObjectPath({
+      businessId: business.id,
+      filename: `${business.name}.${extension}`,
+    });
+
+    try {
+      const stored = await uploadImageObject({
+        objectPath,
+        body: file.buffer,
+        contentType: file.mimetype,
+      });
+      const updated = await prisma.business.update({
+        where: { id: business.id },
+        data: { logoUrl: stored.imageUrl },
+        include: {
+          rejections: {
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
+        },
+      });
+
+      sendSuccess(res, { business: serializeBusiness(updated as RawBusiness) });
+    } catch {
+      sendError(res, "Image storage failed", 503, "IMAGE_STORAGE_UNAVAILABLE");
+      return;
     }
   })
 );
@@ -513,7 +744,14 @@ router.get(
       }),
     ]);
 
-    sendSuccess(res, { items, page, limit, total });
+    sendSuccess(res, {
+      items: items.map((item: Parameters<typeof serializeMenuItem>[0]) =>
+        serializeMenuItem(item)
+      ),
+      page,
+      limit,
+      total,
+    });
   })
 );
 
@@ -544,13 +782,13 @@ router.post(
         name: parsed.data.name,
         description: parsed.data.description ?? null,
         price: parsed.data.price,
-        imageUrl: parsed.data.imageUrl ?? null,
+        imagePath: null,
         dietaryTags: parsed.data.dietaryTags ?? [],
         isAvailable: parsed.data.isAvailable ?? true,
         sortOrder: (max._max.sortOrder ?? -1) + 1,
       },
     });
-    sendSuccess(res, { item }, 201);
+    sendSuccess(res, { item: serializeMenuItem(item) }, 201);
   })
 );
 
@@ -584,7 +822,7 @@ router.patch(
       where: { id: existing.id },
       data: parsed.data,
     });
-    sendSuccess(res, { item });
+    sendSuccess(res, { item: serializeMenuItem(item) });
   })
 );
 
@@ -630,7 +868,129 @@ router.patch(
       where: { id: existing.id },
       data: { isAvailable: parsed.data.isAvailable },
     });
-    sendSuccess(res, { item });
+    sendSuccess(res, { item: serializeMenuItem(item) });
+  })
+);
+
+router.post(
+  "/menu-items/:id/image/upload",
+  requireApprovedBusiness,
+  uploadImageMiddleware,
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const existing = await prisma.menuItem.findFirst({
+      where: { id, businessId: req.business!.id },
+      include: { category: { select: { name: true } } },
+    });
+    if (!existing) {
+      sendError(res, "Menu item not found", 404, "MENU_ITEM_NOT_FOUND");
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      sendError(res, "Image file is required", 400, "IMAGE_FILE_REQUIRED");
+      return;
+    }
+    if (!allowedImageMimeTypes.has(file.mimetype)) {
+      sendError(res, "Unsupported image type", 400, "IMAGE_TYPE_UNSUPPORTED");
+      return;
+    }
+
+    const extension = getExtensionForMimeType(file.mimetype);
+    const objectPath = buildObjectPath({
+      businessId: req.business!.id,
+      itemId: existing.id,
+      filename: `${existing.name}.${extension}`,
+    });
+
+    try {
+      const stored = await uploadImageObject({
+        objectPath,
+        body: file.buffer,
+        contentType: file.mimetype,
+      });
+      const item = await prisma.menuItem.update({
+        where: { id: existing.id },
+        data: { imagePath: stored.imagePath },
+      });
+      if (existing.imagePath && existing.imagePath !== stored.imagePath) {
+        await enqueuePreviousImagePathBestEffort({
+          entityId: existing.id,
+          previousImagePath: existing.imagePath,
+        });
+      }
+      sendSuccess(res, {
+        item: serializeMenuItem(item),
+      });
+    } catch (error) {
+      sendError(res, "Image storage failed", 503, "IMAGE_STORAGE_UNAVAILABLE");
+      return;
+    }
+  })
+);
+
+router.post(
+  "/menu-items/:id/image/generate",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    const parsed = generateItemImageSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const id = req.params.id;
+    const existing = await prisma.menuItem.findFirst({
+      where: { id, businessId: req.business!.id },
+      include: { category: { select: { name: true } } },
+    });
+    if (!existing) {
+      sendError(res, "Menu item not found", 404, "MENU_ITEM_NOT_FOUND");
+      return;
+    }
+
+    const prompt =
+      parsed.data.prompt?.trim() ||
+      `Food product photo of ${existing.name} in ${existing.category.name} style, realistic lighting, high detail`;
+    const generated = await generateMenuItemImage({
+      prompt,
+      itemName: existing.name,
+      categoryName: existing.category.name,
+    });
+
+    if (!generated) {
+      sendError(res, "AI image generation failed", 503, "AI_IMAGE_GENERATION_FAILED");
+      return;
+    }
+
+    const objectPath = buildObjectPath({
+      businessId: req.business!.id,
+      itemId: existing.id,
+      filename: `${existing.name}.${getExtensionForMimeType(generated.mimeType)}`,
+    });
+
+    try {
+      const stored = await uploadImageObject({
+        objectPath,
+        body: generated.buffer,
+        contentType: generated.mimeType,
+      });
+      const item = await prisma.menuItem.update({
+        where: { id: existing.id },
+        data: { imagePath: stored.imagePath },
+      });
+      if (existing.imagePath && existing.imagePath !== stored.imagePath) {
+        await enqueuePreviousImagePathBestEffort({
+          entityId: existing.id,
+          previousImagePath: existing.imagePath,
+        });
+      }
+      sendSuccess(res, { item: serializeMenuItem(item) });
+    } catch {
+      sendError(res, "Image storage failed", 503, "IMAGE_STORAGE_UNAVAILABLE");
+      return;
+    }
   })
 );
 
@@ -647,6 +1007,10 @@ router.delete(
       return;
     }
     await prisma.menuItem.delete({ where: { id: existing.id } });
+    await enqueuePreviousImagePathBestEffort({
+      entityId: existing.id,
+      previousImagePath: existing.imagePath,
+    });
     sendSuccess(res, { deleted: true });
   })
 );

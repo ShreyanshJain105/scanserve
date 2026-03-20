@@ -42,6 +42,7 @@ model Business {
   userId      String         @map("user_id")
   name        String
   slug        String         @unique
+  currencyCode String        @default("USD") @map("currency_code")
   description String?
   logoUrl     String?        @map("logo_url")
   address     String
@@ -96,7 +97,7 @@ model MenuItem {
   name        String
   description String?
   price       Decimal  @db.Decimal(10, 2)
-  imageUrl    String?  @map("image_url")
+  imagePath   String?  @map("image_path")
   isAvailable Boolean  @default(true) @map("is_available")
   dietaryTags String[] @map("dietary_tags")
   sortOrder   Int      @default(0) @map("sort_order")
@@ -229,4 +230,35 @@ model RefreshToken {
   @@index([userId])
   @@unique([tokenHash])
   @@map("refresh_tokens")
+}
+
+// ─── Asset Cleanup Queue ────────────────────────────────────
+
+enum DeletedAssetType {
+  menu_item_image
+}
+
+enum DeletedAssetCleanupStatus {
+  pending
+  processing
+  failed
+  done
+}
+
+model DeletedAssetCleanup {
+  id           String                    @id @default(cuid())
+  assetType    DeletedAssetType          @map("asset_type")
+  entityId     String                    @map("entity_id")
+  s3Path       String                    @map("s3_path")
+  status       DeletedAssetCleanupStatus @default(pending)
+  attemptCount Int                       @default(0) @map("attempt_count")
+  nextAttemptAt DateTime?                @map("next_attempt_at")
+  lastError    String?                   @map("last_error")
+  processedAt  DateTime?                 @map("processed_at")
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([assetType, entityId])
+  @@map("deleted_asset_cleanups")
 }

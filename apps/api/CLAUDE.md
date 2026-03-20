@@ -101,3 +101,20 @@ pnpm db:studio    # open Prisma Studio GUI
 - Extended singleton LLM client in `src/services/llmClient.ts` with description generation support (`generateItemDescription`) while preserving timeout/error handling conventions.
 - Added deterministic description fallback in AI route when LLM output is unavailable and added endpoint tests in `tests/aiRoutes.test.ts`.
 - UX messaging policy alignment: backend responses should continue to provide concise, user-safe messages intended for toast notifications in web UI.
+- ADR-014 implementation: `MenuItem` now persists `imagePath` (`image_path`) in Prisma, with migration `prisma/migrations/20260320043000_menu_item_image_path/migration.sql`.
+- Added local S3-compatible storage service `src/services/objectStorage.ts` (MinIO-first defaults, bucket bootstrap, object upload, public URL resolution).
+- Added provider image-generation adapter `src/services/aiImageProvider.ts` using Nano-Banana-style API contract (`NANOBANANA_*` envs) with timeout and resilient failure handling.
+- Added image endpoints in `src/routes/business.ts`:
+  - `POST /menu-items/:id/image/upload` (multipart image upload + DB path persistence),
+  - `POST /menu-items/:id/image/generate` (AI generation + storage + DB path persistence).
+- Menu-item responses now serialize derived `imageUrl` from stored `imagePath`; DB stores path only.
+- Expanded `tests/menuRoutes.test.ts` with upload/generate image coverage and verified API test/build gates are green.
+- ADR-015 implementation: added `DeletedAssetCleanup` queue model + migration to persist pending S3 deletion tasks for removed/replaced image paths.
+- Added cleanup worker service `src/services/deletedAssetCleanup.ts` (periodic runner, optimistic claim, retry/backoff, structured logs) and boot wiring in `src/index.ts`.
+- Added S3 delete capability in `src/services/objectStorage.ts` and wired enqueue behavior in `src/routes/business.ts` on image replacement and menu-item delete.
+- Added cleanup worker env knobs in `.env.example`: `ENABLE_DELETED_ASSET_CLEANUP`, interval/batch/max-attempt/backoff controls.
+- Added worker tests in `tests/deletedAssetCleanup.test.ts` and queue-enqueue assertions in `tests/menuRoutes.test.ts`.
+- ADR-016 onboarding update: business slug is now server-generated from name and immutable on update (`SLUG_AUTO_GENERATED` / `SLUG_IMMUTABLE` validation paths in `src/routes/business.ts`).
+- Added business currency persistence (`currencyCode` / `currency_code`) and normalized 3-letter uppercase validation in onboarding create/update routes.
+- Added onboarding logo upload endpoint `POST /profile/logo` (multipart) in `src/routes/business.ts`, backed by S3 object storage and persisted to `business.logoUrl`.
+- Added onboarding route tests for slug auto-generation uniqueness, slug immutability rejection, and profile logo upload behavior.

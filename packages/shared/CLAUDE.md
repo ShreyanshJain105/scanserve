@@ -25,3 +25,5 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 - Extended auth request payload types with optional `qrToken` on login/register to support ADR-006 shared-endpoint QR customer auth context.
 - Updated `MenuItem.price` shared type to `string` to align with Layer 4 decimal-string API contract.
 - UX messaging policy alignment: shared response/message shapes are intended for toast-based notifications in UI, not inline page text alerts.
+- Menu item image contract now includes persisted `imagePath` (S3 object key/path) while `imageUrl` remains derived/render-oriented in API responses.
+- Business shared profile contract now includes `currencyCode` for onboarding/admin/dashboard flows.

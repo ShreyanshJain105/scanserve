@@ -45,10 +45,14 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   { retryOn401 = true }: { retryOn401?: boolean } = {}
 ): Promise<T> {
-  const mergedHeaders = {
-    ...defaultHeaders,
-    ...(options.headers || {}),
-  };
+  const isFormDataBody =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+  const mergedHeaders = isFormDataBody
+    ? { ...(options.headers || {}) }
+    : {
+        ...defaultHeaders,
+        ...(options.headers || {}),
+      };
 
   const response = await fetch(`${API_URL}${path}`, {
     ...options,

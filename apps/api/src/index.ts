@@ -9,6 +9,7 @@ import adminRoutes from "./routes/admin";
 import publicRoutes from "./routes/public";
 import aiRoutes from "./routes/ai";
 import { logger } from "./utils/logger";
+import { startDeletedAssetCleanupWorker } from "./services/deletedAssetCleanup";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -134,6 +135,7 @@ app.use(
 
 // ─── Start ──────────────────────────────────────────────────
 if (process.env.NODE_ENV !== "test") {
+  startDeletedAssetCleanupWorker();
   app.listen(PORT, () => {
     logger.info("api.server.started", {
       port: Number(PORT),

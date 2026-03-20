@@ -144,6 +144,7 @@ describe("DashboardMenuPage", () => {
         name: "Burger",
         description: null,
         price: "12.50",
+        imagePath: null,
         imageUrl: null,
         dietaryTags: [],
         isAvailable: true,
@@ -281,6 +282,7 @@ describe("DashboardMenuPage", () => {
               name: "Smoothie",
               description: null,
               price: "9.00",
+              imagePath: null,
               imageUrl: null,
               dietaryTags: ["vegetarian"],
               isAvailable: true,
@@ -346,6 +348,7 @@ describe("DashboardMenuPage", () => {
               name: "Brownie",
               description: null,
               price: "8.00",
+              imagePath: null,
               imageUrl: "https://example.com/brownie.jpg",
               dietaryTags: ["vegetarian"],
               isAvailable: true,
@@ -371,6 +374,84 @@ describe("DashboardMenuPage", () => {
     await waitFor(() => {
       expect(screen.getByAltText("Brownie preview")).toBeTruthy();
       expect(screen.queryByText("No Image")).toBeNull();
+    });
+  });
+
+  it("calls upload and AI generate image endpoints from item actions", async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: "u1", email: "biz@example.com", role: "business" },
+      loading: false,
+      selectedBusiness: { id: "b1", status: "approved" },
+    });
+
+    apiFetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === "/api/business/categories") {
+        return Promise.resolve({
+          categories: [{ id: "c1", businessId: "b1", name: "Desserts", sortOrder: 0 }],
+        });
+      }
+      if (path === "/api/business/menu-items?page=1&limit=10") {
+        return Promise.resolve({
+          items: [
+            {
+              id: "i1",
+              businessId: "b1",
+              categoryId: "c1",
+              name: "Brownie",
+              description: "Dark chocolate brownie",
+              price: "8.00",
+              imagePath: null,
+              imageUrl: null,
+              dietaryTags: ["vegetarian"],
+              isAvailable: true,
+              sortOrder: 0,
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 10,
+        });
+      }
+      if (path === "/api/business/menu-suggestions/categories") {
+        return Promise.resolve({ suggestions: [] });
+      }
+      if (path.startsWith("/api/ai/menu/item-suggestions")) {
+        return Promise.resolve({ suggestions: [] });
+      }
+      if (path === "/api/business/menu-items/i1/image/upload" && options?.method === "POST") {
+        return Promise.resolve({ item: { id: "i1", imagePath: "business/b1/menu-items/i1/uploaded.jpg" } });
+      }
+      if (path === "/api/business/menu-items/i1/image/generate" && options?.method === "POST") {
+        return Promise.resolve({ item: { id: "i1", imagePath: "business/b1/menu-items/i1/generated.jpg" } });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<DashboardMenuPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Brownie")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByLabelText("Upload image for Brownie"));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["abcd"], "brownie.jpg", { type: "image/jpeg" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        "/api/business/menu-items/i1/image/upload",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    fireEvent.click(screen.getByLabelText("Generate AI image for Brownie"));
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        "/api/business/menu-items/i1/image/generate",
+        expect.objectContaining({ method: "POST" })
+      );
     });
   });
 

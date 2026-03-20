@@ -2,6 +2,22 @@ import { EventEmitter } from "events";
 import jwt from "jsonwebtoken";
 import { createMocks } from "node-mocks-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { uploadImageObjectMock, generateMenuItemImageMock } = vi.hoisted(() => ({
+  uploadImageObjectMock: vi.fn(),
+  generateMenuItemImageMock: vi.fn(),
+}));
+
+vi.mock("../src/services/objectStorage", () => ({
+  uploadImageObject: uploadImageObjectMock,
+  resolveImageUrl: (imagePath: string | null) =>
+    imagePath ? `http://localhost:9000/scan2serve-menu-images/${imagePath}` : null,
+}));
+
+vi.mock("../src/services/aiImageProvider", () => ({
+  generateMenuItemImage: generateMenuItemImageMock,
+}));
+
 import businessRouter from "../src/routes/business";
 
 type BusinessStatus = "pending" | "approved" | "rejected";
@@ -21,20 +37,35 @@ type MenuItemRecord = {
   name: string;
   description: string | null;
   price: string;
-  imageUrl: string | null;
+  imagePath: string | null;
   dietaryTags: string[];
   isAvailable: boolean;
   sortOrder: number;
   createdAt: Date;
+};
+type DeletedAssetCleanupRecord = {
+  id: string;
+  assetType: "menu_item_image";
+  entityId: string;
+  s3Path: string;
+  status: "pending" | "processing" | "failed" | "done";
+  attemptCount: number;
+  nextAttemptAt: Date | null;
+  lastError: string | null;
+  processedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 const users: UserRecord[] = [];
 const businesses: BusinessRecord[] = [];
 const categories: CategoryRecord[] = [];
 const menuItems: MenuItemRecord[] = [];
+const deletedAssetCleanups: DeletedAssetCleanupRecord[] = [];
 
 const nextCategoryId = () => `cat_${categories.length + 1}`;
 const nextItemId = () => `item_${menuItems.length + 1}`;
+const nextCleanupId = () => `cleanup_${deletedAssetCleanups.length + 1}`;
 
 vi.mock("../src/prisma", () => ({
   prisma: {
@@ -123,13 +154,23 @@ vi.mock("../src/prisma", () => ({
           .sort((a, b) => a.sortOrder - b.sortOrder)
           .slice(skip, skip + take)
       ),
-      findFirst: vi.fn(async ({ where }) =>
-        menuItems.find(
-          (m) =>
-            (where?.id ? m.id === where.id : true) &&
-            (where?.businessId ? m.businessId === where.businessId : true)
-        ) ?? null
-      ),
+      findFirst: vi.fn(async ({ where, include }) => {
+        const item =
+          menuItems.find(
+            (m) =>
+              (where?.id ? m.id === where.id : true) &&
+              (where?.businessId ? m.businessId === where.businessId : true)
+          ) ?? null;
+        if (!item) return null;
+        if (include?.category?.select?.name) {
+          const category = categories.find((c) => c.id === item.categoryId);
+          return {
+            ...item,
+            category: { name: category?.name || "Category" },
+          };
+        }
+        return item;
+      }),
       create: vi.fn(async ({ data }) => {
         const created: MenuItemRecord = {
           id: nextItemId(),
@@ -138,7 +179,7 @@ vi.mock("../src/prisma", () => ({
           name: data.name,
           description: data.description ?? null,
           price: String(data.price),
-          imageUrl: data.imageUrl ?? null,
+          imagePath: data.imagePath ?? null,
           dietaryTags: data.dietaryTags ?? [],
           isAvailable: data.isAvailable ?? true,
           sortOrder: data.sortOrder,
@@ -164,7 +205,66 @@ vi.mock("../src/prisma", () => ({
         if (index >= 0) menuItems.splice(index, 1);
       }),
     },
-    $transaction: vi.fn(async (ops) => Promise.all(ops)),
+    deletedAssetCleanup: {
+      create: vi.fn(async ({ data }) => {
+        const record: DeletedAssetCleanupRecord = {
+          id: nextCleanupId(),
+          assetType: data.assetType,
+          entityId: data.entityId,
+          s3Path: data.s3Path,
+          status: data.status ?? "pending",
+          attemptCount: data.attemptCount ?? 0,
+          nextAttemptAt: data.nextAttemptAt ?? null,
+          lastError: data.lastError ?? null,
+          processedAt: data.processedAt ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        deletedAssetCleanups.push(record);
+        return record;
+      }),
+      findMany: vi.fn(async ({ where, take }) => {
+        let list = [...deletedAssetCleanups];
+        if (where?.status?.in) list = list.filter((r) => where.status.in.includes(r.status));
+        if (where?.attemptCount?.lt !== undefined) {
+          list = list.filter((r) => r.attemptCount < where.attemptCount.lt);
+        }
+        if (where?.OR) {
+          const now = where.OR.find((c: any) => c.nextAttemptAt?.lte)?.nextAttemptAt?.lte;
+          if (now) {
+            list = list.filter((r) => r.nextAttemptAt === null || r.nextAttemptAt <= now);
+          }
+        }
+        return typeof take === "number" ? list.slice(0, take) : list;
+      }),
+      updateMany: vi.fn(async ({ where, data }) => {
+        let count = 0;
+        for (const row of deletedAssetCleanups) {
+          const matchesId = where?.id ? row.id === where.id : true;
+          const matchesStatus = where?.status?.in
+            ? where.status.in.includes(row.status)
+            : true;
+          if (matchesId && matchesStatus) {
+            Object.assign(row, data, { updatedAt: new Date() });
+            count += 1;
+          }
+        }
+        return { count };
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        const index = deletedAssetCleanups.findIndex((r) => r.id === where.id);
+        deletedAssetCleanups[index] = {
+          ...deletedAssetCleanups[index],
+          ...data,
+          updatedAt: new Date(),
+        };
+        return deletedAssetCleanups[index];
+      }),
+    },
+    $transaction: vi.fn(async (ops) => {
+      if (typeof ops === "function") return ops({});
+      return Promise.all(ops);
+    }),
   },
 }));
 
@@ -191,7 +291,20 @@ const run = async (
     body,
     user,
     headers,
-  }: { body?: unknown; user?: UserRecord; headers?: Record<string, string> } = {}
+    file,
+  }: {
+    body?: unknown;
+    user?: UserRecord;
+    headers?: Record<string, string>;
+    file?: {
+      fieldname: string;
+      originalname: string;
+      encoding: string;
+      mimetype: string;
+      size: number;
+      buffer: Buffer;
+    };
+  } = {}
 ) => {
   const token = user ? makeToken(user) : null;
   const { req, res } = createMocks({
@@ -208,6 +321,8 @@ const run = async (
   (req as any).body = body;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).cookies = token ? { access_token: token } : {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).file = file;
 
   businessRouter.handle(req, res, (err: unknown) => {
     if (err) throw err;
@@ -223,9 +338,12 @@ describe("Layer 4 menu routes", () => {
     businesses.length = 0;
     categories.length = 0;
     menuItems.length = 0;
+    deletedAssetCleanups.length = 0;
 
     users.push({ id: "u_business", email: "biz@example.com", role: "business" });
     businesses.push({ id: "b_1", userId: "u_business", status: "approved" });
+    uploadImageObjectMock.mockReset();
+    generateMenuItemImageMock.mockReset();
   });
 
   it("supports category CRUD and blocks deleting non-empty category", async () => {
@@ -431,6 +549,153 @@ describe("Layer 4 menu routes", () => {
     });
     expect(missingCategory._getStatusCode()).toBe(404);
     expect(missingCategory._getJSONData().error.code).toBe("CATEGORY_NOT_FOUND");
+  });
+
+  it("uploads menu-item image and stores image path", async () => {
+    const user = users[0];
+    const cat = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Mains" },
+    });
+    const categoryId = cat._getJSONData().data.category.id;
+
+    const created = await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { categoryId, name: "Burger", price: "12.50" },
+    });
+    const itemId = created._getJSONData().data.item.id as string;
+
+    uploadImageObjectMock.mockResolvedValue({
+      imagePath: `business/b_1/menu-items/${itemId}/image.jpg`,
+      imageUrl: "http://localhost:9000/scan2serve-menu-images/business/b_1/menu-items/item_1/image.jpg",
+    });
+
+    const uploadRes = await run("POST", `/menu-items/${itemId}/image/upload`, {
+      user,
+      headers: { "x-business-id": "b_1" },
+      file: {
+        fieldname: "image",
+        originalname: "burger.jpg",
+        encoding: "7bit",
+        mimetype: "image/jpeg",
+        size: 4,
+        buffer: Buffer.from("abcd"),
+      },
+    });
+
+    expect(uploadRes._getStatusCode()).toBe(200);
+    expect(uploadRes._getJSONData().data.item.imagePath).toContain(
+      `business/b_1/menu-items/${itemId}/`
+    );
+    expect(deletedAssetCleanups).toHaveLength(0);
+  });
+
+  it("generates menu-item image via provider and stores image path", async () => {
+    const user = users[0];
+    const cat = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Desserts" },
+    });
+    const categoryId = cat._getJSONData().data.category.id;
+
+    const created = await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { categoryId, name: "Brownie", price: "8.00" },
+    });
+    const itemId = created._getJSONData().data.item.id as string;
+
+    generateMenuItemImageMock.mockResolvedValue({
+      buffer: Buffer.from("image-content"),
+      mimeType: "image/png",
+    });
+    uploadImageObjectMock.mockResolvedValue({
+      imagePath: `business/b_1/menu-items/${itemId}/image.png`,
+      imageUrl: "http://localhost:9000/scan2serve-menu-images/business/b_1/menu-items/item_1/image.png",
+    });
+
+    const generateRes = await run("POST", `/menu-items/${itemId}/image/generate`, {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { prompt: "Chocolate brownie on a dark plate" },
+    });
+
+    expect(generateRes._getStatusCode()).toBe(200);
+    expect(generateRes._getJSONData().data.item.imagePath).toContain(
+      `business/b_1/menu-items/${itemId}/`
+    );
+    expect(deletedAssetCleanups).toHaveLength(0);
+  });
+
+  it("enqueues previous image path when replacing existing image", async () => {
+    const user = users[0];
+    const cat = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Mains" },
+    });
+    const categoryId = cat._getJSONData().data.category.id;
+
+    const created = await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { categoryId, name: "Burger", price: "12.50" },
+    });
+    const itemId = created._getJSONData().data.item.id as string;
+    menuItems[0].imagePath = `business/b_1/menu-items/${itemId}/old.jpg`;
+
+    uploadImageObjectMock.mockResolvedValue({
+      imagePath: `business/b_1/menu-items/${itemId}/new.jpg`,
+      imageUrl: "http://localhost:9000/scan2serve-menu-images/new.jpg",
+    });
+
+    const uploadRes = await run("POST", `/menu-items/${itemId}/image/upload`, {
+      user,
+      headers: { "x-business-id": "b_1" },
+      file: {
+        fieldname: "image",
+        originalname: "burger.jpg",
+        encoding: "7bit",
+        mimetype: "image/jpeg",
+        size: 4,
+        buffer: Buffer.from("abcd"),
+      },
+    });
+
+    expect(uploadRes._getStatusCode()).toBe(200);
+    expect(deletedAssetCleanups).toHaveLength(1);
+    expect(deletedAssetCleanups[0].s3Path).toContain("/old.jpg");
+  });
+
+  it("enqueues image path when deleting menu item", async () => {
+    const user = users[0];
+    const cat = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Mains" },
+    });
+    const categoryId = cat._getJSONData().data.category.id;
+
+    const created = await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { categoryId, name: "Burger", price: "12.50" },
+    });
+    const itemId = created._getJSONData().data.item.id as string;
+    menuItems[0].imagePath = `business/b_1/menu-items/${itemId}/old.jpg`;
+
+    const deleted = await run("DELETE", `/menu-items/${itemId}`, {
+      user,
+      headers: { "x-business-id": "b_1" },
+    });
+
+    expect(deleted._getStatusCode()).toBe(200);
+    expect(deletedAssetCleanups).toHaveLength(1);
+    expect(deletedAssetCleanups[0].entityId).toBe(itemId);
+    expect(deletedAssetCleanups[0].s3Path).toContain("/old.jpg");
   });
 
   it("enforces approved-business gating for menu routes", async () => {

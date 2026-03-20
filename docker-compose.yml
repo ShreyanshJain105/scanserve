@@ -1,4 +1,23 @@
 services:
+  minio:
+    image: minio/minio:latest
+    container_name: scan2serve-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /data/.minio.sys/format.json ] || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   db:
     image: postgres:15-alpine
     container_name: scan2serve-db
@@ -36,12 +55,33 @@ services:
       CLIENT_URL: http://localhost:3000
       COOKIE_DOMAIN: localhost
       PORT: 4000
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: scan2serve-menu-images
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: "true"
+      MENU_IMAGE_MAX_BYTES: 5242880
+      BUSINESS_LOGO_MAX_BYTES: 3145728
+      AI_IMAGE_PROVIDER: nano-banana
+      AI_IMAGE_TIMEOUT_MS: 12000
+      NANOBANANA_API_URL: ""
+      NANOBANANA_API_KEY: ""
+      NANOBANANA_MODEL: nano-banana-v1
+      ENABLE_DELETED_ASSET_CLEANUP: "true"
+      DELETED_ASSET_CLEANUP_INTERVAL_MS: 600000
+      DELETED_ASSET_CLEANUP_BATCH_SIZE: 20
+      DELETED_ASSET_CLEANUP_MAX_ATTEMPTS: 8
+      DELETED_ASSET_CLEANUP_BASE_BACKOFF_MS: 60000
     command: >
       sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api db:push && pnpm --filter @scan2serve/api dev"
     ports:
       - "4000:4000"
     depends_on:
       db:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:4000/healthz >/dev/null 2>&1 || exit 1"]
@@ -81,6 +121,7 @@ services:
 
 volumes:
   db-data:
+  minio-data:
   api-node-modules:
   web-node-modules:
   web-next-cache:

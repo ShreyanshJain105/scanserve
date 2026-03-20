@@ -35,3 +35,6 @@ Project documentation for architecture decisions, process notes, and operational
 - Added ADR-012 (Accepted) for dashboard menu visual refresh: color-accented category cards and per-item image placeholder with `Upload` and `Generate AI` entry points (UI-first, backend persistence deferred).
 - Added ADR-013 (Accepted) for item description authoring: manual description input/edit plus AI-generated description endpoint (`/api/ai/menu/item-description`) with deterministic fallback.
 - Recorded cross-app UX messaging policy: prefer toasts for user notifications/errors; avoid inline banner/text feedback patterns.
+- Added ADR-014 (Accepted): menu-item image persistence now uses local S3-compatible storage (MinIO), persists only `image_path` in DB, and wires upload/AI image generation routes into dashboard image actions.
+- Added ADR-015 (Accepted): deleted/replaced image paths are stored in a DB cleanup queue and removed from S3 by periodic retryable cleanup worker.
+- Added ADR-016 (Accepted): onboarding now uses server-side auto-generated immutable slugs, requires currency input, and replaces logo URL entry with drag-drop logo upload.

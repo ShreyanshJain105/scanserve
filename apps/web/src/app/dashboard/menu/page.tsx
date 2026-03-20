@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DIETARY_TAGS, type Category, type MenuItem } from "@scan2serve/shared";
 import { useAuth } from "../../../lib/auth-context";
@@ -104,7 +104,11 @@ export default function DashboardMenuPage() {
   const [busy, setBusy] = useState(false);
   const [generatingDescription, setGeneratingDescription] = useState(false);
   const [generatingEditDescription, setGeneratingEditDescription] = useState(false);
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [generatingImageItemId, setGeneratingImageItemId] = useState<string | null>(null);
+  const [uploadTargetItem, setUploadTargetItem] = useState<MenuItem | null>(null);
   const suggestionRequestIdRef = useRef(0);
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const blocked =
     !selectedBusiness ||
@@ -550,21 +554,67 @@ export default function DashboardMenuPage() {
   };
 
   const handleUploadImage = (item: MenuItem) => {
-    showToast({
-      variant: "info",
-      message: `Image upload flow for "${item.name}" will be enabled in the next step.`,
-    });
+    setUploadTargetItem(item);
+    imageFileInputRef.current?.click();
   };
 
-  const handleGenerateAiImage = (item: MenuItem) => {
-    showToast({
-      variant: "info",
-      message: `AI image generation for "${item.name}" will be enabled in the next step.`,
-    });
+  const handleUploadInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!headers || !uploadTargetItem) return;
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setUploadingItemId(uploadTargetItem.id);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      await apiFetch(`/api/business/menu-items/${uploadTargetItem.id}/image/upload`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+      await loadItems(itemPage);
+      showToast({ variant: "success", message: `Image uploaded for "${uploadTargetItem.name}".` });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload image");
+    } finally {
+      setUploadTargetItem(null);
+      setUploadingItemId(null);
+    }
+  };
+
+  const handleGenerateAiImage = async (item: MenuItem) => {
+    if (!headers) return;
+    setGeneratingImageItemId(item.id);
+    setError(null);
+    try {
+      const prompt = item.description
+        ? `${item.name}. ${item.description}`
+        : `${item.name} plated food photo`;
+      await apiFetch(`/api/business/menu-items/${item.id}/image/generate`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ prompt }),
+      });
+      await loadItems(itemPage);
+      showToast({ variant: "success", message: `AI image generated for "${item.name}".` });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate AI image");
+    } finally {
+      setGeneratingImageItemId(null);
+    }
   };
 
   return (
     <main className="min-h-screen bg-gray-50 p-6">
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={handleUploadInputChange}
+        className="hidden"
+      />
       <section className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-xl border bg-white p-4">
           <h2 className="text-lg font-semibold">Categories</h2>
@@ -915,21 +965,31 @@ export default function DashboardMenuPage() {
                           <div className="flex gap-1.5">
                             <button
                               onClick={() => handleUploadImage(item)}
-                              disabled={busy || blocked}
+                              disabled={busy || blocked || uploadingItemId === item.id}
                               aria-label={`Upload image for ${item.name}`}
                               title={`Upload image for ${item.name}`}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:border-slate-400 disabled:opacity-40"
                             >
-                              <ImageIcon className="h-4 w-4" />
+                              <ImageIcon
+                                className={
+                                  uploadingItemId === item.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"
+                                }
+                              />
                             </button>
                             <button
-                              onClick={() => handleGenerateAiImage(item)}
-                              disabled={busy || blocked}
+                              onClick={() => void handleGenerateAiImage(item)}
+                              disabled={busy || blocked || generatingImageItemId === item.id}
                               aria-label={`Generate AI image for ${item.name}`}
                               title={`Generate AI image for ${item.name}`}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-400 disabled:opacity-40"
                             >
-                              <SparkleIcon className="h-4 w-4" />
+                              <SparkleIcon
+                                className={
+                                  generatingImageItemId === item.id
+                                    ? "h-4 w-4 animate-pulse"
+                                    : "h-4 w-4"
+                                }
+                              />
                             </button>
                           </div>
                         </div>

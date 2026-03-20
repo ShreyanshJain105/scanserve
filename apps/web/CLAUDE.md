@@ -98,3 +98,22 @@ pnpm lint   # run Next.js ESLint
 - Visual rollback follow-up: removed category faded-gradient grouping and menu-section gradient divider lines from `src/app/dashboard/menu/page.tsx`, returning those regions to neutral bordered surfaces.
 - Toast system implementation: added global toast utility (`src/lib/toast.ts`) and viewport (`src/components/ui/toast-viewport.tsx`) mounted in `src/app/layout.tsx`; converted inline auth/admin/onboarding/menu error feedback to toasts and removed inline error text rendering for those flows.
 - UX messaging policy: use toasts for all user notifications/errors; avoid inline red/green page text messages for action feedback.
+- Dashboard menu image actions are now wired to real API endpoints in `src/app/dashboard/menu/page.tsx`:
+  - upload button opens hidden file picker and posts multipart to `/api/business/menu-items/:id/image/upload`,
+  - AI button posts to `/api/business/menu-items/:id/image/generate`.
+- Added per-item upload/generate loading states with icon pulse feedback and success toasts after refresh.
+- Updated `src/lib/api.ts` to preserve custom headers while skipping forced JSON `Content-Type` for `FormData` bodies (required for multipart upload).
+- Expanded `tests/menu-page.test.tsx` with endpoint-call assertions for upload and AI image generation actions.
+- ADR-016 onboarding update in `src/app/dashboard/onboarding/page.tsx`:
+  - slug field is displayed read-only and auto-previewed from business name,
+  - currency input is required (3-letter uppercase),
+  - logo URL text field replaced with drag-drop/click file upload area + preview.
+- On submit, onboarding now uploads selected logo via `POST /api/business/profile/logo` after create/update using returned business id.
+- Added `tests/onboarding-page.test.tsx` coverage for read-only slug behavior, currency capture, and logo upload call path.
+- Onboarding activity/log fix: profile refresh effect now runs from stable user identity dependency (`user.id`/`user.role`) to prevent repeated fetch loops in onboarding.
+- Currency input UX refinement: onboarding now provides searchable code suggestions via `datalist` while still enforcing 3-letter uppercase currency codes.
+- Currency UX consistency fix: replaced native `datalist` with app-styled searchable combobox in onboarding (`src/app/dashboard/onboarding/page.tsx`) to avoid browser-specific dropdown rendering.
+- Added/updated onboarding test selectors for combobox flow in `tests/onboarding-page.test.tsx`.
+- Currency selector follow-up: onboarding now uses a merged single-row input (display + search together); typed search is non-committal until user selects an option.
+- Currency selector behavior: selecting an option must immediately close dropdown and show committed value in the same input.
+- Currency combobox markup rule: avoid nesting combobox interactive controls inside a wrapping `<label>`; use `label htmlFor` + container to prevent browser refocus/reopen on option click.

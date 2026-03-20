@@ -2,6 +2,16 @@ import { EventEmitter } from "events";
 import jwt from "jsonwebtoken";
 import { createMocks } from "node-mocks-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { uploadImageObjectMock } = vi.hoisted(() => ({
+  uploadImageObjectMock: vi.fn(),
+}));
+
+vi.mock("../src/services/objectStorage", () => ({
+  uploadImageObject: uploadImageObjectMock,
+  resolveImageUrl: (imagePath: string | null) =>
+    imagePath ? `http://localhost:9000/scan2serve-menu-images/${imagePath}` : null,
+}));
 import businessRouter from "../src/routes/business";
 import adminRouter from "../src/routes/admin";
 
@@ -14,6 +24,7 @@ type BusinessRecord = {
   userId: string;
   name: string;
   slug: string;
+  currencyCode: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -72,6 +83,7 @@ vi.mock("../src/prisma", () => ({
           userId: data.userId,
           name: data.name,
           slug: data.slug,
+          currencyCode: data.currencyCode ?? "USD",
           description: data.description ?? null,
           logoUrl: data.logoUrl ?? null,
           address: data.address,
@@ -94,6 +106,7 @@ vi.mock("../src/prisma", () => ({
         let list = [...businesses];
         if (where?.userId) list = list.filter((item) => item.userId === where.userId);
         if (where?.id) list = list.filter((item) => item.id === where.id);
+        if (where?.slug) list = list.filter((item) => item.slug === where.slug);
         list.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
         return list[0] ?? null;
       }),
@@ -263,7 +276,20 @@ const run = async (
     body,
     user,
     headers,
-  }: { body?: unknown; user?: UserRecord; headers?: Record<string, string> } = {}
+    file,
+  }: {
+    body?: unknown;
+    user?: UserRecord;
+    headers?: Record<string, string>;
+    file?: {
+      fieldname: string;
+      originalname: string;
+      encoding: string;
+      mimetype: string;
+      size: number;
+      buffer: Buffer;
+    };
+  } = {}
 ) => {
   const token = user ? makeToken(user) : null;
   const { req, res } = createMocks({
@@ -280,6 +306,8 @@ const run = async (
   (req as any).body = body;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).cookies = token ? { access_token: token } : {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).file = file;
 
   router.handle(req, res, (err: unknown) => {
     if (err) throw err;
@@ -296,8 +324,10 @@ describe("Layer 3 onboarding routes", () => {
     rejections.length = 0;
     tables.length = 0;
     qrCodes.length = 0;
+    uploadImageObjectMock.mockReset();
 
     users.push({ id: "u_business", email: "biz@example.com", role: "business" });
+    users.push({ id: "u_business_2", email: "biz2@example.com", role: "business" });
     users.push({ id: "u_admin", email: "admin@example.com", role: "admin" });
   });
 
@@ -308,9 +338,8 @@ describe("Layer 3 onboarding routes", () => {
       user: businessUser,
       body: {
         name: "Cedar Cafe",
-        slug: "cedar-cafe",
+        currencyCode: "usd",
         description: "Coffee and snacks",
-        logoUrl: null,
         address: "12 Market Street",
         phone: "+1-202-000-0000",
       },
@@ -318,6 +347,8 @@ describe("Layer 3 onboarding routes", () => {
 
     expect(created._getStatusCode()).toBe(201);
     expect(created._getJSONData().data.business.status).toBe("pending");
+    expect(created._getJSONData().data.business.slug).toBe("cedar-cafe");
+    expect(created._getJSONData().data.business.currencyCode).toBe("USD");
 
     const listed = await run(businessRouter, "GET", "/profiles", { user: businessUser });
     expect(listed._getStatusCode()).toBe(200);
@@ -347,14 +378,84 @@ describe("Layer 3 onboarding routes", () => {
     expect(patched._getJSONData().data.business.status).toBe("pending");
   });
 
+  it("auto-generates unique slugs and rejects slug updates", async () => {
+    const createdOne = await run(businessRouter, "POST", "/profile", {
+      user: users[0],
+      body: {
+        name: "City Cafe",
+        currencyCode: "INR",
+        address: "12 Main Street",
+        phone: "+91-111-111-1111",
+      },
+    });
+    expect(createdOne._getStatusCode()).toBe(201);
+    expect(createdOne._getJSONData().data.business.slug).toBe("city-cafe");
+
+    const createdTwo = await run(businessRouter, "POST", "/profile", {
+      user: users[1],
+      body: {
+        name: "City Cafe",
+        currencyCode: "INR",
+        address: "44 Main Street",
+        phone: "+91-222-222-2222",
+      },
+    });
+    expect(createdTwo._getStatusCode()).toBe(201);
+    expect(createdTwo._getJSONData().data.business.slug).toBe("city-cafe-2");
+
+    const immutable = await run(businessRouter, "PATCH", "/profile", {
+      user: users[0],
+      body: {
+        businessId: createdOne._getJSONData().data.business.id,
+        slug: "manual-change",
+      },
+    });
+    expect(immutable._getStatusCode()).toBe(400);
+    expect(immutable._getJSONData().error.code).toBe("SLUG_IMMUTABLE");
+  });
+
+  it("uploads business logo through profile logo endpoint", async () => {
+    const created = await run(businessRouter, "POST", "/profile", {
+      user: users[0],
+      body: {
+        name: "Logo Cafe",
+        currencyCode: "USD",
+        address: "88 Street",
+        phone: "+1-303-000-0000",
+      },
+    });
+    const businessId = created._getJSONData().data.business.id as string;
+
+    uploadImageObjectMock.mockResolvedValue({
+      imagePath: `business/${businessId}/profile/logo/abc-logo.jpg`,
+      imageUrl: "http://localhost:9000/scan2serve-menu-images/business/logo.jpg",
+    });
+
+    const uploadRes = await run(businessRouter, "POST", "/profile/logo", {
+      user: users[0],
+      body: { businessId },
+      file: {
+        fieldname: "logo",
+        originalname: "logo.jpg",
+        encoding: "7bit",
+        mimetype: "image/jpeg",
+        size: 4,
+        buffer: Buffer.from("logo"),
+      },
+    });
+    expect(uploadRes._getStatusCode()).toBe(200);
+    expect(uploadRes._getJSONData().data.business.logoUrl).toContain("/business/logo.jpg");
+  });
+
   it("enforces admin moderation transitions", async () => {
-    const adminUser = users[1];
+    const adminUser = users[2];
 
     businesses.push({
       id: "b_pending",
       userId: users[0].id,
       name: "Pending Bistro",
       slug: "pending-bistro",
+      currencyCode: "USD",
       description: null,
       logoUrl: null,
       address: "A",
@@ -369,6 +470,7 @@ describe("Layer 3 onboarding routes", () => {
       userId: users[0].id,
       name: "Approved Bistro",
       slug: "approved-bistro",
+      currencyCode: "USD",
       description: null,
       logoUrl: null,
       address: "B",
@@ -416,6 +518,7 @@ describe("Layer 3 onboarding routes", () => {
       userId: users[0].id,
       name: "Gate Bistro",
       slug: "gate-bistro",
+      currencyCode: "USD",
       description: null,
       logoUrl: null,
       address: "A",
@@ -463,6 +566,7 @@ describe("Layer 3 onboarding routes", () => {
       userId: users[0].id,
       name: "QR Bistro",
       slug: "qr-bistro",
+      currencyCode: "USD",
       description: null,
       logoUrl: null,
       address: "A",
@@ -516,6 +620,7 @@ describe("Layer 3 onboarding routes", () => {
       userId: users[0].id,
       name: "QR Hist",
       slug: "qr-hist",
+      currencyCode: "USD",
       description: null,
       logoUrl: null,
       address: "A",
