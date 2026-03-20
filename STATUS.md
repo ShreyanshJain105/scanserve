@@ -11,10 +11,18 @@
 
 **Date:** 2026-03-20
 **What was done:**
-- Updated dashboard archived filter behavior in `apps/web/src/app/dashboard/page.tsx`.
-- `Show archived` now displays only archived businesses; toggle switches to `Show active` for returning to active list.
-- Added stronger archived visual emphasis: archived business cards and archived overview area use red-tinted backgrounds.
-- Updated dashboard test assertions and revalidated web suite: `pnpm --filter @scan2serve/web test` passes (`27/27`).
+- Marked ADR-018 as accepted and implemented a public-site UI redesign in web.
+- Added reusable public shell with clear `header` + `main` sections/subsections + `footer` (`apps/web/src/components/public/public-site-shell.tsx`).
+- Redesigned home page (`apps/web/src/app/home/page.tsx`) with hero section, structured content sections, light visual direction, and authenticated profile section with a single role CTA.
+- Added reusable dialog surface (`apps/web/src/components/ui/modal-dialog.tsx`) and shared business auth forms (`apps/web/src/components/auth/business-auth-forms.tsx`).
+- Converted auth UX:
+  - `/home` now uses dialog-based login/register flows,
+  - `/login` and `/register/business` remain functional fallback routes and render dialog-style auth surfaces,
+  - `/qr/login` and `/qr/register` now use dialog-style QR auth experiences.
+- Updated public menu placeholder to use the same shell and section structure (`apps/web/src/app/menu/[slug]/page.tsx`).
+- Added home-page coverage (`apps/web/tests/home-page.test.tsx`) and revalidated web quality gates:
+  - `pnpm --filter @scan2serve/web test` passes (`29/29`),
+  - `pnpm --filter @scan2serve/web build` passes.
 
 **What's NOT done yet:**
 - Local runtime validation with real Nano-Banana credentials is still pending (env placeholders are set, provider key/url not configured).
@@ -22,12 +30,14 @@
 - Cleanup queue monitoring endpoint/dashboard is not implemented yet (logs-only observability).
 - Layer 5+ features (tables/QR advanced flows, ordering/payments, dashboards) remain pending.
 - Production cookie/CORS hardening review still pending once deploy targets are fixed.
+- UI professionalism polish pass is deferred until QR scanning and end-to-end customer flows are fully in place (current redesign kept as interim baseline).
 
 **Next step:** Archive lifecycle observability + migration/runbook hardening
 1. Add admin/debug endpoint for archive cleanup worker health and recent archived-delete audit entries.
 2. Consider persisting explicit `logo_path` for businesses to avoid URL parsing when enqueuing logo cleanup.
 3. Add startup/runbook guard to ensure schema sync (`db:push`/migrate) is always re-run after enum/status model changes.
 4. Add targeted dashboard regression test for loading-to-ready rerender path to catch future hook-order regressions earlier.
+5. After QR scan + customer flow completion, run a dedicated UI professional-polish iteration (visual system, detail consistency, interaction/accessibility QA).
 
 **Build progress:**
 ```
@@ -439,6 +449,14 @@ Layer 11: Polish & Deploy
 - Updated `tests/dashboard.test.tsx` for archived-only toggle expectation and archived red-chip class assertion.
 - Revalidated with `pnpm --filter @scan2serve/web test` (27 tests passing).
 
+### 2026-03-20 — Session 63: ADR-018 accepted + public UI redesign with dialog auth
+- Accepted ADR-018 and implemented a structured light-theme public shell (`header/main/footer`) used across home and public-facing auth/menu surfaces.
+- Rebuilt `/home` with explicit hero, sectioned body/subsections, and authenticated profile card showing one role-aware CTA.
+- Added reusable dialog primitives and shared business auth forms, then moved home login/register UX into dialogs.
+- Converted `/qr/login` and `/qr/register` into dialog-style QR auth pages while preserving QR token behavior.
+- Kept `/login` and `/register/business` as functional fallback routes with dialog-style rendering.
+- Added `tests/home-page.test.tsx` for home dialog + profile CTA behavior and revalidated web test/build pipelines.
+
 ---
 
 ## Decisions Log
@@ -460,6 +478,7 @@ Layer 11: Polish & Deploy
 | ADR-015 | S3 deletion queue + periodic cleanup worker | Track deleted/replaced image paths in DB and run scheduled retryable cleanup to remove orphaned S3 objects safely | 2026-03-20 |
 | ADR-016 | Onboarding auto-slug, currency input, and drag-drop logo upload | Remove manual slug edits, enforce server-side unique slug generation, collect currency, and replace logo URL field with uploaded image flow | 2026-03-20 |
 | ADR-017 | Dashboard logos + business archive lifecycle with 30-day retention delete | Improve dashboard identity using logos, replace destructive delete with reversible archive window, and enforce eventual hard delete with audit trail | 2026-03-20 |
+| ADR-018 | Sitewide public UI redesign with home/QR auth dialogs | Introduce structured public shell, home hero/profile sections, light visual system, and dialog-based auth UX while retaining fallback auth routes | 2026-03-20 |
 
 ---
 

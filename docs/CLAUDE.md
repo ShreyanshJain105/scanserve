@@ -39,3 +39,4 @@ Project documentation for architecture decisions, process notes, and operational
 - Added ADR-015 (Accepted): deleted/replaced image paths are stored in a DB cleanup queue and removed from S3 by periodic retryable cleanup worker.
 - Added ADR-016 (Accepted): onboarding now uses server-side auto-generated immutable slugs, requires currency input, and replaces logo URL entry with drag-drop logo upload.
 - Added ADR-017 (Accepted): dashboard business cards use logos, business delete flow is replaced with archive+confirm behavior, restore is allowed within retention window, and archived businesses are auto-deleted after 30 days with audit logging.
+- Added ADR-018 (Accepted): sitewide public UI redesign with explicit header/body/footer shell, home hero + authenticated profile section, dialog-based auth UX on home/QR pages, and light-theme visual system refresh.

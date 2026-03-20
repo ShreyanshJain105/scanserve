@@ -128,3 +128,14 @@ pnpm lint   # run Next.js ESLint
 - Archived filter behavior refinement: `Show archived` now switches the business grid to archived-only view (not mixed list), with `Show active` to return to active businesses in `src/app/dashboard/page.tsx`.
 - Archived emphasis update: archived business cards and archived overview panel/metric cards use red-tinted backgrounds (`red-50` / `red-100`) to make non-active state visually obvious.
 - Updated `tests/dashboard.test.tsx` to assert archived-only toggle behavior and archived chip red styling.
+- ADR-018 accepted and implemented for public-surface redesign:
+  - added reusable public shell (`src/components/public/public-site-shell.tsx`) with structured header/main/footer,
+  - redesigned home (`src/app/home/page.tsx`) with hero, sectioned body, and authenticated profile card (single role CTA),
+  - introduced reusable dialog surface (`src/components/ui/modal-dialog.tsx`) and shared business auth forms (`src/components/auth/business-auth-forms.tsx`).
+- Auth UX update:
+  - `/home` now uses local-state login/register dialogs,
+  - fallback `/login` and `/register/business` remain functional and render dialog-style auth surfaces,
+  - `/qr/login` and `/qr/register` now use dialog-style QR auth pages in QR context.
+- Public placeholder alignment: `/menu/[slug]` now uses the same structured public shell and sectioned layout.
+- Light-theme baseline update in `src/app/globals.css`: semantic light tokens and explicit sans/display typography stacks for consistent bright visual direction.
+- Added `tests/home-page.test.tsx` to cover home dialog opening and authenticated profile CTA behavior.
