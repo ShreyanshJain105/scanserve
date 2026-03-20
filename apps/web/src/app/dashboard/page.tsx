@@ -5,6 +5,19 @@ import { useAuth } from "../../lib/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { showToast } from "../../lib/toast";
+import { AppHeader } from "../../components/layout/app-header";
+import { BodyBackButton } from "../../components/layout/body-back-button";
+
+const PencilIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
+  <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M13.8 3.2L16.8 6.2L7 16H4V13L13.8 3.2Z"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 export default function DashboardPage() {
   const {
@@ -53,8 +66,11 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Business dashboard" />
+        <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
+          <p>Loading...</p>
+        </section>
       </main>
     );
   }
@@ -63,48 +79,57 @@ export default function DashboardPage() {
 
   if (user.role !== "business") {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center space-y-4">
-        <h1 className="text-3xl font-semibold">Welcome, {user.email}</h1>
-        <p className="text-gray-600">Role: {user.role}</p>
-        <button
-          onClick={logout}
-          className="rounded-md bg-black px-4 py-2 text-white"
-        >
-          Logout
-        </button>
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Business dashboard" />
+        <section className="mx-auto flex min-h-[60vh] max-w-6xl flex-col items-center justify-center space-y-4 p-6">
+          <h1 className="text-3xl font-semibold">Welcome, {user.email}</h1>
+          <p className="text-gray-600">Role: {user.role}</p>
+          <button
+            onClick={logout}
+            className="rounded-md bg-black px-4 py-2 text-white"
+          >
+            Logout
+          </button>
+        </section>
       </main>
     );
   }
 
   if (businessLoading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p>Loading business profile...</p>
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Business dashboard" />
+        <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
+          <p>Loading business profile...</p>
+        </section>
       </main>
     );
   }
 
   if (businesses.length === 0) {
     return (
-      <main className="min-h-screen mx-auto max-w-3xl p-8">
-        <h1 className="text-3xl font-semibold">Business onboarding required</h1>
-        <p className="mt-2 text-gray-600">
-          Create your first business profile before using dashboard operations.
-        </p>
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={() => router.push("/dashboard/onboarding")}
-            className="rounded-md bg-black px-4 py-2 text-white"
-          >
-            Start onboarding
-          </button>
-          <button
-            onClick={logout}
-            className="rounded-md border border-gray-300 px-4 py-2"
-          >
-            Logout
-          </button>
-        </div>
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Business dashboard" />
+        <section className="mx-auto max-w-3xl p-8">
+          <h1 className="text-3xl font-semibold">Business onboarding required</h1>
+          <p className="mt-2 text-gray-600">
+            Create your first business profile before using dashboard operations.
+          </p>
+          <div className="mt-6 flex gap-3">
+            <button
+              onClick={() => router.push("/dashboard/onboarding")}
+              className="rounded-md bg-black px-4 py-2 text-white"
+            >
+              Start onboarding
+            </button>
+            <button
+              onClick={logout}
+              className="rounded-md border border-gray-300 px-4 py-2"
+            >
+              Logout
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
@@ -122,6 +147,7 @@ export default function DashboardPage() {
         : selectedBusiness?.status === "archived"
           ? "Archived - restore within 30 days"
           : "Approved";
+  const showQuickActions = !showArchived && selectedBusiness?.status !== "archived";
 
   const runArchive = async () => {
     if (!selectedBusiness) return;
@@ -162,11 +188,13 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
+      <AppHeader leftMeta="Business dashboard" />
       <section className="mx-auto max-w-6xl space-y-6 p-6">
+        <BodyBackButton />
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-5">
           <div>
             <h1 className="text-2xl font-semibold">Business Dashboard</h1>
-            <p className="text-sm text-gray-600">{user.email}</p>
+            <p className="text-sm text-gray-600">Manage businesses, archive state, and operations.</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -175,75 +203,108 @@ export default function DashboardPage() {
             >
               Add business
             </button>
-            <button
-              onClick={logout}
-              className="rounded-md bg-black px-3 py-2 text-sm text-white"
-            >
-              Logout
-            </button>
           </div>
         </header>
 
-        <section className="rounded-xl border bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Your businesses</p>
-            <button
-              onClick={() => setShowArchived((current) => !current)}
-              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium"
-            >
-              {showArchived ? "Show active" : "Show archived"}
-            </button>
-          </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleBusinesses.map((business) => (
+        <div
+          className={`grid gap-4 ${
+            showQuickActions ? "lg:grid-cols-[1fr_320px]" : ""
+          }`}
+        >
+          <section className="rounded-xl border bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">Your businesses</p>
               <button
-                key={business.id}
-                onClick={() => selectBusiness(business.id)}
+                onClick={() => setShowArchived((current) => !current)}
+                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium"
+              >
+                {showArchived ? "Show active" : "Show archived"}
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleBusinesses.map((business) => (
+                <button
+                  key={business.id}
+                  onClick={() => selectBusiness(business.id)}
                 className={`rounded-lg border p-4 text-left transition ${
                   selectedBusiness?.id === business.id
                     ? business.status === "archived"
-                      ? "border-red-300 bg-red-100"
-                      : "border-black bg-gray-100"
+                      ? "border-2 border-red-300 bg-red-100"
+                        : "border-2 border-orange-300 bg-gray-100"
                     : business.status === "archived"
                       ? "border-red-200 bg-red-50 hover:bg-red-100/70"
                       : "border-gray-200 bg-white hover:bg-gray-50"
                 }`}
-              >
-                <div className="flex items-center gap-3">
-                  {business.logoUrl ? (
-                    <img
-                      src={business.logoUrl}
-                      alt={`${business.name} logo`}
-                      className="h-12 w-12 rounded-md border object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-gray-100 text-xs font-semibold text-gray-600">
-                      {business.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{business.name}</p>
-                    <p className="truncate text-sm text-gray-600">{business.slug}</p>
-                  </div>
-                </div>
-                <span
-                  className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs capitalize ${
-                    business.status === "archived"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-gray-200 text-gray-700"
-                  }`}
                 >
-                  {business.status}
-                </span>
+                  <div className="flex items-center gap-3">
+                    {business.logoUrl ? (
+                      <img
+                        src={business.logoUrl}
+                        alt={`${business.name} logo`}
+                        className="h-12 w-12 rounded-md border object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-gray-100 text-xs font-semibold text-gray-600">
+                        {business.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{business.name}</p>
+                      <p className="truncate text-sm text-gray-600">{business.slug}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs capitalize ${
+                      business.status === "archived"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    {business.status}
+                  </span>
+                </button>
+              ))}
+              {visibleBusinesses.length === 0 && (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">
+                  No businesses to show for this view.
+                </div>
+              )}
+            </div>
+          </section>
+          {showQuickActions && (
+            <div className="space-y-3">
+              <button
+                onClick={() => router.push("/dashboard/menu")}
+                className="w-full rounded-xl border border-orange-200 bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 p-5 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+              >
+                <p className="text-2xl font-semibold text-slate-900">Manage menu</p>
+                <p className="mt-2 text-sm text-slate-700">
+                  Edit categories, prices, availability, and images.
+                </p>
               </button>
-            ))}
-            {visibleBusinesses.length === 0 && (
-              <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">
-                No businesses to show for this view.
+              <div className="flex items-start gap-2">
+                <button
+                  onClick={() => setArchiveDialogOpen(true)}
+                  className="rounded-lg border border-red-200 bg-gradient-to-br from-rose-100 via-red-100 to-orange-100 px-4 py-3 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                >
+                  <p className="text-base font-semibold text-red-800">Archive business</p>
+                </button>
+                <button
+                  onClick={() =>
+                    selectedBusiness
+                      ? router.push(`/dashboard/onboarding?businessId=${selectedBusiness.id}`)
+                      : null
+                  }
+                  aria-label="Edit business details"
+                  title="Edit business details"
+                  className="rounded-lg border border-slate-300 bg-white p-3 text-slate-800 shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                >
+                  <PencilIcon />
+                </button>
               </div>
-            )}
-          </div>
-        </section>
+            </div>
+          )}
+        </div>
 
         <section
           className={`relative rounded-xl border p-6 ${
@@ -255,22 +316,7 @@ export default function DashboardPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Active business overview</h2>
             <div className="flex items-center gap-2">
-              {selectedBusiness?.status !== "archived" ? (
-                <>
-                  <button
-                    onClick={() => router.push("/dashboard/menu")}
-                    className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium"
-                  >
-                    Manage menu
-                  </button>
-                  <button
-                    onClick={() => setArchiveDialogOpen(true)}
-                    className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-700"
-                  >
-                    Archive business
-                  </button>
-                </>
-              ) : (
+              {selectedBusiness?.status === "archived" ? (
                 <button
                   onClick={runRestore}
                   disabled={restoreSubmitting}
@@ -278,7 +324,7 @@ export default function DashboardPage() {
                 >
                   {restoreSubmitting ? "Restoring..." : "Restore business"}
                 </button>
-              )}
+              ) : null}
               <span
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   selectedBusiness?.status === "archived"

@@ -146,6 +146,7 @@ const menuItemAvailabilitySchema = z.object({
 const menuItemListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
+  categoryId: z.string().min(1).optional(),
 });
 const menuItemSuggestionQuerySchema = z.object({
   categoryId: z.string().min(1),
@@ -850,15 +851,21 @@ router.post(
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
       return;
     }
+    const orderedCategoryIds = parsed.data.orders.map((item) => item.id);
+    if (new Set(orderedCategoryIds).size !== orderedCategoryIds.length) {
+      sendError(res, "Duplicate category ids in reorder payload", 400, "VALIDATION_ERROR");
+      return;
+    }
+
     await prisma.$transaction(
-      parsed.data.orders.map((item) =>
+      orderedCategoryIds.map((id, sortOrder) =>
         prisma.category.updateMany({
-          where: { id: item.id, businessId: req.business!.id },
-          data: { sortOrder: item.sortOrder },
+          where: { id, businessId: req.business!.id },
+          data: { sortOrder },
         })
       )
     );
-    sendSuccess(res, { updated: parsed.data.orders.length });
+    sendSuccess(res, { updated: orderedCategoryIds.length });
   })
 );
 
@@ -902,12 +909,26 @@ router.get(
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
       return;
     }
-    const { page, limit } = parsed.data;
+    const { page, limit, categoryId } = parsed.data;
+    if (categoryId) {
+      const category = await prisma.category.findFirst({
+        where: { id: categoryId, businessId: req.business!.id },
+        select: { id: true },
+      });
+      if (!category) {
+        sendError(res, "Category not found", 404, "CATEGORY_NOT_FOUND");
+        return;
+      }
+    }
     const skip = (page - 1) * limit;
+    const where = {
+      businessId: req.business!.id,
+      ...(categoryId ? { categoryId } : {}),
+    };
     const [total, items] = await prisma.$transaction([
-      prisma.menuItem.count({ where: { businessId: req.business!.id } }),
+      prisma.menuItem.count({ where }),
       prisma.menuItem.findMany({
-        where: { businessId: req.business!.id },
+        where,
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         skip,
         take: limit,
@@ -1005,15 +1026,21 @@ router.post(
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
       return;
     }
+    const orderedItemIds = parsed.data.orders.map((item) => item.id);
+    if (new Set(orderedItemIds).size !== orderedItemIds.length) {
+      sendError(res, "Duplicate menu item ids in reorder payload", 400, "VALIDATION_ERROR");
+      return;
+    }
+
     await prisma.$transaction(
-      parsed.data.orders.map((item) =>
+      orderedItemIds.map((id, sortOrder) =>
         prisma.menuItem.updateMany({
-          where: { id: item.id, businessId: req.business!.id },
-          data: { sortOrder: item.sortOrder },
+          where: { id, businessId: req.business!.id },
+          data: { sortOrder },
         })
       )
     );
-    sendSuccess(res, { updated: parsed.data.orders.length });
+    sendSuccess(res, { updated: orderedItemIds.length });
   })
 );
 

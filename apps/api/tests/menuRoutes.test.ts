@@ -521,6 +521,88 @@ describe("Layer 4 menu routes", () => {
     expect(deleted._getStatusCode()).toBe(200);
   });
 
+  it("filters menu-item listing by categoryId", async () => {
+    const user = users[0];
+    const cat1 = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Main" },
+    });
+    const cat2 = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Dessert" },
+    });
+    const categoryId1 = cat1._getJSONData().data.category.id;
+    const categoryId2 = cat2._getJSONData().data.category.id;
+
+    await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: {
+        categoryId: categoryId1,
+        name: "Burger",
+        price: "12.50",
+      },
+    });
+    await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: {
+        categoryId: categoryId2,
+        name: "Brownie",
+        price: "8.50",
+      },
+    });
+
+    const filtered = await run(
+      "GET",
+      `/menu-items?page=1&limit=10&categoryId=${categoryId2}`,
+      {
+        user,
+        headers: { "x-business-id": "b_1" },
+      }
+    );
+    expect(filtered._getStatusCode()).toBe(200);
+    expect(filtered._getJSONData().data.total).toBe(1);
+    expect(filtered._getJSONData().data.items[0].name).toBe("Brownie");
+  });
+
+  it("normalizes reorder sortOrder to contiguous values", async () => {
+    const user = users[0];
+    const cat = await run("POST", "/categories", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { name: "Main" },
+    });
+    const categoryId = cat._getJSONData().data.category.id;
+
+    const item1 = await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { categoryId, name: "Burger", price: "12.50" },
+    });
+    const item2 = await run("POST", "/menu-items", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { categoryId, name: "Pasta", price: "10.00" },
+    });
+    const id1 = item1._getJSONData().data.item.id;
+    const id2 = item2._getJSONData().data.item.id;
+
+    const reordered = await run("POST", "/menu-items/reorder", {
+      user,
+      headers: { "x-business-id": "b_1" },
+      body: { orders: [{ id: id2, sortOrder: 99 }, { id: id1, sortOrder: 77 }] },
+    });
+    expect(reordered._getStatusCode()).toBe(200);
+
+    const latestItem1 = menuItems.find((item) => item.id === id1);
+    const latestItem2 = menuItems.find((item) => item.id === id2);
+    expect(latestItem2?.sortOrder).toBe(0);
+    expect(latestItem1?.sortOrder).toBe(1);
+  });
+
   it("validates menu-item update payloads and category ownership", async () => {
     const user = users[0];
     const cat = await run("POST", "/categories", {

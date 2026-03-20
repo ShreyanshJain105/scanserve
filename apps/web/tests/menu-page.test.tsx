@@ -48,7 +48,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Starters", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({
           items: [],
           total: 0,
@@ -87,7 +87,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Starters", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({
           items: [],
           total: 25,
@@ -95,7 +95,7 @@ describe("DashboardMenuPage", () => {
           limit: 10,
         });
       }
-      if (path === "/api/business/menu-items?page=2&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=2&limit=10")) {
         return Promise.resolve({
           items: [],
           total: 25,
@@ -122,7 +122,7 @@ describe("DashboardMenuPage", () => {
 
     await waitFor(() => {
       expect(apiFetchMock).toHaveBeenCalledWith(
-        "/api/business/menu-items?page=2&limit=10",
+        "/api/business/menu-items?page=2&limit=10&categoryId=c1",
         expect.objectContaining({ method: "GET" })
       );
       expect(screen.getByText("Page 2 of 3 (25 total items)")).toBeTruthy();
@@ -158,7 +158,10 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Main", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10" && options?.method === "GET") {
+      if (
+        path.startsWith("/api/business/menu-items?page=1&limit=10") &&
+        options?.method === "GET"
+      ) {
         return Promise.resolve({
           items: currentItems,
           total: currentItems.length,
@@ -210,6 +213,12 @@ describe("DashboardMenuPage", () => {
     fireEvent.click(screen.getByLabelText("Delete item Burger XL"));
 
     await waitFor(() => {
+      expect(screen.getByText("Delete menu item?")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Confirm delete"));
+
+    await waitFor(() => {
       expect(apiFetchMock).toHaveBeenCalledWith(
         "/api/business/menu-items/i1",
         expect.objectContaining({ method: "DELETE" })
@@ -241,7 +250,7 @@ describe("DashboardMenuPage", () => {
       if (path === "/api/business/categories") {
         return Promise.resolve({ categories: [] });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({ items: [], total: 0, page: 1, limit: 10 });
       }
       if (path === "/api/business/menu-suggestions/categories") {
@@ -272,7 +281,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Beverages", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({
           items: [
             {
@@ -338,7 +347,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Desserts", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({
           items: [
             {
@@ -390,7 +399,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Desserts", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({
           items: [
             {
@@ -468,7 +477,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Main", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({ items: [], total: 0, page: 1, limit: 10 });
       }
       if (path === "/api/business/menu-suggestions/categories") {
@@ -521,7 +530,7 @@ describe("DashboardMenuPage", () => {
           ],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({ items: [], total: 0, page: 1, limit: 10 });
       }
       if (path === "/api/business/menu-suggestions/categories") {
@@ -568,7 +577,7 @@ describe("DashboardMenuPage", () => {
           categories: [{ id: "c1", businessId: "b1", name: "Beverages", sortOrder: 0 }],
         });
       }
-      if (path === "/api/business/menu-items?page=1&limit=10") {
+      if (path.startsWith("/api/business/menu-items?page=1&limit=10")) {
         return Promise.resolve({ items: [], total: 0, page: 1, limit: 10 });
       }
       if (path === "/api/business/menu-suggestions/categories") {

@@ -7,6 +7,9 @@ import { DIETARY_TAGS, type Category, type MenuItem } from "@scan2serve/shared";
 import { useAuth } from "../../../lib/auth-context";
 import { apiFetch } from "../../../lib/api";
 import { showToast } from "../../../lib/toast";
+import { ModalDialog } from "../../../components/ui/modal-dialog";
+import { AppHeader } from "../../../components/layout/app-header";
+import { BodyBackButton } from "../../../components/layout/body-back-button";
 
 type MenuItemsResponse = {
   items: MenuItem[];
@@ -27,6 +30,12 @@ type ItemEditDraft = {
   categoryId: string;
   dietaryTag: string;
   description: string;
+};
+
+type PendingDeleteTarget = {
+  entity: "category" | "item";
+  id: string;
+  name: string;
 };
 
 type IconProps = {
@@ -107,6 +116,7 @@ export default function DashboardMenuPage() {
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
   const [generatingImageItemId, setGeneratingImageItemId] = useState<string | null>(null);
   const [uploadTargetItem, setUploadTargetItem] = useState<MenuItem | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDeleteTarget | null>(null);
   const suggestionRequestIdRef = useRef(0);
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -191,18 +201,26 @@ export default function DashboardMenuPage() {
     setItemSuggestions(data?.suggestions ?? []);
   };
 
-  const loadItems = async (page: number) => {
+  const loadItems = async (page: number, categoryId?: string) => {
     if (!headers) return;
+    const activeCategoryId = categoryId ?? selectedCategoryId;
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(itemLimit),
+    });
+    if (activeCategoryId) {
+      params.set("categoryId", activeCategoryId);
+    }
     const itemData = await apiFetch<MenuItemsResponse>(
-      `/api/business/menu-items?page=${page}&limit=${itemLimit}`,
+      `/api/business/menu-items?${params.toString()}`,
       {
         method: "GET",
         headers,
       }
     );
-    setItems(itemData.items);
-    setItemPage(itemData.page);
-    setItemTotal(itemData.total);
+    setItems(Array.isArray(itemData.items) ? itemData.items : []);
+    setItemPage(typeof itemData.page === "number" ? itemData.page : page);
+    setItemTotal(typeof itemData.total === "number" ? itemData.total : 0);
   };
 
   useEffect(() => {
@@ -216,11 +234,23 @@ export default function DashboardMenuPage() {
 
   useEffect(() => {
     if (!blocked) {
-      Promise.all([loadCategories(), loadItems(1), loadCategorySuggestions()]).catch((err) =>
-        setError(err instanceof Error ? err.message : "Failed to load menu")
-      );
+      loadCategories()
+        .then((loadedCategories) =>
+          Promise.all([
+            loadItems(1, loadedCategories[0]?.id),
+            loadCategorySuggestions(),
+          ])
+        )
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load menu"));
     }
   }, [blocked, headers, itemLimit]);
+
+  useEffect(() => {
+    if (blocked || !selectedCategoryId) return;
+    loadItems(1, selectedCategoryId).catch((err) =>
+      setError(err instanceof Error ? err.message : "Failed to load menu page")
+    );
+  }, [blocked, selectedCategoryId]);
 
   useEffect(() => {
     if (blocked) return;
@@ -239,16 +269,30 @@ export default function DashboardMenuPage() {
     };
   }, [blocked, headers, selectedBusiness, selectedCategoryId, categories, itemTotal, itemName]);
 
-  if (loading) return <main className="min-h-screen p-8">Loading...</main>;
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Menu management" />
+        <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
+          <p>Loading...</p>
+        </section>
+      </main>
+    );
+  }
   if (!user) return null;
 
   if (user.role !== "business") {
-    return <main className="min-h-screen p-8">Only business users can manage menu.</main>;
+    return (
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Menu management" />
+        <section className="mx-auto max-w-6xl p-6">Only business users can manage menu.</section>
+      </main>
+    );
   }
 
   const hasCategories = categories.length > 0;
   const totalPages = Math.max(1, Math.ceil(itemTotal / itemLimit));
-  const filteredItems = items.filter((item) => item.categoryId === selectedCategoryId);
+  const filteredItems = items;
 
   const createCategory = async (e: FormEvent) => {
     e.preventDefault();
@@ -401,25 +445,13 @@ export default function DashboardMenuPage() {
     }
   };
 
-  const deleteCategory = async (categoryId: string) => {
-    if (!headers) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await apiFetch(`/api/business/categories/${categoryId}`, {
-        method: "DELETE",
-        headers,
-      });
-      if (selectedCategoryId === categoryId) {
-        setSelectedCategoryId("");
-      }
-      await Promise.all([loadCategories(), loadCategorySuggestions()]);
-      await loadItems(1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete category");
-    } finally {
-      setBusy(false);
-    }
+  const requestDeleteCategory = (categoryId: string) => {
+    const category = categories.find((entry) => entry.id === categoryId);
+    setPendingDelete({
+      entity: "category",
+      id: categoryId,
+      name: category?.name ?? "this category",
+    });
   };
 
   const startItemEdit = (item: MenuItem) => {
@@ -460,19 +492,48 @@ export default function DashboardMenuPage() {
     }
   };
 
-  const deleteItem = async (itemId: string) => {
-    if (!headers) return;
+  const requestDeleteItem = (itemId: string) => {
+    const item = filteredItems.find((entry) => entry.id === itemId);
+    setPendingDelete({
+      entity: "item",
+      id: itemId,
+      name: item?.name ?? "this item",
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!headers || !pendingDelete) return;
+    const target = pendingDelete;
     setBusy(true);
     setError(null);
     try {
-      await apiFetch(`/api/business/menu-items/${itemId}`, {
-        method: "DELETE",
-        headers,
-      });
-      const nextPage = items.length === 1 && itemPage > 1 ? itemPage - 1 : itemPage;
-      await loadItems(nextPage);
+      if (target.entity === "category") {
+        await apiFetch(`/api/business/categories/${target.id}`, {
+          method: "DELETE",
+          headers,
+        });
+        if (selectedCategoryId === target.id) {
+          setSelectedCategoryId("");
+        }
+        await Promise.all([loadCategories(), loadCategorySuggestions()]);
+        await loadItems(1);
+      } else {
+        await apiFetch(`/api/business/menu-items/${target.id}`, {
+          method: "DELETE",
+          headers,
+        });
+        const nextPage = items.length === 1 && itemPage > 1 ? itemPage - 1 : itemPage;
+        await loadItems(nextPage);
+      }
+      setPendingDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete menu item");
+      setError(
+        err instanceof Error
+          ? err.message
+          : target.entity === "category"
+            ? "Failed to delete category"
+            : "Failed to delete menu item"
+      );
     } finally {
       setBusy(false);
     }
@@ -607,7 +668,8 @@ export default function DashboardMenuPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
+    <main className="min-h-screen bg-gray-50">
+      <AppHeader leftMeta="Menu management" />
       <input
         ref={imageFileInputRef}
         type="file"
@@ -615,7 +677,9 @@ export default function DashboardMenuPage() {
         onChange={handleUploadInputChange}
         className="hidden"
       />
-      <section className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[320px_1fr]">
+      <section className="mx-auto max-w-6xl p-6">
+        <BodyBackButton className="mb-4" />
+        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-xl border bg-white p-4">
           <h2 className="text-lg font-semibold">Categories</h2>
           <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
@@ -689,7 +753,9 @@ export default function DashboardMenuPage() {
                 ) : (
                   <div className="space-y-2">
                     <button
-                      onClick={() => setSelectedCategoryId(category.id)}
+                      onClick={() => {
+                        setSelectedCategoryId(category.id);
+                      }}
                       className={`w-full rounded-lg border px-3 py-2 text-left text-sm font-medium transition ${
                         selectedCategoryId === category.id
                           ? "border-slate-400 bg-slate-100 text-slate-900 shadow-sm"
@@ -727,7 +793,7 @@ export default function DashboardMenuPage() {
                         <PencilIcon />
                       </button>
                       <button
-                        onClick={() => deleteCategory(category.id)}
+                        onClick={() => requestDeleteCategory(category.id)}
                         disabled={busy || blocked}
                         aria-label={`Delete category ${category.name}`}
                         title={`Delete ${category.name}`}
@@ -1044,7 +1110,7 @@ export default function DashboardMenuPage() {
                           <PencilIcon />
                         </button>
                         <button
-                          onClick={() => deleteItem(item.id)}
+                          onClick={() => requestDeleteItem(item.id)}
                           disabled={busy || blocked}
                           aria-label={`Delete item ${item.name}`}
                           title={`Delete ${item.name}`}
@@ -1095,8 +1161,38 @@ export default function DashboardMenuPage() {
               </div>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
       </section>
+      <ModalDialog
+        open={!!pendingDelete}
+        title={pendingDelete?.entity === "category" ? "Delete category?" : "Delete menu item?"}
+        subtitle={
+          pendingDelete?.entity === "category"
+            ? `Delete "${pendingDelete.name}" only if it has no items.`
+            : `Delete "${pendingDelete?.name}" permanently.`
+        }
+        onClose={busy ? undefined : () => setPendingDelete(null)}
+      >
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setPendingDelete(null)}
+            disabled={busy}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirmDelete()}
+            disabled={busy}
+            className="rounded-md bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+          >
+            {busy ? "Deleting..." : "Confirm delete"}
+          </button>
+        </div>
+      </ModalDialog>
     </main>
   );
 }

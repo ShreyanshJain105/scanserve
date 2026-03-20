@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../../lib/auth-context";
 import { showToast } from "../../../lib/toast";
 import { apiFetch } from "../../../lib/api";
+import { AppHeader } from "../../../components/layout/app-header";
+import { BodyBackButton } from "../../../components/layout/body-back-button";
 
 type FormState = {
   name: string;
@@ -166,8 +168,11 @@ function BusinessOnboardingPageContent() {
 
   if (loading || !user || user.role !== "business") {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Business onboarding" />
+        <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
+          <p>Loading...</p>
+        </section>
       </main>
     );
   }
@@ -234,8 +239,11 @@ function BusinessOnboardingPageContent() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <section className="mx-auto max-w-2xl rounded-xl border bg-white p-6">
+    <main className="min-h-screen bg-gray-50">
+      <AppHeader leftMeta="Business onboarding" />
+      <section className="mx-auto max-w-2xl p-6">
+        <BodyBackButton className="mb-4" />
+        <div className="rounded-xl border bg-white p-6">
         <h1 className="text-2xl font-semibold">
           {existing ? "Update your business profile" : "Create your business profile"}
         </h1>
@@ -264,10 +272,19 @@ function BusinessOnboardingPageContent() {
               onChange={(event) =>
                 setForm((current) => ({ ...current, name: event.target.value }))
               }
-              className="rounded-md border px-3 py-2"
+              className={`rounded-md border px-3 py-2 ${
+                existing ? "cursor-not-allowed bg-gray-100 text-gray-600" : ""
+              }`}
               placeholder="Example: Green Leaf Cafe"
+              disabled={!!existing}
+              readOnly={!!existing}
               required
             />
+            {existing ? (
+              <span className="text-xs text-gray-500">
+                Business name is locked after profile creation.
+              </span>
+            ) : null}
           </label>
 
           <label className="grid gap-1 text-sm">
@@ -450,6 +467,7 @@ function BusinessOnboardingPageContent() {
             </button>
           </div>
         </form>
+        </div>
       </section>
     </main>
   );
@@ -459,8 +477,11 @@ export default function BusinessOnboardingPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen flex items-center justify-center">
-          <p>Loading...</p>
+        <main className="min-h-screen bg-gray-50">
+          <AppHeader leftMeta="Business onboarding" />
+          <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
+            <p>Loading...</p>
+          </section>
         </main>
       }
     >

@@ -4,9 +4,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import BusinessOnboardingPage from "../src/app/dashboard/onboarding/page";
 
 const pushMock = vi.fn();
+const searchParamsMockState = { value: "" };
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(searchParamsMockState.value),
 }));
 
 const useAuthMock = vi.fn();
@@ -28,6 +29,7 @@ describe("BusinessOnboardingPage", () => {
     pushMock.mockReset();
     useAuthMock.mockReset();
     apiFetchMock.mockReset();
+    searchParamsMockState.value = "";
     vi.stubGlobal("URL", {
       ...URL,
       createObjectURL: vi.fn(() => "blob:preview"),
@@ -122,5 +124,42 @@ describe("BusinessOnboardingPage", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
+  });
+
+  it("locks business name and slug when editing existing profile", async () => {
+    searchParamsMockState.value = "businessId=b1";
+    useAuthMock.mockReturnValue({
+      user: { id: "u1", email: "biz@example.com", role: "business" },
+      loading: false,
+      businesses: [
+        {
+          id: "b1",
+          userId: "u1",
+          name: "Locked Cafe",
+          slug: "locked-cafe",
+          currencyCode: "USD",
+          description: "desc",
+          logoUrl: null,
+          address: "Addr",
+          phone: "12345",
+          status: "approved",
+          createdAt: "",
+          updatedAt: "",
+          rejections: [],
+        },
+      ],
+      createBusinessProfile: vi.fn(),
+      updateBusinessProfile: vi.fn(),
+      refreshBusinessProfiles: vi.fn(),
+    });
+
+    render(<BusinessOnboardingPage />);
+
+    const nameInput = screen.getByDisplayValue("Locked Cafe") as HTMLInputElement;
+    const slugInput = screen.getByDisplayValue("locked-cafe") as HTMLInputElement;
+
+    expect(nameInput.disabled).toBe(true);
+    expect(slugInput.disabled).toBe(true);
+    expect(screen.getByText("Business name is locked after profile creation.")).toBeTruthy();
   });
 });

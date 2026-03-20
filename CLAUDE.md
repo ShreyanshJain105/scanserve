@@ -449,3 +449,23 @@ This section is the high-level source of truth for what is already implemented a
 - Root spec-sync pass completed: `Database Schema`, `API Endpoints`, `Key Frontend Routes`, and monorepo command guidance were reconciled against live code and `STATUS.md` so base CLAUDE reflects real current behavior.
 - ADR-017 accepted and implemented: dashboard business cards render logos, businesses can be archived/restored via API/UI, archived entries are hidden by default in dashboard, and a scheduled worker permanently deletes >30-day archived businesses with audit logging.
 - ADR-018 accepted and implemented: public web surfaces now use a structured light-theme shell (header/main/footer), home includes hero + authenticated profile section, and auth entry points are dialog-based on home plus QR auth pages while keeping `/login` and `/register/business` as functional fallback routes.
+- Layer 4 completion pass finalized:
+  - API menu-item listing now supports `categoryId` query filtering with ownership validation,
+  - category/item reorder endpoints normalize persisted `sortOrder` values to contiguous `0..N-1`,
+  - reorder payloads reject duplicate IDs.
+- Dashboard menu now requests category-scoped item pages and reloads items on category switch; delete actions (category/item) use explicit confirm guards.
+- Layer 4 validation status: `pnpm --filter @scan2serve/api test` (47/47) and `pnpm --filter @scan2serve/web test` (29/29) are passing after category-filter URL test alignment.
+- Dashboard menu delete UX follow-up: category/item delete confirmations are now rendered as in-app modal dialogs (not browser `window.confirm`) for consistency with dashboard interaction patterns.
+- Web UI shell consistency update: all UI pages now use a shared header pattern with home-link brand (`Scan2Serve`) and right-aligned profile info/actions; dashboard/admin/onboarding/menu pages render the same header component used by public shell routes.
+- Shared header now includes a cross-page back-navigation control (`Back`, hidden on `/home`) using browser history with `/home` fallback.
+- Back-navigation placement revised: `Back` now appears in body top-left (not header) through shared web component usage on public and dashboard/admin surfaces.
+- Dashboard quick-action affordance update: `Manage menu` is now surfaced as a dedicated bright gradient clickable card in dashboard overview rather than a small inline button.
+- Dashboard quick-action placement refinement: gradient `Manage menu` card is positioned with the business cards (`Your businesses` section), not inside Active Business Overview.
+- Dashboard quick-action placement latest: gradient `Manage menu` card is a separate panel on the right side of the `Your businesses` area (outside that card container).
+- Dashboard visual consistency update: selected business card highlight now matches the manage-menu gradient style, and manage-menu helper copy is intentionally shorter to reduce clutter.
+- Dashboard style correction: selected business cards use prior neutral selected fill again, with gradient-family border color as accent.
+- Dashboard selected-card emphasis: selected business cards now use thicker borders (`border-2`) for clearer selection pop.
+- Dashboard action cards update: right-side quick-action panel now stacks `Manage menu` and `Archive business` cards; archive action is no longer an inline button in Active Business Overview.
+- Dashboard action controls now include an `Edit details` action beside archive in the right quick-action area, routing to onboarding edit for selected business.
+- Business profile edit policy in web UI now locks `name` alongside immutable slug; edit mode updates only non-name profile fields.
+- Dashboard archived-view policy: enabling `Show archived` hides non-archived operational quick actions (menu/edit/archive) so archived browsing is read-only focused.

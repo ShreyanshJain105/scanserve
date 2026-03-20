@@ -161,6 +161,9 @@ describe("DashboardPage", () => {
     fireEvent.click(screen.getByText("Show archived"));
     expect(screen.getByText("Old Cafe")).toBeTruthy();
     expect(screen.queryByText("Active Cafe")).toBeNull();
+    expect(screen.queryByText("Manage menu")).toBeNull();
+    expect(screen.queryByLabelText("Edit business details")).toBeNull();
+    expect(screen.queryByText("Archive business")).toBeNull();
     const archivedChip = screen.getByText("archived");
     expect(archivedChip.className.includes("bg-red-100")).toBe(true);
   });

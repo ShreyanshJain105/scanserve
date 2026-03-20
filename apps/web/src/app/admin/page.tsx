@@ -6,13 +6,15 @@ import type { BusinessProfile } from "@scan2serve/shared";
 import { useAuth } from "../../lib/auth-context";
 import { apiFetch } from "../../lib/api";
 import { showToast } from "../../lib/toast";
+import { AppHeader } from "../../components/layout/app-header";
+import { BodyBackButton } from "../../components/layout/body-back-button";
 
 type AdminBusiness = BusinessProfile & {
   rejections?: { id: string; reason: string | null; createdAt: string }[];
 };
 
 export default function AdminPage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([]);
   const [statusFilter, setStatusFilter] = useState<
@@ -98,26 +100,25 @@ export default function AdminPage() {
 
   if (loading || !user || user.role !== "admin") {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+      <main className="min-h-screen bg-gray-50">
+        <AppHeader leftMeta="Admin moderation" />
+        <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
+          <p>Loading...</p>
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <section className="mx-auto max-w-6xl space-y-6">
+    <main className="min-h-screen bg-gray-50">
+      <AppHeader leftMeta="Admin moderation" />
+      <section className="mx-auto max-w-6xl space-y-6 p-6">
+        <BodyBackButton />
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-5">
           <div>
             <h1 className="text-2xl font-semibold">Admin Moderation</h1>
             <p className="text-sm text-gray-600">Pending businesses: {pendingCount}</p>
           </div>
-          <button
-            onClick={logout}
-            className="rounded-md bg-black px-4 py-2 text-sm text-white"
-          >
-            Logout
-          </button>
         </header>
 
         <section className="rounded-xl border bg-white p-4">

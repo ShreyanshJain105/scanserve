@@ -139,3 +139,30 @@ pnpm lint   # run Next.js ESLint
 - Public placeholder alignment: `/menu/[slug]` now uses the same structured public shell and sectioned layout.
 - Light-theme baseline update in `src/app/globals.css`: semantic light tokens and explicit sans/display typography stacks for consistent bright visual direction.
 - Added `tests/home-page.test.tsx` to cover home dialog opening and authenticated profile CTA behavior.
+- Layer 4 completion follow-up in `src/app/dashboard/menu/page.tsx`:
+  - menu-item list fetches now pass `categoryId` and reload page-1 data when selected category changes,
+  - list response handling now defaults safely for missing/partial payloads to prevent render-time crashes,
+  - category/item delete actions now require explicit `confirm(...)`.
+- Updated `tests/menu-page.test.tsx` to align menu-item mocks with category-filtered URL shape and keep confirm flow deterministic via global confirm stub.
+- Delete-confirm UX refinement: replaced browser-native `window.confirm(...)` in `src/app/dashboard/menu/page.tsx` with in-app modal confirmation UI using `src/components/ui/modal-dialog.tsx`, matching dashboard-style dialog behavior.
+- Updated menu delete test flow (`tests/menu-page.test.tsx`) to assert and confirm through dialog action (`Confirm delete`) instead of stubbing global confirm.
+- Global header consistency update:
+  - added shared app header component `src/components/layout/app-header.tsx` with brand link to `/home` and profile block at top-right.
+  - public shell now reuses this header (`src/components/public/public-site-shell.tsx`) so home/auth/QR/public menu pages stay aligned.
+  - dashboard/admin/onboarding/menu pages now render the same header with optional left-side page context metadata.
+- Header navigation update: shared app header now includes a `Back` button (hidden on `/home`) that uses browser history when available and falls back to `/home`.
+- Back-button placement update: moved `Back` out of header into main content top-left via `src/components/layout/body-back-button.tsx`.
+- `PublicSiteShell` now renders the shared body back control above page content; dashboard/admin/onboarding/menu pages render the same body back control at the top of their main sections.
+- Dashboard UI refinement: converted the small `Manage menu` action into a separate full-width clickable gradient card in `src/app/dashboard/page.tsx` for stronger visual priority and discoverability.
+- Dashboard placement follow-up: moved the gradient `Manage menu` quick-action card out of Active Business Overview and into the `Your businesses` grid as the leading card.
+- Dashboard placement correction: moved the gradient `Manage menu` quick-action card outside the `Your businesses` container and placed it as a separate right-side panel beside that section.
+- Dashboard polish follow-up:
+  - simplified `Manage menu` card copy to reduce visual clutter,
+  - selected non-archived business cards now use the same amber-orange-rose gradient treatment as the menu quick-action card.
+- Dashboard selection style follow-up: reverted selected non-archived business-card fill to previous neutral background (`bg-gray-100`) and retained a gradient-aligned accent via border color (`border-orange-300`).
+- Dashboard selection emphasis tweak: increased selected business-card border thickness to `border-2` (both archived and non-archived selected states) for stronger visual prominence.
+- Dashboard action layout refinement: pulled `Archive business` out of Active Business Overview and rendered it as a separate clickable card below `Manage menu` in the right-side quick-action panel.
+- Dashboard quick-actions update: added `Edit details` button adjacent to archive action card in right panel; routes to onboarding edit path (`/dashboard/onboarding?businessId=...`).
+- Onboarding edit restrictions: existing business profiles now lock `Business name` input (read-only/disabled), matching slug immutability and allowing edits only for other fields.
+- Added onboarding regression coverage (`tests/onboarding-page.test.tsx`) to verify locked name+slug behavior for existing-profile edit mode.
+- Archived-view guard: when `Show archived` mode is active on dashboard, hide quick actions (`Manage menu`, `Edit details`, `Archive business`) regardless of previously selected active business.

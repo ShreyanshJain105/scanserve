@@ -127,3 +127,8 @@ pnpm db:studio    # open Prisma Studio GUI
   - writes audit rows to `archived_business_deletion_audits`,
   - enqueues menu/logo asset paths into `deleted_asset_cleanups` for deferred S3 deletion.
 - Added archive lifecycle env knobs in `.env.example` and test coverage in `tests/archivedBusinessCleanup.test.ts` plus onboarding-route archive/restore tests.
+- Layer 4 completion update in `src/routes/business.ts`:
+  - `GET /menu-items` now supports optional `categoryId` filtering with category ownership validation.
+  - Category/item reorder endpoints now normalize `sortOrder` to contiguous `0..N-1` values using payload order.
+  - Reorder payload validation now rejects duplicate IDs.
+- Added API regression coverage in `tests/menuRoutes.test.ts` for category-filtered item listing and contiguous reorder normalization behavior.

@@ -11,18 +11,12 @@
 
 **Date:** 2026-03-20
 **What was done:**
-- Marked ADR-018 as accepted and implemented a public-site UI redesign in web.
-- Added reusable public shell with clear `header` + `main` sections/subsections + `footer` (`apps/web/src/components/public/public-site-shell.tsx`).
-- Redesigned home page (`apps/web/src/app/home/page.tsx`) with hero section, structured content sections, light visual direction, and authenticated profile section with a single role CTA.
-- Added reusable dialog surface (`apps/web/src/components/ui/modal-dialog.tsx`) and shared business auth forms (`apps/web/src/components/auth/business-auth-forms.tsx`).
-- Converted auth UX:
-  - `/home` now uses dialog-based login/register flows,
-  - `/login` and `/register/business` remain functional fallback routes and render dialog-style auth surfaces,
-  - `/qr/login` and `/qr/register` now use dialog-style QR auth experiences.
-- Updated public menu placeholder to use the same shell and section structure (`apps/web/src/app/menu/[slug]/page.tsx`).
-- Added home-page coverage (`apps/web/tests/home-page.test.tsx`) and revalidated web quality gates:
-  - `pnpm --filter @scan2serve/web test` passes (`29/29`),
-  - `pnpm --filter @scan2serve/web build` passes.
+- Added archived-view action guard on dashboard:
+  - when `Show archived` is enabled, hide quick action cards/options (`Manage menu`, `Edit details`, `Archive business`).
+- Keeps archived view focused on archived-business browsing without active management controls.
+- Updated dashboard test to assert quick actions are hidden in archived mode.
+- Revalidated web tests:
+  - `pnpm --filter @scan2serve/web test` passes (`30/30`).
 
 **What's NOT done yet:**
 - Local runtime validation with real Nano-Banana credentials is still pending (env placeholders are set, provider key/url not configured).
@@ -32,20 +26,19 @@
 - Production cookie/CORS hardening review still pending once deploy targets are fixed.
 - UI professionalism polish pass is deferred until QR scanning and end-to-end customer flows are fully in place (current redesign kept as interim baseline).
 
-**Next step:** Archive lifecycle observability + migration/runbook hardening
-1. Add admin/debug endpoint for archive cleanup worker health and recent archived-delete audit entries.
-2. Consider persisting explicit `logo_path` for businesses to avoid URL parsing when enqueuing logo cleanup.
-3. Add startup/runbook guard to ensure schema sync (`db:push`/migrate) is always re-run after enum/status model changes.
-4. Add targeted dashboard regression test for loading-to-ready rerender path to catch future hook-order regressions earlier.
-5. After QR scan + customer flow completion, run a dedicated UI professional-polish iteration (visual system, detail consistency, interaction/accessibility QA).
+**Next step:** Start Layer 5 (Table + QR management completion)
+1. Replace placeholder business table endpoints with full CRUD/list behavior and ownership/status gating.
+2. Implement dashboard table-management UI (bulk create, edit labels, activate/deactivate, regenerate QR).
+3. Add QR download/export flows and route-level + UI test coverage for Layer 5 contracts.
+4. Keep archive/deleted-asset cleanup observability follow-ups queued after Layer 5 baseline lands.
 
 **Build progress:**
 ```
 Layer 1:  Foundation          ✅ DONE
 Layer 2:  Authentication      ✅ DONE
 Layer 3:  Business Onboarding ✅ DONE
-Layer 4:  Menu Management     ← NEXT
-Layer 5:  Table & QR Codes
+Layer 4:  Menu Management     ✅ DONE
+Layer 5:  Table & QR Codes    ← NEXT
 Layer 6:  Public Menu & Cart
 Layer 7:  Ordering & Payments
 Layer 8:  Order Management
@@ -456,6 +449,86 @@ Layer 11: Polish & Deploy
 - Converted `/qr/login` and `/qr/register` into dialog-style QR auth pages while preserving QR token behavior.
 - Kept `/login` and `/register/business` as functional fallback routes with dialog-style rendering.
 - Added `tests/home-page.test.tsx` for home dialog + profile CTA behavior and revalidated web test/build pipelines.
+
+### 2026-03-20 — Session 64: Layer 4 completion pass (category-filtered listing + reorder normalization)
+- Finalized Layer 4 backend contracts by adding optional `categoryId` filtering to `GET /api/business/menu-items`, including category ownership validation.
+- Hardened reorder behavior in category/item reorder endpoints to persist contiguous `sortOrder` values (`0..N-1`) and reject duplicate IDs in payloads.
+- Updated dashboard menu loading to request category-scoped items, refresh on category change, and guard against partial list payloads.
+- Added delete confirms for category/item actions in menu UI.
+- Extended API/web test coverage for the new behavior and fixed menu-page mocks for category-query URL shapes.
+- Revalidated both suites: API `47/47` and web `29/29` passing.
+
+### 2026-03-20 — Session 65: Menu delete confirm UX moved to app dialog
+- Replaced `window.confirm(...)` usage in dashboard menu delete actions with in-app modal dialog confirmation.
+- Added shared `ModalDialog` confirm surface for both category and menu-item delete flows in `apps/web/src/app/dashboard/menu/page.tsx`.
+- Updated `apps/web/tests/menu-page.test.tsx` to assert dialog-driven confirmation (`Confirm delete`) before delete API invocation.
+- Revalidated web tests via `pnpm --filter @scan2serve/web test -- tests/menu-page.test.tsx` (29/29 passing in run output).
+
+### 2026-03-20 — Session 66: Shared header across pages with profile at top-right
+- Added reusable app header component (`apps/web/src/components/layout/app-header.tsx`) with brand home-link, optional left metadata slot, and right-side auth/profile controls.
+- Wired `PublicSiteShell` to use this shared header so home, auth fallback pages, QR auth pages, and public menu use the same header baseline.
+- Added shared header to business/admin routes (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/dashboard/menu/page.tsx`, `apps/web/src/app/dashboard/onboarding/page.tsx`, `apps/web/src/app/admin/page.tsx`) for consistent cross-page chrome.
+- Verified web suite after rollout: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 67: Added global header back button
+- Added `Back` navigation control in shared header (`apps/web/src/components/layout/app-header.tsx`).
+- Back button is visible on non-home routes, uses browser history for navigation, and falls back to `/home` when history is unavailable.
+- Verified no regressions with `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 68: Moved back button to body top-left
+- Removed back-navigation control from shared header and introduced shared body-level control (`apps/web/src/components/layout/body-back-button.tsx`).
+- Added body back button at the top-left of main content in public shell and dashboard/admin/onboarding/menu pages.
+- Kept navigation behavior intact (history back with `/home` fallback; hidden on `/home`).
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 69: Dashboard manage-menu action promoted to gradient card
+- Removed the inline `Manage menu` button from the dashboard overview action row.
+- Added a separate clickable quick-action card with bright gradient styling in `apps/web/src/app/dashboard/page.tsx` that navigates to `/dashboard/menu`.
+- Kept archive/restore status actions unchanged and preserved blocked-state behavior.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 70: Moved manage-menu card beside business cards
+- Moved the gradient `Manage menu` quick-action card out of Active Business Overview into the `Your businesses` grid as the left/leading card.
+- Preserved route behavior (`/dashboard/menu`) and visual emphasis styling.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 71: Manage-menu card moved outside businesses card to right panel
+- Updated dashboard layout to place the gradient `Manage menu` quick-action as a standalone right-side panel adjacent to `Your businesses` (not inside that card/grid).
+- Preserved action routing to `/dashboard/menu` and archived-state conditional visibility.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 72: Simplified quick-action copy + gradient-selected business card
+- Shortened `Manage menu` quick-action text for a cleaner, less cluttered card.
+- Updated selected non-archived business-card styling to use the same gradient family as the quick-action card for visual consistency.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 73: Selection style revert with gradient border accent
+- Reverted selected non-archived business-card background to previous neutral selected style (`bg-gray-100`).
+- Kept gradient-family alignment by setting selected non-archived business-card border to `border-orange-300`.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 74: Increased selected-card border thickness
+- Increased selected business-card border width to `border-2` for stronger visual emphasis.
+- Preserved previous selected-state color logic (`orange` for active, `red` for archived).
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 75: Archive action converted to right-panel card
+- Moved `Archive business` out of Active Business Overview action row.
+- Added `Archive business` as a second clickable card below `Manage menu` in the right-side quick-action panel beside `Your businesses`.
+- Preserved archived-state restore behavior in overview.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (29/29 passing).
+
+### 2026-03-20 — Session 76: Added edit-details action and locked name in edit mode
+- Added `Edit details` action adjacent to archive in right quick-action area; routes to onboarding edit URL with selected business id.
+- Updated onboarding edit mode to lock `Business name` (disabled/read-only) while keeping slug immutable and editable scope limited to other fields.
+- Extended onboarding tests with existing-profile lock assertions.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (30/30 passing).
+
+### 2026-03-20 — Session 77: Hide quick actions in archived-view mode
+- Added explicit dashboard guard to hide quick actions when `Show archived` is active.
+- Hidden actions in archived view: `Manage menu`, `Edit details`, `Archive business`.
+- Updated dashboard tests to assert action absence in archived mode.
+- Revalidated web suite: `pnpm --filter @scan2serve/web test` (30/30 passing).
 
 ---
 
