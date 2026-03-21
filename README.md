@@ -7,7 +7,7 @@ Customers scan a QR code at their table to view the menu, place orders, and pay 
 ---
 
 ## Home Screen
-![Home Screen](docs/images/home-page.png)
+![Home Screen](docs/images/home-page)
 
 ## Business Dashboard
 ![Dashboard](docs/images/business-dashboard-page.png)
