@@ -10,7 +10,18 @@ Customers scan a QR code at their table to view the menu, place orders, and pay 
 ![Home Screen](docs/images/home-page)
 
 ## Business Dashboard
-![Dashboard](docs/images/business-dashboard-page.png)
+![Business Dashboard](docs/images/business-dashboard-page)
+
+## Business Login Page
+![Business Login](docs/images/business-login-page)
+
+## Menu Edit
+![Menu Edit](docs/images/menu-edit-page)
+
+## QR Generation
+![QR Generation](docs/images/qr-page)
+
+---
 
 ## Features
 
