@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Scan2Serve** — A platform where restaurants/cafés create digital menus accessible via QR codes. Customers scan QR codes at tables to view menus, place orders, and pay online (Stripe). Business owners manage menus, tables, and orders through a dashboard. Admins approve businesses and oversee the platform.
+**Scan2Serve** — A platform where restaurants/cafés create digital menus accessible via QR codes. Customers scan QR codes at tables to view menus, place orders, and pay online (Razorpay). Business owners manage menus, tables, and orders through a dashboard. Admins approve businesses and oversee the platform.
 
 ## Tech Stack
 
@@ -32,7 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend:** Node.js + Express REST API
 - **Database:** PostgreSQL with Prisma ORM
 - **Auth:** JWT-based, three roles: customer, business, admin
-- **Payments:** Stripe (Checkout Sessions)
+- **Payments:** Razorpay (Checkout)
 - **QR Generation:** `qrcode` npm package (server-side)
 - **File Storage:** Local/S3 for menu item images
 
@@ -51,7 +51,7 @@ Express.js Backend (apps/api/)
   ├── Menu CRUD (categories, items, images)
   ├── Table & QR Management (bulk create, download)
   ├── Order Management (create, status updates, filtering)
-  └── Payments (Stripe checkout sessions, webhooks)
+  └── Payments (Razorpay checkout + signature verification)
         │               ▲
         ▼               │
 PostgreSQL DB    packages/shared/
@@ -248,9 +248,9 @@ Build features in this order. Each layer depends on the layers above it.
   │              LAYER 7: ORDERING & PAYMENTS                      │
   ├────────────────────────────────────────────────────────────────┤
   │ • Order submission API (items, table_id, customer name/phone) │
-  │ • Stripe Checkout Session creation                            │
-  │ • Stripe webhook handler (payment success/failure)            │
-  │ • Payment flow: cart → Stripe Checkout → success page         │
+  │ • Razorpay order creation                                     │
+  │ • Razorpay signature verification                             │
+  │ • Payment flow: cart → Razorpay Checkout → status page        │
   │ • Order confirmation with order number                        │
   │ • Order status page /order/[id] (polling for updates)         │
   └────────────────────────────────────────────────────────────────┘
@@ -293,7 +293,7 @@ Build features in this order. Each layer depends on the layers above it.
 │ • Mobile responsiveness audit                                         │
 │ • Rate limiting & input sanitization                                  │
 │ • Deploy: Vercel (frontend) + Railway/Render (API) + managed Postgres │
-│ • Domain, SSL, CORS, production Stripe keys                           │
+│ • Domain, SSL, CORS, production Razorpay keys                         │
 │ • Seed admin account                                                  │
 │ • End-to-end flow testing                                             │
 └────────────────────────────────────────────────────────────────────────┘
@@ -325,7 +325,7 @@ Planned but not yet present in web app routes:
 
 - **Polling over WebSockets** for order updates (15s interval). Simpler for MVP; WebSocket upgrade planned post-MVP.
 - **Table mapping included** — businesses specify table count, each gets a numbered QR. No visual floor plan in MVP.
-- **Payments required** — all orders go through Stripe. No cash/pay-at-counter in MVP.
+- **Payments required** — all orders go through Razorpay. No cash/pay-at-counter in MVP.
 - **Admin-approved onboarding** — businesses register → pending → admin approves before they can create menus.
 - **English only** for MVP; currency is selected per business profile (`currency_code`).
 - **Mobile-first** public menu — most customers scan QR from phones.

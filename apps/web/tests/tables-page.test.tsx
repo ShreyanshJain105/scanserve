@@ -6,6 +6,7 @@ import DashboardTablesPage from "../src/app/dashboard/tables/page";
 const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/dashboard/tables",
 }));
 
 const useAuthMock = vi.fn();

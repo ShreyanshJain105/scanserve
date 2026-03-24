@@ -45,9 +45,19 @@ export default function DashboardTablesPage() {
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>({});
   const blocked =
     !selectedBusiness ||
+    selectedBusiness.blocked ||
     selectedBusiness.status === "pending" ||
     selectedBusiness.status === "rejected" ||
     selectedBusiness.status === "archived";
+  const blockedReason = selectedBusiness?.blocked
+    ? "This business is blocked by an admin. Table and QR changes are disabled until it is unblocked."
+    : selectedBusiness?.status === "pending"
+      ? "Table changes are disabled until your selected business is approved."
+      : selectedBusiness?.status === "rejected"
+        ? "This business was rejected. Update details in onboarding to resubmit for approval."
+        : selectedBusiness?.status === "archived"
+          ? "This business is archived. Restore it before editing tables."
+          : null;
 
   const headers = useMemo(
     () => (selectedBusiness ? { "x-business-id": selectedBusiness.id } : undefined),
@@ -221,6 +231,12 @@ export default function DashboardTablesPage() {
             Create tables, edit labels, toggle availability, regenerate and download QR codes.
           </p>
         </section>
+
+        {blocked && blockedReason && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {blockedReason}
+          </div>
+        )}
 
         <section className="rounded-xl border bg-white p-5">
           <h2 className="text-lg font-semibold">Bulk Create</h2>

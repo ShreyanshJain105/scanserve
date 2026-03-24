@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import type {
   UserProfile,
   LoginRequest,
@@ -80,6 +81,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [businessLoading, setBusinessLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pathname = usePathname();
+  const [lastQrToken, setLastQrToken] = useState<string | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
   const refreshBusinessProfiles = async (forUser?: UserProfile | null) => {
     const targetUser = forUser ?? user;
@@ -150,8 +154,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    refreshProfile().finally(() => setLoading(false));
+    refreshProfile()
+      .finally(() => {
+        setLoading(false);
+        setLastQrToken(getQrTokenFromLocation() ?? null);
+        setBootstrapped(true);
+      });
   }, []);
+
+  useEffect(() => {
+    if (!bootstrapped) return;
+    const currentToken = getQrTokenFromLocation() ?? null;
+    if (currentToken === lastQrToken) return;
+    setLastQrToken(currentToken);
+    setLoading(true);
+    refreshProfile().finally(() => setLoading(false));
+  }, [pathname, bootstrapped, lastQrToken]);
 
   const login = async (input: LoginRequest): Promise<UserProfile> => {
     setError(null);

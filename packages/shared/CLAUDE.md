@@ -28,3 +28,9 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 - Menu item image contract now includes persisted `imagePath` (S3 object key/path) while `imageUrl` remains derived/render-oriented in API responses.
 - Business shared profile contract now includes `currencyCode` for onboarding/admin/dashboard flows.
 - Business shared lifecycle contract now includes `archived` status and optional `archivedAt` for dashboard archive/restore behavior.
+
+## Updates 2026-03-24
+- Order shared types now represent monetary values as strings; `CreateOrderRequest` only accepts item ids + quantities (no client prices).
+
+## Updates 2026-03-24
+- Order shared type now uses Razorpay fields (`razorpayOrderId`, `razorpayPaymentId`) instead of Stripe.

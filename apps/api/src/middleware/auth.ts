@@ -43,7 +43,13 @@ export const requireAuth = async (
     if (!token) return sendAuthError(res);
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    req.user = { id: decoded.sub, role: decoded.role, email: decoded.email };
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+      select: { id: true, role: true, email: true },
+    });
+    if (!user) return sendAuthError(res);
+    if (user.role !== decoded.role) return sendAuthError(res);
+    req.user = { id: user.id, role: user.role, email: user.email ?? decoded.email };
     return next();
   } catch (err) {
     return sendAuthError(res);

@@ -11,7 +11,7 @@ Customers scan a QR code at their table to view the menu, place orders, and pay 
 **For Customers**
 - Scan a QR code at any table to instantly open the restaurant's menu
 - Browse categories, filter by dietary tags, and add items to a cart
-- Submit orders and pay securely via Stripe Checkout
+- Submit orders and pay securely via Razorpay Checkout
 - Track order status in real time
 
 **For Business Owners**
@@ -35,7 +35,7 @@ Customers scan a QR code at their table to view the menu, place orders, and pay 
 | Backend | Node.js, Express |
 | Database | PostgreSQL, Prisma ORM |
 | Auth | JWT (access + refresh cookies), role-based |
-| Payments | Stripe Checkout |
+| Payments | Razorpay Checkout |
 | AI | Google Gemini (menu suggestions, item descriptions, image generation) |
 | File Storage | S3-compatible (MinIO locally) |
 | QR Codes | `qrcode` npm package (server-side) |
@@ -58,7 +58,7 @@ Express.js Backend (apps/api/)
   ├── Menu CRUD (categories, items, images)
   ├── Table & QR Management
   ├── Order Management
-  ├── Payments (Stripe)
+  ├── Payments (Razorpay)
   └── AI endpoints (/api/ai/*)
         │              ▲
         ▼              │
@@ -109,7 +109,7 @@ scan2serve/
 - Node.js 18+
 - pnpm
 - Docker & Docker Compose
-- A Stripe account (for payments)
+- A Razorpay account (for payments)
 - A Google Gemini API key (for AI features)
 
 ### 1. Clone and install
@@ -215,7 +215,7 @@ pnpm dev:api      # backend only
 
 - **Polling over WebSockets** — order updates use 15-second polling for MVP simplicity; WebSocket upgrade is planned post-MVP.
 - **Admin-gated onboarding** — businesses go through a `pending → approved` flow before they can publish menus.
-- **Payments required** — all orders go through Stripe; cash/pay-at-counter is not supported in MVP.
+- **Payments required** — all orders go through Razorpay; cash/pay-at-counter is not supported in MVP.
 - **Mobile-first public menu** — the customer-facing menu is optimised for phones since most users scan from a mobile device.
 - **Immutable slugs** — business slugs are auto-generated server-side on creation and cannot be changed.
 - **S3-path storage** — `image_path` (object path) is stored in the database, not raw URLs, to keep storage-layer URLs decoupled from the data model.

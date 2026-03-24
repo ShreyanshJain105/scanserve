@@ -6,6 +6,7 @@ import DashboardMenuPage from "../src/app/dashboard/menu/page";
 const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/dashboard/menu",
 }));
 
 const useAuthMock = vi.fn();

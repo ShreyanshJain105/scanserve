@@ -26,6 +26,39 @@ import {
   enqueueDeletedMenuItemImage,
 } from "../services/deletedAssetCleanup";
 
+const notifyAdmins = async (params: {
+  businessId: string;
+  type: string;
+  message: string;
+  payload?: Prisma.JsonValue;
+  actorUserId?: string | null;
+}) => {
+  const admins = await prisma.user.findMany({
+    where: { role: "admin" },
+    select: { id: true },
+  });
+  await Promise.all(
+    admins.map(async (admin) => {
+      const event = await prisma.notificationEvent.create({
+        data: {
+          userId: admin.id,
+          actorUserId: params.actorUserId ?? null,
+          businessId: params.businessId,
+          type: params.type,
+          message: params.message,
+          payload: params.payload,
+        },
+      });
+      await prisma.notificationInbox.create({
+        data: {
+          userId: admin.id,
+          eventId: event.id,
+        },
+      });
+    })
+  );
+};
+
 const router: express.Router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -197,6 +230,7 @@ type RawBusiness = {
   address: string;
   phone: string;
   status: "pending" | "approved" | "rejected" | "archived";
+  blocked: boolean;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -214,6 +248,7 @@ type SerializedBusiness = {
   address: string;
   phone: string;
   status: "pending" | "approved" | "rejected" | "archived";
+  blocked: boolean;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -232,6 +267,7 @@ const serializeBusiness = (business: RawBusiness): SerializedBusiness => {
     address: business.address,
     phone: business.phone,
     status: business.status,
+    blocked: business.blocked,
     archivedAt: business.archivedAt ? business.archivedAt.toISOString() : null,
     createdAt: business.createdAt.toISOString(),
     updatedAt: business.updatedAt.toISOString(),
@@ -499,6 +535,13 @@ router.post(
         },
       });
 
+      await notifyAdmins({
+        businessId: created.id,
+        type: "BUSINESS_SUBMITTED",
+        message: `New business submitted: ${created.name}`,
+        actorUserId: req.user!.id,
+      });
+
       sendSuccess(res, { business: serializeBusiness(created as RawBusiness) }, 201);
       return;
     } catch (error) {
@@ -556,6 +599,107 @@ router.get(
   })
 );
 
+const serializeNotification = (
+  event: {
+    id: string;
+    businessId: string | null;
+    type: string;
+    message: string;
+    payload: Prisma.JsonValue | null;
+    createdAt: Date;
+    actorUserId: string | null;
+    business?: { id: string; name: string } | null;
+  },
+  inboxId?: string | null
+) => ({
+  id: event.id,
+  inboxId: inboxId ?? null,
+  businessId: event.businessId,
+  businessName: event.business?.name ?? "Business",
+  type: event.type,
+  message: event.message,
+  payload: event.payload ?? undefined,
+  actorUserId: event.actorUserId,
+  createdAt: event.createdAt.toISOString(),
+});
+
+router.get(
+  "/notifications",
+  asyncHandler(async (req, res) => {
+    const scope = req.query.scope === "all" ? "all" : "unread";
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const unreadCountPromise = prisma.notificationInbox.count({
+      where: { userId: req.user!.id },
+    });
+
+    if (scope === "unread") {
+      const inboxRows = await prisma.notificationInbox.findMany({
+        where: { userId: req.user!.id },
+        orderBy: { createdAt: "desc" },
+        skip: offset,
+        take: limit,
+        include: {
+          event: {
+            include: {
+              business: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+      const unreadCount = await unreadCountPromise;
+      sendSuccess(res, {
+        scope: "unread",
+        unreadCount,
+        notifications: inboxRows.map((row: (typeof inboxRows)[number]) =>
+          serializeNotification(row.event, row.id)
+        ),
+      });
+      return;
+    }
+
+    const events = await prisma.notificationEvent.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: { business: { select: { id: true, name: true } } },
+    });
+    const unreadCount = await unreadCountPromise;
+    sendSuccess(res, {
+      scope: "all",
+      unreadCount,
+      notifications: events.map((event: (typeof events)[number]) => serializeNotification(event, null)),
+    });
+  })
+);
+
+router.post(
+  "/notifications/:inboxId/read",
+  asyncHandler(async (req, res) => {
+    const inboxId = req.params.inboxId;
+    const existing = await prisma.notificationInbox.findFirst({
+      where: { id: inboxId, userId: req.user!.id },
+    });
+    if (!existing) {
+      sendError(res, "Notification not found", 404, "NOTIFICATION_NOT_FOUND");
+      return;
+    }
+    await prisma.notificationInbox.delete({ where: { id: inboxId } });
+    const unreadCount = await prisma.notificationInbox.count({ where: { userId: req.user!.id } });
+    sendSuccess(res, { unreadCount });
+  })
+);
+
+router.post(
+  "/notifications/read-all",
+  asyncHandler(async (req, res) => {
+    await prisma.notificationInbox.deleteMany({ where: { userId: req.user!.id } });
+    sendSuccess(res, { unreadCount: 0 });
+  })
+);
+
 router.patch(
   "/profile",
   asyncHandler(async (req, res) => {
@@ -589,7 +733,7 @@ router.patch(
       return;
     }
 
-    const data = {
+    const updatePayload = {
       ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
       ...(parsed.data.currencyCode !== undefined
         ? { currencyCode: normalizeCurrencyCode(parsed.data.currencyCode) }
@@ -597,15 +741,62 @@ router.patch(
       ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
       ...(parsed.data.address !== undefined ? { address: parsed.data.address } : {}),
       ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}),
-      ...(business.status === "rejected" ? { status: "pending" as const } : {}),
     };
 
-    if (Object.keys(data).length === 0) {
+    if (Object.keys(updatePayload).length === 0) {
       sendError(res, "No fields provided for update", 400, "VALIDATION_ERROR");
       return;
     }
 
     try {
+      if (business.status === "approved") {
+        const existingPending = await prisma.businessUpdateRequest.findFirst({
+          where: { businessId: business.id, status: "pending" },
+        });
+        const mergedPayload =
+          existingPending && existingPending.payload
+            ? { ...(existingPending.payload as Record<string, unknown>), ...updatePayload }
+            : updatePayload;
+
+        const request = existingPending
+          ? await prisma.businessUpdateRequest.update({
+              where: { id: existingPending.id },
+              data: { payload: mergedPayload, status: "pending" },
+            })
+          : await prisma.businessUpdateRequest.create({
+              data: {
+                businessId: business.id,
+                payload: mergedPayload,
+              },
+            });
+
+        if (!existingPending) {
+          await notifyAdmins({
+            businessId: business.id,
+            type: "BUSINESS_UPDATE_SUBMITTED",
+            message: `Business update submitted: ${business.name}`,
+            actorUserId: req.user!.id,
+          });
+        }
+
+        sendSuccess(res, {
+          business: serializeBusiness(business as RawBusiness),
+          pendingUpdate: {
+            id: request.id,
+            status: request.status,
+            payload: request.payload,
+            createdAt: request.createdAt.toISOString(),
+            updatedAt: request.updatedAt.toISOString(),
+          },
+        });
+        return;
+      }
+
+      const data = {
+        ...updatePayload,
+        ...(business.status === "rejected" ? { status: "pending" as const } : {}),
+      };
+
       const updated = await prisma.business.update({
         where: { id: business.id },
         data,

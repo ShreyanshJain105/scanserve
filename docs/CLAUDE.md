@@ -47,3 +47,19 @@ Project documentation for architecture decisions, process notes, and operational
 - Added ADR-023 (Accepted): keeps a single `/api/auth/*` namespace and enforces business-vs-customer scope resolution by `qrToken` validity, with strict cookie isolation and mixed-session guardrails.
 - Added ADR-024 (Accepted): introduces dual-session visibility (`businessUser` + `customerUser`) and scoped logout/login UX in unified auth without splitting route namespaces.
 - Added ADR-025 (Accepted): auth entry routes now guard against redundant login/register calls when scope session already exists and all auth dialogs expose visible close controls.
+
+## Updates 2026-03-24
+- Marked `docs/adr/ADR-026-in-place-auth-dialogs-without-route-transitions.md` as superseded without implementation.
+- Auth UX policy remains route-based: keep explicit redirects to `/login`, `/register/business`, `/qr/login`, and `/qr/register` instead of introducing a global in-place auth dialog controller.
+
+## Updates 2026-03-24
+- Added and accepted `docs/adr/ADR-027-public-menu-and-cart.md` to define Layer 6 scope: public menu SSR, read-only public menu API, and client-side cart keyed by business/table/qrToken, with ordering/payment deferred to Layer 7.
+
+## Updates 2026-03-24
+- Drafted `docs/adr/ADR-028-business-update-approvals-and-block-flag.md` (Proposed) to add a `blocked` flag, queue business profile edits for admin approval instead of blocking live businesses, and introduce admin approve/reject flows for pending updates.
+
+## Updates 2026-03-24
+- Drafted `docs/adr/ADR-034-razorpay-payments.md` (Proposed) to replace Stripe with Razorpay for UPI support.
+
+## Updates 2026-03-24
+- ADR-034 accepted: replace Stripe payment flow with Razorpay order create + signature verification.

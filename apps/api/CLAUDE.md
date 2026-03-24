@@ -1,7 +1,7 @@
 # apps/api — Express Backend
 
 ## What this is
-REST API server built with Express + TypeScript. Handles auth, menu CRUD, table/QR management, orders, payments (Stripe), and admin operations.
+REST API server built with Express + TypeScript. Handles auth, menu CRUD, table/QR management, orders, payments (Razorpay), and admin operations.
 
 ## Commands
 ```bash
@@ -161,3 +161,51 @@ pnpm db:studio    # open Prisma Studio GUI
   - extended `POST /api/auth/logout` to accept optional `{ scope: "business" | "customer" | "all" }` for explicit scoped logout in mixed-session scenarios.
 - Added auth route tests in `tests/authRoutes.test.ts` for dual-session introspection and scoped logout behavior.
 - Runtime verification note: `/api/auth/sessions` reports both `businessUser` and `customerUser` independently from access cookies; `activeScope` follows qrToken-context resolution, so without QR context it remains `business` even when only customer session is still active.
+
+## Updates 2026-03-24
+- Added public menu endpoint `GET /api/public/menu/:slug` that validates approved/non-archived business, optional active table, and QR/grace tokens, returning sorted categories/items with derived image URLs and decimal-string prices.
+- Expanded `apps/api/tests/publicRoutes.test.ts` with public menu coverage; API test suite passes.
+
+## Updates 2026-03-24
+- Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.
+- API test suite re-run and passing.
+
+## Updates 2026-03-24
+- ADR-028 accepted: added `blocked` flag and business update request queue model.
+- `Business` now has `blocked` boolean; middleware returns `BUSINESS_BLOCKED` for blocked businesses.
+- Approved-business profile edits are queued in `business_update_requests` and do not block live data; pending/rejected keep prior behavior.
+- Admin endpoints added: list/approve/reject update requests and block/unblock businesses.
+- Prisma schema updated (new enum/table). API test suite passes.
+
+## Updates 2026-03-24
+- Added business notifications table and owner-facing `GET /api/business/notifications` (last 50) including business name/type/message/payload.
+- Admin approve/reject/block/unblock actions now emit notifications to the business owner.
+- API tests re-run and still passing (13 files, 66 tests).
+
+## Updates 2026-03-24
+- ADR-029 accepted: added `notification_events` (history) and `notification_inbox` (unread) tables with indexes.
+- Admin moderation actions now emit event + inbox entries with actor attribution.
+- Business notification endpoints now support scope unread/all, mark-read, and mark-all; responses include unread count and inbox id for mark-read.
+
+## Updates 2026-03-24
+- ADR-030 accepted: removed legacy `business_notifications` Prisma model and relations; schema now uses only `notification_events` + `notification_inbox`.
+
+## Updates 2026-03-24
+- Admin approve/reject now emits notification events + inbox entries (`BUSINESS_APPROVED`/`BUSINESS_REJECTED`).
+
+## Updates 2026-03-24
+- Added admin notifications endpoints and emission for business submissions and update requests.
+
+## Updates 2026-03-24
+- ADR-032 approved: pending UX-only changes for notifications and blocked banners (no API changes yet).
+
+## Updates 2026-03-24
+- Layer 7 ordering endpoints updated: `POST /api/public/orders` now enforces server-side price calculation with normalized item quantities (item id + quantity only).
+- Order checkout now includes menu item names in Stripe line items, supports `{ORDER_ID}` env URL templates, and returns order details with business currency data.
+- Added Stripe webhook router (`src/routes/payments.ts`) using raw body parsing to mark orders paid/failed; mounted before JSON middleware in `src/index.ts`.
+- Added Stripe env keys to `.env.example`; added API tests for order creation totals and webhook handling.
+
+## Updates 2026-03-24
+- Replaced Stripe checkout/webhook flow with Razorpay order creation + signature verification (`/api/public/orders/:id/checkout`, `/api/public/orders/:id/verify-payment`).
+- Removed Stripe service/router and raw-body webhook mount; added Razorpay service (`src/services/razorpay.ts`) and Razorpay env vars in `.env.example`.
+- Order schema now stores `razorpay_order_id` + `razorpay_payment_id` (migration `20260324180000_razorpay_payments`); public route tests cover Razorpay checkout + verify.

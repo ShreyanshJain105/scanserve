@@ -8,6 +8,7 @@ const useAuthMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/home",
 }));
 
 vi.mock("../src/lib/auth-context", () => ({

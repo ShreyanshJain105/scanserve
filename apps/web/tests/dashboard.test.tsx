@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: pushMock,
   }),
+  usePathname: () => "/dashboard",
 }));
 
 const useAuthMock = vi.fn();

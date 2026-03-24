@@ -89,6 +89,15 @@ function BusinessOnboardingPageContent() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string>("");
   const [dragOver, setDragOver] = useState(false);
+  const blockedReason = existing?.blocked
+    ? "This business is blocked by an admin. You can update details, but it will remain blocked until unblocked."
+    : existing?.status === "pending"
+      ? "Your business is pending approval. Updates will be reviewed by admin."
+      : existing?.status === "rejected"
+        ? "This business was rejected. Update details to resubmit for approval."
+        : existing?.status === "archived"
+          ? "This business is archived. Restore it before making changes."
+          : null;
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const currencyInputRef = useRef<HTMLInputElement | null>(null);
   const currencyDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -243,6 +252,11 @@ function BusinessOnboardingPageContent() {
       <AppHeader leftMeta="Business onboarding" />
       <section className="mx-auto max-w-2xl p-6">
         <BodyBackButton className="mb-4" />
+        {blockedReason && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {blockedReason}
+          </div>
+        )}
         <div className="rounded-xl border bg-white p-6">
         <h1 className="text-2xl font-semibold">
           {existing ? "Update your business profile" : "Create your business profile"}

@@ -12,6 +12,7 @@ const useAuthMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, replace: replaceMock }),
+  usePathname: () => "/login",
   useSearchParams: () =>
     new URLSearchParams({
       token: "valid-qr-live-token-123456",

@@ -36,6 +36,15 @@ export default function DashboardPage() {
   const [archiveConfirmText, setArchiveConfirmText] = useState("");
   const [archiveSubmitting, setArchiveSubmitting] = useState(false);
   const [restoreSubmitting, setRestoreSubmitting] = useState(false);
+  const blockedReason = selectedBusiness?.blocked
+    ? "This business is blocked by an admin. Dashboard actions are disabled until it is unblocked."
+    : selectedBusiness?.status === "pending"
+      ? "Dashboard actions are disabled until your selected business is approved."
+      : selectedBusiness?.status === "rejected"
+        ? "This business was rejected. Update details to resubmit for approval."
+        : selectedBusiness?.status === "archived"
+          ? "This business is archived. Restore it to access dashboard actions."
+          : null;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -178,6 +187,11 @@ export default function DashboardPage() {
       <AppHeader leftMeta="Business dashboard" />
       <section className="mx-auto max-w-6xl space-y-6 p-6">
         <BodyBackButton />
+        {blockedReason && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {blockedReason}
+          </div>
+        )}
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-5">
           <div>
             <h1 className="text-2xl font-semibold">Business Dashboard</h1>

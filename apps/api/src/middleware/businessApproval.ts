@@ -104,6 +104,10 @@ export const requireApprovedBusiness = async (
     );
   }
 
+  if ((business as any).blocked) {
+    return sendError(res, "This business is blocked by admin", 403, "BUSINESS_BLOCKED");
+  }
+
   req.business = {
     id: business.id,
     userId: business.userId,

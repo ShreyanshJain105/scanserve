@@ -28,8 +28,6 @@ app.use(
   })
 );
 
-// Parse JSON bodies (Stripe webhooks need raw body, so that route will override this)
-app.use(express.json());
 app.use(cookieParser());
 app.use((req, res, next) => {
   const startedAt = process.hrtime.bigint();
@@ -87,6 +85,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Parse JSON bodies for all routes.
+app.use(express.json());
+
 // ─── Health Check ───────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
   res.json({ status: 1, data: { ok: true, timestamp: new Date().toISOString() } });
@@ -99,7 +100,6 @@ app.get("/healthz", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/business", businessRoutes);
 // app.use("/api/orders", orderRoutes);
-// app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/ai", aiRoutes);

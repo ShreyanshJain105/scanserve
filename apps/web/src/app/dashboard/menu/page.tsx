@@ -91,6 +91,30 @@ const CATEGORY_CARD_TONES = [
 export default function DashboardMenuPage() {
   const { user, loading, selectedBusiness } = useAuth();
   const router = useRouter();
+  const currencyFormatter = useMemo(() => {
+    const currency = selectedBusiness?.currencyCode || "USD";
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+    });
+  }, [selectedBusiness?.currencyCode]);
+
+  const currencySymbol = useMemo(() => {
+    try {
+      const parts = currencyFormatter.formatToParts(0);
+      const symbolPart = parts.find((part) => part.type === "currency");
+      return symbolPart?.value || "$";
+    } catch {
+      return "$";
+    }
+  }, [currencyFormatter]);
+
+  const formatPrice = (value: string | number) => {
+    const num = typeof value === "number" ? value : Number(value);
+    if (Number.isNaN(num)) return value.toString();
+    return currencyFormatter.format(num);
+  };
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -122,8 +146,16 @@ export default function DashboardMenuPage() {
 
   const blocked =
     !selectedBusiness ||
+    selectedBusiness.blocked ||
     selectedBusiness.status === "pending" ||
     selectedBusiness.status === "rejected";
+  const blockedReason = selectedBusiness?.blocked
+    ? "This business is blocked by an admin. Menu changes are disabled until it is unblocked."
+    : selectedBusiness?.status === "pending"
+      ? "Menu changes are disabled until your selected business is approved."
+      : selectedBusiness?.status === "rejected"
+        ? "This business was rejected. Update details in onboarding to resubmit for approval."
+        : null;
 
   const headers = useMemo(
     () =>
@@ -679,6 +711,11 @@ export default function DashboardMenuPage() {
       />
       <section className="mx-auto max-w-6xl p-6">
         <BodyBackButton className="mb-4" />
+        {blocked && blockedReason && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {blockedReason}
+          </div>
+        )}
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-xl border bg-white p-4">
           <h2 className="text-lg font-semibold">Categories</h2>
@@ -811,9 +848,9 @@ export default function DashboardMenuPage() {
 
         <section className="relative rounded-xl border bg-white p-4">
           <h2 className="text-lg font-semibold">Menu Items</h2>
-          {blocked && (
+          {blocked && blockedReason && (
             <p className="mt-2 rounded-md bg-amber-50 p-2 text-sm text-amber-800">
-              Menu changes are disabled until your selected business is approved.
+              {blockedReason}
             </p>
           )}
           {!hasCategories && !blocked && (
@@ -838,12 +875,17 @@ export default function DashboardMenuPage() {
                 className="w-full rounded-md border px-3 py-2 text-sm"
               />
             </div>
-            <input
-              value={itemPrice}
-              onChange={(e) => setItemPrice(e.target.value)}
-              placeholder="Price (e.g. 12.50)"
-              className="rounded-md border px-3 py-2 text-sm"
-            />
+            <div className="flex items-center rounded-md border bg-white px-2">
+              <span className="pr-2 text-sm font-semibold text-slate-700">
+                {currencySymbol}
+              </span>
+              <input
+                value={itemPrice}
+                onChange={(e) => setItemPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full flex-1 border-0 bg-transparent px-1 py-2 text-sm focus:outline-none"
+              />
+            </div>
             <select
               value={itemTags[0] || ""}
               onChange={(e) => setItemTags(e.target.value ? [e.target.value] : [])}
@@ -923,13 +965,20 @@ export default function DashboardMenuPage() {
                         }
                         className="rounded border px-2 py-1 text-sm"
                       />
-                      <input
-                        value={itemEditDraft.price}
-                        onChange={(e) =>
-                          setItemEditDraft((prev) => (prev ? { ...prev, price: e.target.value } : prev))
-                        }
-                        className="rounded border px-2 py-1 text-sm"
-                      />
+                      <div className="flex items-center rounded border bg-white px-2">
+                        <span className="pr-2 text-sm font-semibold text-slate-700">
+                          {currencySymbol}
+                        </span>
+                        <input
+                          value={itemEditDraft.price}
+                          onChange={(e) =>
+                            setItemEditDraft((prev) =>
+                              prev ? { ...prev, price: e.target.value } : prev
+                            )
+                          }
+                          className="w-full flex-1 border-0 bg-transparent px-1 py-1 text-sm focus:outline-none"
+                        />
+                      </div>
                       <select
                         value={itemEditDraft.categoryId}
                         onChange={(e) =>
@@ -1061,9 +1110,7 @@ export default function DashboardMenuPage() {
                         </div>
                         <div className="min-w-[170px]">
                           <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-gray-600">
-                            ${Number.parseFloat(item.price).toFixed(2)}
-                          </p>
+                          <p className="text-sm text-gray-600">{formatPrice(item.price)}</p>
                           {item.description && (
                             <p className="mt-1 max-w-xl text-sm text-slate-500">{item.description}</p>
                           )}

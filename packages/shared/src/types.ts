@@ -74,6 +74,7 @@ export interface BusinessProfile {
   address: string;
   phone: string;
   status: BusinessStatus;
+  blocked?: boolean;
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -109,6 +110,28 @@ export interface MenuItem {
   sortOrder: number;
 }
 
+export type BusinessNotificationType =
+  | "UPDATE_APPROVED"
+  | "UPDATE_REJECTED"
+  | "BUSINESS_APPROVED"
+  | "BUSINESS_REJECTED"
+  | "BUSINESS_BLOCKED"
+  | "BUSINESS_UNBLOCKED"
+  | "BUSINESS_SUBMITTED"
+  | "BUSINESS_UPDATE_SUBMITTED";
+
+export interface BusinessNotification {
+  id: string;
+  inboxId?: string | null;
+  businessId: string;
+  businessName: string;
+  type: BusinessNotificationType;
+  message: string;
+  actorUserId?: string | null;
+  payload?: unknown;
+  createdAt: string;
+}
+
 // ─── Tables & QR ────────────────────────────────────────────
 
 export interface Table {
@@ -136,8 +159,9 @@ export interface Order {
   businessId: string;
   tableId: string;
   status: OrderStatus;
-  totalAmount: number;
-  stripePaymentId: string | null;
+  totalAmount: string;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId: string | null;
   paymentStatus: PaymentStatus;
   customerName: string;
   customerPhone: string | null;
@@ -149,7 +173,7 @@ export interface OrderItem {
   orderId: string;
   menuItemId: string;
   quantity: number;
-  unitPrice: number;
+  unitPrice: string;
   specialInstructions: string | null;
 }
 
@@ -161,6 +185,5 @@ export interface CreateOrderRequest {
   items: {
     menuItemId: string;
     quantity: number;
-    specialInstructions?: string;
   }[];
 }

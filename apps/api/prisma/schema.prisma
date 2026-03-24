@@ -25,6 +25,10 @@ model User {
 
   businesses    Business[]
   refreshTokens RefreshToken[]
+  notifications NotificationEvent[]       @relation("NotificationEventUser")
+  actedNotifications NotificationEvent[]  @relation("NotificationEventActor")
+  inboxEntries   NotificationInbox[]
+  
 
   @@map("users")
 }
@@ -49,6 +53,7 @@ model Business {
   address     String
   phone       String
   status      BusinessStatus @default(pending)
+  blocked     Boolean        @default(false)
   archivedAt  DateTime?      @map("archived_at")
   archivedPreviousStatus BusinessStatus? @map("archived_previous_status")
   createdAt   DateTime       @default(now()) @map("created_at")
@@ -61,9 +66,66 @@ model Business {
   qrCodes    QrCode[]
   orders     Order[]
   rejections BusinessRejection[]
+  updateRequests BusinessUpdateRequest[]
+  notificationEvents NotificationEvent[]
 
   @@index([status, archivedAt])
   @@map("businesses")
+}
+
+enum BusinessUpdateRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+model BusinessUpdateRequest {
+  id         String                       @id @default(cuid())
+  businessId String                       @map("business_id")
+  payload    Json
+  status     BusinessUpdateRequestStatus  @default(pending)
+  reviewNote String?                      @map("review_note")
+  reviewedBy String?                      @map("reviewed_by")
+  reviewedAt DateTime?                    @map("reviewed_at")
+  createdAt  DateTime                     @default(now()) @map("created_at")
+  updatedAt  DateTime                     @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+  @@map("business_update_requests")
+}
+
+model NotificationEvent {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  actorUserId String?   @map("actor_user_id")
+  businessId  String?   @map("business_id")
+  type        String
+  message     String
+  payload     Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user     User      @relation("NotificationEventUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor    User?     @relation("NotificationEventActor", fields: [actorUserId], references: [id])
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  inbox    NotificationInbox[]
+
+  @@index([userId, createdAt])
+  @@map("notification_events")
+}
+
+model NotificationInbox {
+  id        String            @id @default(cuid())
+  userId    String            @map("user_id")
+  eventId   String            @map("event_id")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notification_inbox")
 }
 
 model BusinessRejection {
@@ -189,7 +251,8 @@ model Order {
   tableId         String        @map("table_id")
   status          OrderStatus   @default(pending)
   totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
-  stripePaymentId String?       @map("stripe_payment_id")
+  razorpayOrderId String?       @map("razorpay_order_id")
+  razorpayPaymentId String?     @map("razorpay_payment_id")
   paymentStatus   PaymentStatus @default(pending) @map("payment_status")
   customerName    String        @map("customer_name")
   customerPhone   String?       @map("customer_phone")

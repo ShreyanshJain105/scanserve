@@ -1,8 +1,13 @@
 # ADR-026: In-Place Auth Dialogs Without Route Transitions
 
 **Date:** 2026-03-20  
-**Status:** Proposed  
+**Status:** Superseded  
 **Depends on:** ADR-023, ADR-024, ADR-025
+
+## Superseded Note
+On 2026-03-24 this proposal was explicitly dropped. The project keeps route-based auth entry
+pages (`/login`, `/register/business`, `/qr/login`, `/qr/register`) and history-first close
+behavior rather than moving to a global in-place auth dialog controller.
 
 ## Context
 Current auth UX still relies on route-based auth pages (`/login`, `/register/business`, `/qr/login`, `/qr/register`) that render dialog UI after navigation.  
@@ -87,3 +92,12 @@ Final removal/redirect of legacy routes occurs only after internal link migratio
 3. Closing dialog keeps user on same page.
 4. Already-logged-in guard blocks redundant auth API calls.
 5. Legacy auth routes remain safe during migration and do not break deep links.
+
+## Outcome
+This ADR is not being implemented.
+
+The retained project direction is:
+- auth entry remains route-based and explicit,
+- route pages continue rendering dialog-style auth surfaces,
+- close behavior should prefer `router.back()` with safe fallback routing,
+- future work should not introduce a global auth-dialog controller unless a new ADR replaces this decision.

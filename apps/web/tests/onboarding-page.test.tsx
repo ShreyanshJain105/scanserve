@@ -7,6 +7,7 @@ const pushMock = vi.fn();
 const searchParamsMockState = { value: "" };
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
+  usePathname: () => "/dashboard/onboarding",
   useSearchParams: () => new URLSearchParams(searchParamsMockState.value),
 }));
 

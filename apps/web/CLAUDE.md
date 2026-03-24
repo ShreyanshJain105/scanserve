@@ -198,6 +198,118 @@ pnpm lint   # run Next.js ESLint
 - Home-page auth scope cleanup:
   - removed direct QR login/register preview links from `src/app/home/page.tsx`; home keeps business-first entry while customer auth stays in QR/menu flow.
 - Updated `tests/app-header.test.tsx` to assert business-only login in default header mode and customer-only login/logout in customer header mode.
+
+## Updates 2026-03-24
+- Added notification bell/badge in `AppHeader` that fetches `/api/business/notifications`; link goes to `/dashboard/notifications`.
+- Admin page now renders pending-update diffs (from/to) with raw payload toggle.
+- Menu and tables pages show blocked/pending/rejected/archived banners explaining disabled state.
+- Added tests `tests/notifications-page.test.tsx` and updated `tests/app-header.test.tsx`; full web suite passing.
+
+## Updates 2026-03-24
+- Header notification bell is now icon-only, right-aligned, and opens inline scrollable/paginated list (no redirect); badge uses fetched count.
+- Logout hidden when no session; dashboard link suppressed when already on dashboard.
+- Added `usePathname` mocks across tests; web suite still fully passing.
+
+## Updates 2026-03-24
+- Notifications panel now consumes unread/all scopes from `/api/business/notifications`, shows unread count, supports per-item mark-read and mark-all.
+- Badge count reflects backend unread count; panel includes scope toggle.
+
+## Updates 2026-03-24
+- ADR-032 approved: polish notification UX and standardize blocked banners across owner pages (implementation pending).
+
+## Updates 2026-03-24
+- Notification panel shows grouped business headers, type badges, actor hint, and payload field diffs.
+- Added blocked banners on dashboard and onboarding pages; web tests passing.
 - Auth dialog close-navigation refinement:
   - updated close handlers in `/login`, `/register/business`, `/qr/login`, and `/qr/register` to prefer browser-history back (`router.back()`) before any fallback route push.
   - this avoids forced redirection to `/home` when dialogs were opened from in-context pages (e.g., menu QR flow).
+
+## Updates 2026-03-24
+- Auth entry policy clarified: keep route-based auth redirects (`/login`, `/register/business`, `/qr/login`, `/qr/register`) and do not pursue ADR-026's global in-place auth dialog controller.
+- Added public menu + cart implementation (ADR-027 accepted): SSR `/menu/[slug]` now fetches public menu API and renders categories/items with availability; client-side cart persists per business/table/QR token using localStorage with quantity controls and total display.
+- Added regression coverage `tests/public-menu.test.tsx`; full web suite passes.
+- The supported UX remains dialog-style auth pages with history-first close behavior rather than shared client-side dialog orchestration.
+
+## Updates 2026-03-24
+- Redesigned public menu surface: hide item descriptions, keep dietary badges and price focus.
+- Added floating cart button at bottom-right that opens a bottom sheet cart drawer on the same page; cart drawer reuses localStorage cart scoped by business/table/QR token.
+- Updated `apps/web/tests/public-menu.test.tsx` accordingly; web test suite remains green.
+
+## Updates 2026-03-24
+- Reduced public menu card footprint (smaller padding/thumb) and added tap-to-select to reveal descriptions on demand.
+- Fixed cart drawer close control copy (“Hide cart”) and kept floating button toggling in sync.
+- Extended `tests/public-menu.test.tsx` with description-toggle assertion; web tests still pass.
+
+## Updates 2026-03-24
+- Further compacted public menu cards to boxy grid and shifted description reveal to a right-hand slide-in panel on selection.
+- Cart toggle remains synchronized; no API changes. Tests updated/rerun (web suite green).
+
+## Updates 2026-03-24
+- Simplified cart controls to a single floating toggle (no separate hide button inside drawer).
+- Public menu cards now render as full-width rows with inline descriptions and row-style layout.
+- Updated `apps/web/tests/public-menu.test.tsx`; web suite remains green.
+
+## Updates 2026-03-24
+- Restyled public menu row actions: quantity strip on rose background with inline count; “In cart/Add to cart” label sits below price/controls.
+- Web tests re-run (11 files, 42 tests) still green.
+
+## Updates 2026-03-24
+- Dashboard menu page now formats item prices with the selected business currency (Intl.NumberFormat using `selectedBusiness.currencyCode`); item list price display updated accordingly.
+- Web test suite re-run (11 files, 42 tests) passes.
+
+## Updates 2026-03-24
+- Dashboard menu item create form now shows the business currency symbol inside the price input (derived from `selectedBusiness.currencyCode`).
+- Web tests re-run (11 files, 42 tests) still passing.
+
+## Updates 2026-03-24
+- Price input currency symbol now bolded with tighter left placement; layout padding adjusted.
+- Web tests re-run (11 files, 42 tests) remain green.
+
+## Updates 2026-03-24
+- Added owner notifications page `apps/web/src/app/dashboard/notifications/page.tsx` consuming `/api/business/notifications` with business name/type/message/payload/time display.
+- Added notification types to shared package; web test suite remains green.
+
+## Updates 2026-03-24
+- Admin page now shows blocked badge, block/unblock toggle, and inline pending-update list with approve/reject actions (pulls `/api/admin/businesses/:id/updates` and block endpoint).
+- Web tests still passing (11 files, 42 tests).
+
+## Updates 2026-03-24
+- Owner dashboards now honor `blocked` flag: menu and tables pages treat blocked businesses as disabled (same gating as pending/rejected/archived).
+- Web test suite remains green (11 files, 42 tests).
+
+## Updates 2026-03-24
+- Added notifications entry point in header for business users (links to `/dashboard/notifications`).
+- Ran full web suite after changes (11 files, 42 tests).
+
+## Updates 2026-03-24
+- Public menu cart now captures customer details, creates orders via `/api/public/orders`, and initiates Stripe checkout (`Order & pay` button).
+- Added `/order/[id]` status page in public flow with order totals and item breakdown.
+- Updated public-menu and order-page tests; web suite re-run and passing.
+
+## Updates 2026-03-24
+- Auth context now refreshes when QR token scope changes (path change) so dashboard access is restored immediately after leaving menu/QR flows.
+- Added navigation mock in auth-context tests; web suite still passing.
+
+## Updates 2026-03-24
+- Dashboard menu price inputs now use a flex prefix for currency symbols to avoid overlap with longer codes (e.g., AED).
+
+## Updates 2026-03-24
+- Header now hides login controls when a session exists (business or customer); logout remains available.
+
+## Updates 2026-03-24
+- Header user cards now act as dropdowns with scoped logout actions; removed standalone logout dropdown.
+
+## Updates 2026-03-24
+- Header user-card dropdowns now attach to the card width for consistent aesthetics.
+
+## Updates 2026-03-24
+- Header dropdowns now auto-close on outside clicks.
+
+## Updates 2026-03-24
+- Header dropdowns (including notifications) now close when clicking anywhere outside the open dropdown menus.
+
+## Updates 2026-03-24
+- Removed duplicate notification scope tag since the selector buttons already indicate scope.
+
+## Updates 2026-03-24
+- Public menu checkout now uses Razorpay: loads checkout script, creates Razorpay order via API, verifies payment, then redirects to `/order/[id]`.

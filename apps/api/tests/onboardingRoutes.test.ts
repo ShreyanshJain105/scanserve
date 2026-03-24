@@ -259,6 +259,28 @@ vi.mock("../src/prisma", () => ({
     }),
     user: {
       findUnique: vi.fn(async ({ where: { id } }) => users.find((item) => item.id === id) ?? null),
+      findMany: vi.fn(async ({ where }) =>
+        users.filter((item) => (where?.role ? item.role === where.role : true))
+      ),
+    },
+    notificationEvent: {
+      create: vi.fn(async ({ data }) => ({
+        id: `ne_${Date.now()}`,
+        ...data,
+        createdAt: new Date(),
+      })),
+      findMany: vi.fn(async () => []),
+    },
+    notificationInbox: {
+      create: vi.fn(async ({ data }) => ({
+        id: `ni_${Date.now()}`,
+        ...data,
+        createdAt: new Date(),
+      })),
+      findMany: vi.fn(async () => []),
+      count: vi.fn(async () => 0),
+      delete: vi.fn(async () => ({ id: "ni_deleted" })),
+      deleteMany: vi.fn(async () => ({ count: 0 })),
     },
   },
 }));

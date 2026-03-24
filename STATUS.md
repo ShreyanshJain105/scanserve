@@ -9,30 +9,22 @@
 
 ## Last Session
 
-**Date:** 2026-03-20
+**Date:** 2026-03-24
 **What was done:**
-- Diagnosed auth-dialog redirect issue: dialog close handlers were using forced route pushes (`/home` or `/qr/:token`) instead of returning to previous page context.
-- Updated auth dialog pages to use history-first close behavior:
-  - `apps/web/src/app/(auth)/login/page.tsx`
-  - `apps/web/src/app/(auth)/register/business/page.tsx`
-  - `apps/web/src/app/qr/login/page.tsx`
-  - `apps/web/src/app/qr/register/page.tsx`
-- Close behavior now:
-  - if browser history exists: `router.back()`
-  - fallback only when needed (home or qr token route).
-- Revalidated web tests after change:
-  - `pnpm --filter @scan2serve/web test -- tests/auth-dialogs.test.tsx tests/app-header.test.tsx`
-  - full suite also passes (`38/38`).
+- Marked ADR-034 accepted and replaced Stripe with Razorpay for Layer 7 payments.
+- API now creates Razorpay orders and verifies signatures via `/api/public/orders/:id/checkout` + `/api/public/orders/:id/verify-payment`.
+- Removed Stripe webhook/router and service; added Razorpay service + env vars; order schema now stores Razorpay order/payment ids.
+- Web public menu checkout now loads Razorpay script, opens checkout, verifies payment, then redirects to `/order/[id]`.
+- Updated shared Order types and API public-route tests for Razorpay checkout + verification.
 
 **What's NOT done yet:**
-- Live browser validation is still pending for the latest history-first close behavior in real navigation flows.
-- Optional mixed-session hardening remains open: extend `/api/auth/sessions` and scope resolver to honor QR grace-rotation tokens if product requires it.
-- Layer 6+ feature work remains pending.
+- Live Razorpay checkout + signature verification with real keys not run (blocked: Razorpay test mode account not created yet).
+- Layer 8 order management (business-facing) not started.
+- Admin UI clarity improvements (admin panel UX) deferred per user request.
 
-**Next step:** Validate auth dialog close behavior live, then continue Layer 6
-1. Verify `/login`, `/register/business`, `/qr/login`, `/qr/register` close buttons always return to prior page in browser flow.
-2. Recheck QR menu flow (`menu -> login as customer -> close -> reopen`) for token/context stability.
-3. Start Layer 6 ADR and implementation for real public menu/cart flow.
+**Next step:**
+1. Run live Razorpay checkout + signature verification with test keys.
+2. Draft ADR for Layer 8 order management and begin implementation after approval.
 
 **Build progress:**
 ```
@@ -41,8 +33,8 @@ Layer 2:  Authentication      ✅ DONE
 Layer 3:  Business Onboarding ✅ DONE
 Layer 4:  Menu Management     ✅ DONE
 Layer 5:  Table & QR Codes    ✅ DONE
-Layer 6:  Public Menu & Cart  ⏳ PENDING
-Layer 7:  Ordering & Payments
+Layer 6:  Public Menu & Cart  ✅ DONE
+Layer 7:  Ordering & Payments ✅ DONE
 Layer 8:  Order Management
 Layer 9:  Business Dashboard
 Layer 10: Admin Panel
@@ -198,6 +190,41 @@ Layer 11: Polish & Deploy
 - Expanded Layer 4 web tests (`menu-page.test.tsx`) for item edit/delete interactions and blocked-business state behavior.
 - Re-ran DB seed against local docker Postgres using explicit `DATABASE_URL`; seeding completed successfully.
 - Revalidated API/web test and build suites successfully.
+
+### 2026-03-24 — Session 25: ADR-028 UI + notifications pass
+- Added owner header notification bell with badge (fetches `/api/business/notifications`) and new notifications page test coverage.
+- Admin pending-update list now shows field-level diffs and raw payload toggle; blocked/pending reasons surfaced on menu/tables pages via banners.
+- Added blocked-state banners for menu/tables flows; kept blocked/pending/rejected/archived actions disabled.
+- New web tests for header badge and notifications page; re-ran full API suite (13/66) and web suite (12/43) — all green.
+
+### 2026-03-24 — Session 26: Header bell inline + logout visibility
+- Header notification bell moved to rightmost, icon-only; opens inline scrollable/paginated list instead of navigating.
+- Logout hidden when no session; dashboard link hidden while on dashboard path to avoid self-link.
+- Updated test mocks for `usePathname`; reran web suite (12/43) all green; API suite unchanged (13/66).
+
+### 2026-03-24 — Session 27: ADR-029 unread inbox + history
+- Accepted ADR-029 introducing `notification_events` (history) and `notification_inbox` (unread) tables.
+- Added unread/all notification endpoints plus mark-read and mark-all; admin approve/reject/block/unblock now write event + inbox.
+- Header panel now supports unread/all toggle, per-item mark-read, mark-all; badge uses unread count. Updated shared types; API (13/66) and Web (12/43) tests passing.
+
+### 2026-03-24 — Session 28: ADR-030 remove legacy notifications
+- Removed legacy `business_notifications` Prisma model and relations; notifications now only use `notification_events` + `notification_inbox`.
+- Added ADR-030 and prepared for full DB wipe + schema re-push.
+
+### 2026-03-24 — Session 29: Admin approval notifications
+- Added notification event + inbox emission for initial business approve/reject actions.
+- Extended notification type union with business approval/rejection variants.
+
+### 2026-03-24 — Session 30: Admin inbox notifications
+- Added admin inbox endpoints and header support; business submissions and update requests now emit admin notifications.
+- Updated API tests to mock notification event/inbox prisma calls.
+
+### 2026-03-24 — Session 31: ADR-032 approved (UX polish)
+- ADR-032 approved to polish notification UX and standardize blocked banners across owner pages (implementation pending).
+
+### 2026-03-24 — Session 32: ADR-032 implementation
+- Notification panel now renders field-level diffs, type badges, and actor hints with grouped business headers.
+- Added blocked-status banners on dashboard and onboarding pages; web test suite passing.
 
 ### 2026-03-20 — Session 25: Root-route redirect + `/home` landing split
 - Added ADR-008 and accepted root-route policy: `/` now redirects by auth state while the public landing page lives at `/home`.
@@ -645,6 +672,101 @@ Layer 11: Polish & Deploy
   - `apps/web/src/app/qr/register/page.tsx`
 - Revalidated web tests after close-navigation changes (full suite passing).
 
+### 2026-03-24 — Session 96: ADR-026 rejected
+- Marked ADR-026 as superseded and explicitly dropped the proposed global in-place auth dialog controller.
+- Updated docs and web context notes to preserve route-based auth redirects plus history-first close behavior as the supported auth UX direction.
+- No product code changed in this session; this was decision-record and handoff cleanup only.
+
+### 2026-03-24 — Session 97: Web auth regression check + ADR-027 drafted
+- Re-ran `pnpm --filter @scan2serve/web test -- --runInBand`; all suites passed including auth dialog close coverage.
+- Auth live-browser validation remains outstanding (test-only this session).
+- Added proposed ADR-027 for Layer 6 public menu + client-side cart scope.
+
+### 2026-03-24 — Session 98: ADR-027 accepted + Layer 6 public menu/cart implementation
+- Marked ADR-027 as Accepted and implemented public menu delivery: new API `GET /api/public/menu/:slug` enforcing approved+active business/table/QR context and returning categories/items with derived image URLs.
+- Built SSR public menu page with client-side cart persisted per business/table/QR token and availability-aware quantity controls.
+- Added regression coverage: `apps/api/tests/publicRoutes.test.ts` for public menu endpoint and `apps/web/tests/public-menu.test.tsx` for cart isolation and quantity behaviors.
+- Full API and web test suites pass after changes.
+
+### 2026-03-24 — Session 99: Public menu UI compact + sliding description
+- Compacted public menu item cards into boxier layout and reduced padding/thumb size.
+- Item descriptions now slide in from the right when a card is selected; hidden otherwise.
+- Cart drawer close label fixed (“Hide cart”); floating cart toggle stays in sync.
+- Updated `apps/web/tests/public-menu.test.tsx`; full web suite (11 files, 42 tests) passes.
+
+### 2026-03-24 — Session 100: Row-style menu cards + single cart toggle
+- Converted public menu cards to full-width rows with inline descriptions and simplified layout.
+- Cart drawer now uses only the floating toggle to open/close (removed inner hide button).
+- Updated `apps/web/tests/public-menu.test.tsx`; web suite still passing (11 files, 42 tests).
+
+### 2026-03-24 — Session 101: Quantity strip + label placement
+- Restyled public menu row actions with rose quantity strip (− qty +) and moved “In cart/Add to cart” under price/controls.
+- Web tests refreshed; suite remains green (11 files, 42 tests).
+
+### 2026-03-24 — Session 102: Dashboard menu currency formatting
+- Dashboard menu item list now uses business currency for price display (Intl.NumberFormat with `selectedBusiness.currencyCode`).
+- Web test suite re-run (11 files, 42 tests) passes.
+
+### 2026-03-24 — Session 103: Currency symbol in menu item form
+- Added business currency symbol to the dashboard menu item price input (derived from `selectedBusiness.currencyCode`). Web test suite re-run (11 files, 42 tests) passes.
+
+### 2026-03-24 — Session 104: Business edits require re-approval
+- Earlier interim change (flip approved to pending on edit) now superseded by queued-updates approach in Session 106.
+
+### 2026-03-24 — Session 105: ADR-028 drafted
+- Proposed queued updates + blocked flag.
+
+### 2026-03-24 — Session 106: ADR-028 accepted + backend queue/block implemented
+- Added business update request queue, blocked flag, middleware guard, admin list/approve/reject endpoints, and block/unblock endpoint. API tests (13 files, 66 tests) pass.
+
+### 2026-03-24 — Session 107: Notifications backend
+- Added business notifications table and owner listing endpoint; admin moderation/block actions now emit notifications. API tests still passing.
+
+### 2026-03-24 — Session 108: Owner notifications page
+- Added `/dashboard/notifications` listing latest business notifications (type/message/business/time). Shared types updated; web tests still pass.
+
+### 2026-03-24 — Session 109: Admin pending-updates UI
+- Admin moderation page now includes block/unblock toggle and inline pending update list with approve/reject actions (fetches `/api/admin/businesses/:id/updates`).
+- Web tests remain green (11 files, 42 tests).
+
+### 2026-03-24 — Session 110: Blocked-state guard in owner dashboards
+- Menu and tables dashboards now gate actions when business is blocked (aligned with pending/rejected/archived gating). Web tests remain green (11 files, 42 tests).
+
+### 2026-03-24 — Session 111: Layer 7 ordering & payments
+- Accepted ADR-033 and enforced server-side item lookup/pricing for order creation.
+- Added public order create/checkout/status endpoints, Stripe webhook processing, and Stripe env keys.
+- Public menu cart now captures customer details and initiates checkout; added `/order/[id]` status page.
+- Added API/web test coverage for order creation, payments webhook, public menu checkout, and order page; API + web suites green.
+
+### 2026-03-24 — Session 112: Auth scope refresh on navigation
+- Auth context now refreshes when QR token scope changes (menu/QR to non-QR) to prevent dashboard redirects on client navigation.
+- Web tests re-run and passing.
+
+### 2026-03-24 — Session 113: Menu currency input layout fix
+- Reworked menu price inputs to use a flex currency prefix (prevents overlap for long codes like AED).
+
+### 2026-03-24 — Session 114: Header login visibility tweak
+- Suppressed login controls when a business/customer session exists; logout remains visible.
+
+### 2026-03-24 — Session 115: Header logout dropdowns
+- Moved logout actions into business/customer user cards as dropdown menus; removed standalone logout dropdown.
+
+### 2026-03-24 — Session 116: Header dropdown alignment
+- Aligned user-card dropdown menus to the card width to avoid detached button-like visuals.
+
+### 2026-03-24 — Session 117: Header dropdown close behavior
+- Added outside-click handling to close header dropdown menus.
+
+### 2026-03-24 — Session 118: Dropdown close scope tweak
+- Refined dropdown close behavior to close when clicking outside any open dropdown menu (including notifications).
+
+### 2026-03-24 — Session 119: Notification header cleanup
+- Removed redundant scope tag from notifications dropdown header (kept selector buttons only).
+
+### 2026-03-24 — Session 120: Razorpay payments
+- Accepted ADR-034 and replaced Stripe with Razorpay order create + signature verification.
+- Updated API/public menu checkout flow, schema fields, shared types, and tests; removed Stripe service/router.
+
 ---
 
 ## Decisions Log
@@ -674,6 +796,14 @@ Layer 11: Polish & Deploy
 | ADR-023 | Unified auth routes with QR-token scope resolution | Keep a single `/api/auth/*` surface and prevent cross-scope bleed by resolving customer scope from valid `qrToken` while maintaining strict cookie isolation | 2026-03-20 |
 | ADR-024 | Dual-session visibility and scoped logout in unified auth | Show both valid business/customer sessions concurrently and allow explicit scoped logout/login actions without splitting auth route namespaces | 2026-03-20 |
 | ADR-025 | Auth entry already-logged-in guard + dialog close controls | Prevent redundant auth writes when scope session already exists and ensure all auth dialogs expose explicit close actions with safe navigation | 2026-03-20 |
+| ADR-026 | Reject in-place/global auth dialog controller; keep route-based auth redirects | Route-based auth pages are the preferred UX, and history-first close behavior is sufficient without shared global auth-dialog state | 2026-03-24 |
+| ADR-027 | Public menu + client-side cart (Layer 6) — Accepted | Define public menu SSR + read-only API and local cart keyed by business/table/QR token; defer ordering/payments to Layer 7 | 2026-03-24 |
+| ADR-029 | Notification read-state split (inbox + history) — Accepted | Durable unread tracking via `notification_inbox`, immutable history via `notification_events`, mark-read endpoints, and unread badge accuracy | 2026-03-24 |
+| ADR-030 | Remove legacy `business_notifications` table — Accepted | Avoid duplicate notification storage and rely solely on inbox + history tables | 2026-03-24 |
+| ADR-031 | Admin notification inbox — Accepted | Provide admin notifications for submissions/updates using existing inbox+history tables | 2026-03-24 |
+| ADR-032 | Notification UX polish + blocked banner consistency — Accepted | Improve readability of notifications and standardize blocked-state messaging | 2026-03-24 |
+| ADR-033 | Ordering & payments (Layer 7) — Accepted | Define order creation, Stripe checkout, webhook handling, and order status surfaces | 2026-03-24 |
+| ADR-034 | Razorpay payments (replace Stripe) — Accepted | Support UPI by replacing Stripe with Razorpay order + signature verification flow | 2026-03-24 |
 
 ---
 

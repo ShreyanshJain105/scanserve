@@ -51,6 +51,13 @@ const nextRotId = () => `r_${qrRotations.length + 1}`;
 
 vi.mock("../src/prisma", () => ({
   prisma: {
+    user: {
+      findUnique: vi.fn(async ({ where }) => {
+        if (where?.id) return users.find((u) => u.id === where.id) ?? null;
+        if (where?.email) return users.find((u) => u.email === where.email) ?? null;
+        return null;
+      }),
+    },
     business: {
       findFirst: vi.fn(async ({ where, select }) => {
         const row =
