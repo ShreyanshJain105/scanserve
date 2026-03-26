@@ -8,6 +8,45 @@ const defaultHeaders = {
   "Content-Type": "application/json",
 };
 
+const CSRF_COOKIE_NAME = "csrf_token";
+const CSRF_HEADER_NAME = "x-csrf-token";
+
+let cachedCsrfToken: string | null = null;
+
+const readCookieValue = (name: string) => {
+  if (typeof document === "undefined") return null;
+  const parts = document.cookie.split(";").map((part) => part.trim());
+  const match = parts.find((part) => part.startsWith(`${name}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.slice(name.length + 1));
+};
+
+const getCsrfToken = () => {
+  const token = readCookieValue(CSRF_COOKIE_NAME);
+  if (token && token !== cachedCsrfToken) {
+    cachedCsrfToken = token;
+  }
+  return cachedCsrfToken;
+};
+
+const ensureCsrfToken = async () => {
+  const existing = getCsrfToken();
+  if (existing) return existing;
+  const response = await fetch(`${API_URL}/api/auth/csrf`, {
+    method: "GET",
+    credentials: "include",
+  });
+  const body = await parseResponse<{ csrfToken: string }>(response);
+  if (body.status === 1) {
+    cachedCsrfToken = body.data?.csrfToken ?? null;
+    return cachedCsrfToken;
+  }
+  return null;
+};
+
+const isMutatingMethod = (method?: string) =>
+  ["POST", "PUT", "PATCH", "DELETE"].includes((method || "GET").toUpperCase());
+
 async function parseResponse<T>(res: Response): Promise<ApiResponse<T>> {
   const data = await res.json();
   return data as ApiResponse<T>;
@@ -45,6 +84,8 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   { retryOn401 = true }: { retryOn401?: boolean } = {}
 ): Promise<T> {
+  const needsCsrf = isMutatingMethod(options.method);
+  const csrfToken = needsCsrf ? await ensureCsrfToken() : null;
   const isFormDataBody =
     typeof FormData !== "undefined" && options.body instanceof FormData;
   const mergedHeaders = isFormDataBody
@@ -53,6 +94,9 @@ export async function apiFetch<T>(
         ...defaultHeaders,
         ...(options.headers || {}),
       };
+  if (needsCsrf && csrfToken) {
+    (mergedHeaders as Record<string, string>)[CSRF_HEADER_NAME] = csrfToken;
+  }
 
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -61,14 +105,18 @@ export async function apiFetch<T>(
   });
 
   if (response.status === 401 && retryOn401) {
+    const refreshCsrfToken = await ensureCsrfToken();
     const qrTokenHeader =
       typeof mergedHeaders === "object" && mergedHeaders !== null
         ? (mergedHeaders as Record<string, string>)["x-qr-token"]
         : undefined;
+    const refreshHeaders: Record<string, string> = {};
+    if (qrTokenHeader) refreshHeaders["x-qr-token"] = qrTokenHeader;
+    if (refreshCsrfToken) refreshHeaders[CSRF_HEADER_NAME] = refreshCsrfToken;
     const refreshed = await fetch(`${API_URL}/api/auth/refresh`, {
       method: "POST",
       credentials: "include",
-      headers: qrTokenHeader ? { "x-qr-token": qrTokenHeader } : undefined,
+      headers: Object.keys(refreshHeaders).length ? refreshHeaders : undefined,
     });
     const refreshBody = await parseResponse<unknown>(refreshed);
     if (refreshBody.status === 1) {

@@ -13,6 +13,7 @@ import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { consumeQrAuthAttempt } from "../middleware/qrAuthRateLimit";
 import { sendError, sendSuccess } from "../utils/response";
+import { issueCsrfToken } from "../utils/csrf";
 import type { UserRole } from "@scan2serve/shared";
 
 const router: express.Router = express.Router();
@@ -218,6 +219,14 @@ router.post(
     return sendSuccess(res, {
       user: { id: user.id, email: user.email, role: user.role },
     }, 201);
+  })
+);
+
+router.get(
+  "/csrf",
+  asyncHandler(async (_req, res) => {
+    const token = issueCsrfToken(res);
+    return sendSuccess(res, { csrfToken: token });
   })
 );
 

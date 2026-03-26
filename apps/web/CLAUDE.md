@@ -118,6 +118,11 @@ pnpm lint   # run Next.js ESLint
 - Currency selector behavior: selecting an option must immediately close dropdown and show committed value in the same input.
 - Currency combobox markup rule: avoid nesting combobox interactive controls inside a wrapping `<label>`; use `label htmlFor` + container to prevent browser refocus/reopen on option click.
 - ADR-017 dashboard update in `src/app/dashboard/page.tsx`:
+
+## Updates 2026-03-26
+- Added CSRF token support in `src/lib/api.ts`: fetches `/api/auth/csrf` when needed and sends `x-csrf-token` on mutating requests (including refresh retry).
+- Added dismiss button to toast notifications in `src/components/ui/toast-viewport.tsx`.
+- Toast viewport now positions below the sticky header by reading header height and setting a CSS offset.
   - business cards now render business logos (with fallback placeholder),
   - archived businesses are hidden by default with `Show archived` toggle,
   - archive flow uses explicit confirm dialog (type `ARCHIVE`) and restore action.

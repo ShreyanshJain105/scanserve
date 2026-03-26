@@ -9,13 +9,16 @@
 
 ## Last Session
 
-**Date:** 2026-03-24
+**Date:** 2026-03-26
 **What was done:**
-- Marked ADR-034 accepted and replaced Stripe with Razorpay for Layer 7 payments.
-- API now creates Razorpay orders and verifies signatures via `/api/public/orders/:id/checkout` + `/api/public/orders/:id/verify-payment`.
-- Removed Stripe webhook/router and service; added Razorpay service + env vars; order schema now stores Razorpay order/payment ids.
-- Web public menu checkout now loads Razorpay script, opens checkout, verifies payment, then redirects to `/order/[id]`.
-- Updated shared Order types and API public-route tests for Razorpay checkout + verification.
+- Implemented ADR-035 CSRF tokens: added API CSRF middleware, `/api/auth/csrf` token issuer, and web client auto-header support.
+- Added API tests for CSRF middleware.
+- Added close button to toast notifications in web UI.
+- Expanded docker-compose to include seed step and common envs (Razorpay, LLM, admin seed, QR auth), plus web env_file wiring.
+- Positioned toast notifications below the sticky header via dynamic offset.
+- Added colored log output in API logger for non-production TTY sessions.
+- Updated logger to colorize logs in all environments unless `LOG_COLOR=false`.
+- Trimmed docker-compose env overrides to keep only Docker-specific values (DB/S3/internal URLs).
 
 **What's NOT done yet:**
 - Live Razorpay checkout + signature verification with real keys not run (blocked: Razorpay test mode account not created yet).
@@ -767,6 +770,35 @@ Layer 11: Polish & Deploy
 - Accepted ADR-034 and replaced Stripe with Razorpay order create + signature verification.
 - Updated API/public menu checkout flow, schema fields, shared types, and tests; removed Stripe service/router.
 
+### 2026-03-26 — Session 121: ADR-035 auth refresh + CSRF strategy
+- Drafted ADR-035 to capture decisions around access-token refresh handling and CSRF posture.
+- ADR scope narrowed to CSRF only; refresh-token implementation stays unchanged.
+- ADR accepted: implement CSRF tokens for mutating routes.
+
+### 2026-03-26 — Session 122: CSRF token implementation
+- Added CSRF token issuance endpoint `GET /api/auth/csrf` and global CSRF middleware for mutating routes.
+- Web `apiFetch` now fetches/attaches `x-csrf-token` and includes it in refresh retries.
+- Added API test coverage for CSRF middleware behavior.
+
+### 2026-03-26 — Session 123: Toast close button
+- Added a dismiss button to the toast viewport so users can manually close notifications.
+
+### 2026-03-26 — Session 124: Compose env + seed wiring
+- Added `db:seed` to API compose startup and wired common env vars (Razorpay, LLM, admin seed, QR auth).
+- Added web `env_file` to load `apps/web/.env.local` in compose.
+
+### 2026-03-26 — Session 125: Toast offset below header
+- Toast viewport now computes header height and positions below it to avoid covering the header.
+
+### 2026-03-26 — Session 126: Colored API logs
+- API logger now colorizes log lines by level in non-production TTY sessions (disable via `LOG_COLOR=false`).
+
+### 2026-03-26 — Session 127: Force colored logs
+- Logger now colorizes logs in all environments by default; set `LOG_COLOR=false` to disable.
+
+### 2026-03-26 — Session 128: Compose env trimming
+- Removed env overrides from compose for values already defined in `apps/api/.env.local` and `apps/web/.env.local`, keeping only Docker-specific DB/S3/internal URLs.
+
 ---
 
 ## Decisions Log
@@ -804,6 +836,7 @@ Layer 11: Polish & Deploy
 | ADR-032 | Notification UX polish + blocked banner consistency — Accepted | Improve readability of notifications and standardize blocked-state messaging | 2026-03-24 |
 | ADR-033 | Ordering & payments (Layer 7) — Accepted | Define order creation, Stripe checkout, webhook handling, and order status surfaces | 2026-03-24 |
 | ADR-034 | Razorpay payments (replace Stripe) — Accepted | Support UPI by replacing Stripe with Razorpay order + signature verification flow | 2026-03-24 |
+| ADR-035 | CSRF strategy for cookie-based auth — Accepted | Implement CSRF tokens for mutating routes | 2026-03-26 |
 
 ---
 

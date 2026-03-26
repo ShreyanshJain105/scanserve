@@ -12,10 +12,13 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 class Logger {
   private static instance: Logger;
   private readonly minLevel: number;
+  private readonly useColor: boolean;
 
   private constructor() {
     const envLevel = (process.env.LOG_LEVEL || "info").toLowerCase() as LogLevel;
     this.minLevel = LOG_LEVELS[envLevel] ?? LOG_LEVELS.info;
+    const colorFlag = process.env.LOG_COLOR;
+    this.useColor = colorFlag !== "false";
   }
 
   static getInstance() {
@@ -52,15 +55,16 @@ class Logger {
     };
 
     const line = JSON.stringify(payload);
+    const output = this.useColor ? this.colorize(level, line) : line;
     if (level === "error") {
-      console.error(line);
+      console.error(output);
       return;
     }
     if (level === "warn") {
-      console.warn(line);
+      console.warn(output);
       return;
     }
-    console.log(line);
+    console.log(output);
   }
 
   private normalizeContext(context: LogContext): LogContext {
@@ -77,6 +81,17 @@ class Logger {
       normalized[key] = value;
     }
     return normalized;
+  }
+
+  private colorize(level: LogLevel, line: string) {
+    const colors: Record<LogLevel, string> = {
+      debug: "\u001b[90m",
+      info: "\u001b[36m",
+      warn: "\u001b[33m",
+      error: "\u001b[31m",
+    };
+    const reset = "\u001b[0m";
+    return `${colors[level]}${line}${reset}`;
   }
 }
 

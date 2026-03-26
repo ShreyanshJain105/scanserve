@@ -499,6 +499,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
   return (
     <header
       ref={headerRef}
+      data-app-header
       className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur"
     >
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3.5">

@@ -41,7 +41,7 @@ services:
     container_name: scan2serve-api
     working_dir: /app
     env_file:
-      - ./apps/api/.env
+      - ./apps/api/.env.local
     volumes:
       - ./:/app
       - api-node-modules:/app/node_modules
@@ -50,32 +50,11 @@ services:
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
       DATABASE_URL: postgresql://scan2serve:scan2serve@db:5432/scan2serve
-      JWT_SECRET: dev-secret
-      ACCESS_TOKEN_TTL_MINUTES: 15
-      REFRESH_TOKEN_TTL_DAYS: 7
-      BCRYPT_SALT_ROUNDS: 10
       CLIENT_URL: http://localhost:3000
-      COOKIE_DOMAIN: localhost
-      PORT: 4000
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_URL: http://localhost:9000
-      S3_REGION: us-east-1
-      S3_BUCKET: scan2serve-menu-images
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin
-      S3_FORCE_PATH_STYLE: "true"
-      MENU_IMAGE_MAX_BYTES: 5242880
-      BUSINESS_LOGO_MAX_BYTES: 3145728
-      AI_IMAGE_TIMEOUT_MS: 30000
-      GEMINI_API_URL: https://generativelanguage.googleapis.com/v1beta
-      GEMINI_IMAGE_MODEL: gemini-3-pro-image-preview
-      ENABLE_DELETED_ASSET_CLEANUP: "true"
-      DELETED_ASSET_CLEANUP_INTERVAL_MS: 600000
-      DELETED_ASSET_CLEANUP_BATCH_SIZE: 20
-      DELETED_ASSET_CLEANUP_MAX_ATTEMPTS: 8
-      DELETED_ASSET_CLEANUP_BASE_BACKOFF_MS: 60000
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api db:push && pnpm --filter @scan2serve/api dev"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api db:push && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api dev"
     ports:
       - "4000:4000"
     depends_on:
@@ -94,6 +73,8 @@ services:
     image: node:20-alpine
     container_name: scan2serve-web
     working_dir: /app
+    env_file:
+      - ./apps/web/.env.local
     volumes:
       - ./:/app
       - web-node-modules:/app/node_modules
@@ -102,9 +83,7 @@ services:
       NODE_ENV: development
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
-      NEXT_PUBLIC_API_URL: http://localhost:4000
       API_INTERNAL_URL: http://api:4000
-      PORT: 3000
     command: >
       sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/web exec next dev --hostname 0.0.0.0 --port 3000"
     ports:

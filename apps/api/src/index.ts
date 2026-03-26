@@ -8,6 +8,7 @@ import businessRoutes from "./routes/business";
 import adminRoutes from "./routes/admin";
 import publicRoutes from "./routes/public";
 import aiRoutes from "./routes/ai";
+import { requireCsrf } from "./middleware/csrf";
 import { logger } from "./utils/logger";
 import { startDeletedAssetCleanupWorker } from "./services/deletedAssetCleanup";
 import { startArchivedBusinessCleanupWorker } from "./services/archivedBusinessCleanup";
@@ -87,6 +88,7 @@ app.use((req, res, next) => {
 
 // Parse JSON bodies for all routes.
 app.use(express.json());
+app.use(requireCsrf);
 
 // ─── Health Check ───────────────────────────────────────────
 app.get("/api/health", (_req, res) => {

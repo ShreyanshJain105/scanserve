@@ -199,6 +199,12 @@ pnpm db:studio    # open Prisma Studio GUI
 ## Updates 2026-03-24
 - ADR-032 approved: pending UX-only changes for notifications and blocked banners (no API changes yet).
 
+## Updates 2026-03-26
+- Added CSRF utilities (`src/utils/csrf.ts`) and global CSRF middleware (`src/middleware/csrf.ts`) enforced on mutating routes.
+- Added `GET /api/auth/csrf` to issue CSRF token cookie + payload for client use.
+- Added API test coverage for CSRF middleware (`tests/csrfMiddleware.test.ts`).
+- Added colored log output in `src/utils/logger.ts` (disable with `LOG_COLOR=false`).
+
 ## Updates 2026-03-24
 - Layer 7 ordering endpoints updated: `POST /api/public/orders` now enforces server-side price calculation with normalized item quantities (item id + quantity only).
 - Order checkout now includes menu item names in Stripe line items, supports `{ORDER_ID}` env URL templates, and returns order details with business currency data.

@@ -63,3 +63,8 @@ Project documentation for architecture decisions, process notes, and operational
 
 ## Updates 2026-03-24
 - ADR-034 accepted: replace Stripe payment flow with Razorpay order create + signature verification.
+
+## Updates 2026-03-26
+- Drafted `docs/adr/ADR-035-csrf-strategy.md` to capture CSRF posture decisions (proposed, awaiting approval).
+- Scoped ADR-035 to CSRF strategy only; refresh-token implementation stays unchanged.
+- ADR-035 accepted: implement CSRF tokens for mutating routes.

@@ -487,3 +487,18 @@ This section is the high-level source of truth for what is already implemented a
 - ADR-023 accepted and implemented: mixed business/customer browser sessions keep one `/api/auth/*` namespace and resolve scope by `qrToken` validity, with scoped cookie handling for login/register/refresh/me/logout and no separate customer auth route tree.
 - ADR-024 accepted and implemented: auth now exposes dual-session visibility (`/api/auth/sessions`) and scoped logout controls, while web header/auth context can show both active identities and offer scope-specific login/logout actions.
 - ADR-025 accepted and implemented: auth entry flows now short-circuit when corresponding scope is already logged in (using session-state introspection), and auth dialogs across business/QR routes include explicit close controls.
+
+## Updates 2026-03-26
+- Drafted ADR-035 (`docs/adr/ADR-035-csrf-strategy.md`) for CSRF strategy (proposed, awaiting answers).
+- Decision: Pending user approval on auto-refresh vs 401+client refresh and CSRF posture.
+- Impact: Auth/session security approach for upcoming work.
+- Next: Collect answers and update ADR-035 status before implementation.
+- Update: ADR-035 scope narrowed to CSRF strategy only; refresh-token implementation remains unchanged.
+- Update: ADR-035 accepted; implement CSRF tokens for mutating routes.
+- Implemented CSRF tokens: `GET /api/auth/csrf` issues token cookie + payload, API enforces `x-csrf-token` on mutating routes, and web `apiFetch` attaches token automatically.
+- Added toast dismiss button in web toast viewport for manual close.
+- Toast viewport now offsets below the sticky header based on header height.
+- API logs now colorize by level in non-production TTY sessions (disable via `LOG_COLOR=false`).
+- Update: colorized API logs are now on by default in all environments unless `LOG_COLOR=false`.
+- Trimmed docker-compose env overrides to keep only Docker-specific DB/S3/internal URLs.
+- Updated docker-compose to run `db:seed`, add common API envs (Razorpay/LLM/admin/QR), and load web `.env.local`.
