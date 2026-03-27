@@ -34,3 +34,7 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 
 ## Updates 2026-03-24
 - Order shared type now uses Razorpay fields (`razorpayOrderId`, `razorpayPaymentId`) instead of Stripe.
+
+## Updates 2026-03-27
+- Added shared org/business RBAC types (`OrgRole`, `OrgInviteStatus`, `BusinessRole`) plus org/membership interfaces.
+- Extended notification type union to include org invite and business-access events.

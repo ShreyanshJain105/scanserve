@@ -166,6 +166,17 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added public menu endpoint `GET /api/public/menu/:slug` that validates approved/non-archived business, optional active table, and QR/grace tokens, returning sorted categories/items with derived image URLs and decimal-string prices.
 - Expanded `apps/api/tests/publicRoutes.test.ts` with public menu coverage; API test suite passes.
 
+## Updates 2026-03-27
+- Implemented business order management endpoints in `src/routes/business.ts`: `GET /orders` (status filter + cursor pagination), `GET /orders/:id` detail, and `PATCH /orders/:id/status` with status transition validation.
+- Added order-event publisher service at `src/services/orderEvents.ts` and wired best-effort event emission for public order create, Razorpay verify, and business status updates.
+- Added Layer 8 API coverage in `tests/orderManagementRoutes.test.ts`.
+- Implemented ADR-037 org+RBAC backend: org/org-invite/membership endpoints in `src/routes/business.ts`, org membership + business membership tables in Prisma schema, and role gating for menu/table/admin actions.
+- Updated business resolution (`requireApprovedBusiness`) to respect business memberships and attach `req.businessRole`.
+- Added API test coverage for org invite flows and updated existing tests to include business membership mocks.
+- Fixed Prisma schema relation by adding `Business.memberships` for `BusinessMembership`.
+- Added org membership lookup + org creation API tests in `tests/orgInviteRoutes.test.ts`.
+- Stabilized API tests: added business membership mocks in `tests/aiRoutes.test.ts`, hoisted org-invite prisma store, and added Decimal fallback setup in `tests/publicRoutes.test.ts`.
+
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.
 - API test suite re-run and passing.

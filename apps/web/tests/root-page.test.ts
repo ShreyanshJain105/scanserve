@@ -20,7 +20,6 @@ describe("RootPage", () => {
   });
 
   it("redirects to /home when auth cookies are missing", async () => {
-    const fetchSpy = vi.spyOn(global, "fetch");
     cookiesMock.mockResolvedValue({
       get: () => undefined,
       getAll: () => [],
@@ -28,18 +27,10 @@ describe("RootPage", () => {
 
     await RootPage();
 
-    expect(fetchSpy).not.toHaveBeenCalled();
     expect(redirectMock).toHaveBeenCalledWith("/home");
   });
 
-  it("redirects to /dashboard for logged-in business users", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        status: 1,
-        data: { user: { role: "business" } },
-      }),
-    } as Response);
+  it("redirects to /explore when access token is present", async () => {
     cookiesMock.mockResolvedValue({
       get: (name: string) =>
         name === "access_token" ? { value: "access" } : name === "refresh_token" ? { value: "refresh" } : undefined,
@@ -51,74 +42,20 @@ describe("RootPage", () => {
 
     await RootPage();
 
-    expect(redirectMock).toHaveBeenCalledWith("/dashboard");
+    expect(redirectMock).toHaveBeenCalledWith("/explore");
   });
 
-  it("redirects to /admin for logged-in admin users", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        status: 1,
-        data: { user: { role: "admin" } },
-      }),
-    } as Response);
+  it("redirects to /explore when qr access token is present", async () => {
     cookiesMock.mockResolvedValue({
       get: (name: string) =>
-        name === "access_token" ? { value: "access" } : name === "refresh_token" ? { value: "refresh" } : undefined,
+        name === "qr_customer_access" ? { value: "qr-access" } : undefined,
       getAll: () => [
-        { name: "access_token", value: "access" },
-        { name: "refresh_token", value: "refresh" },
+        { name: "qr_customer_access", value: "qr-access" },
       ],
     });
 
     await RootPage();
 
-    expect(redirectMock).toHaveBeenCalledWith("/admin");
-  });
-
-  it("falls back to /home when /api/auth/me is not valid", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: false,
-      json: async () => ({}),
-    } as Response);
-    cookiesMock.mockResolvedValue({
-      get: (name: string) =>
-        name === "access_token" ? { value: "access" } : name === "refresh_token" ? { value: "refresh" } : undefined,
-      getAll: () => [
-        { name: "access_token", value: "access" },
-        { name: "refresh_token", value: "refresh" },
-      ],
-    });
-
-    await RootPage();
-
-    expect(redirectMock).toHaveBeenCalledWith("/home");
-  });
-
-  it("uses refresh fallback when /api/auth/me fails and refresh is valid", async () => {
-    vi.spyOn(global, "fetch")
-      .mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({}),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 1,
-          data: { user: { role: "business" } },
-        }),
-      } as Response);
-    cookiesMock.mockResolvedValue({
-      get: (name: string) =>
-        name === "access_token" ? { value: "access" } : name === "refresh_token" ? { value: "refresh" } : undefined,
-      getAll: () => [
-        { name: "access_token", value: "access" },
-        { name: "refresh_token", value: "refresh" },
-      ],
-    });
-
-    await RootPage();
-
-    expect(redirectMock).toHaveBeenCalledWith("/dashboard");
+    expect(redirectMock).toHaveBeenCalledWith("/explore");
   });
 });

@@ -4,7 +4,8 @@ import multer from "multer";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import QRCode from "qrcode";
-import { DIETARY_TAGS } from "@scan2serve/shared";
+import { DIETARY_TAGS, ORDER_STATUS_FLOW } from "@scan2serve/shared";
+import type { OrderStatus } from "@scan2serve/shared";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendError, sendSuccess } from "../utils/response";
@@ -25,6 +26,7 @@ import {
   enqueueDeletedBusinessLogo,
   enqueueDeletedMenuItemImage,
 } from "../services/deletedAssetCleanup";
+import { fetchOrderSnapshot, publishOrderEventBestEffort } from "../services/orderEvents";
 
 const notifyAdmins = async (params: {
   businessId: string;
@@ -210,6 +212,40 @@ const menuItemSuggestionQuerySchema = z.object({
   categoryId: z.string().min(1),
   q: z.string().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(10).optional(),
+});
+const orgInviteCheckSchema = z.object({
+  email: z.string().email(),
+});
+const orgInviteCreateSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(["manager", "staff"]),
+});
+const orgInviteActionSchema = z.object({
+  inviteId: z.string().min(1),
+});
+const orgCreateSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+});
+const businessMembershipCreateSchema = z.object({
+  businessId: z.string().min(1),
+  userId: z.string().min(1),
+  role: z.enum(["manager", "staff"]),
+});
+const orderStatusSchema = z.enum([
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready",
+  "completed",
+  "cancelled",
+]);
+const orderListQuerySchema = z.object({
+  status: orderStatusSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.string().min(1).optional(),
+});
+const orderStatusUpdateSchema = z.object({
+  status: orderStatusSchema,
 });
 const generateItemImageSchema = z.object({
   prompt: z.string().min(4).max(500).optional(),
@@ -504,7 +540,205 @@ const serializeTableRow = (table: {
 
 type SerializedTableInput = Parameters<typeof serializeTableRow>[0];
 
+const serializeOrderSummary = (order: {
+  id: string;
+  businessId: string;
+  tableId: string;
+  status: OrderStatus;
+  totalAmount: Prisma.Decimal;
+  razorpayOrderId: string | null;
+  razorpayPaymentId: string | null;
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  customerName: string;
+  customerPhone: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  table?: { id: string; tableNumber: number; label: string | null } | null;
+}) => ({
+  id: order.id,
+  businessId: order.businessId,
+  tableId: order.tableId,
+  status: order.status,
+  totalAmount: order.totalAmount.toString(),
+  razorpayOrderId: order.razorpayOrderId,
+  razorpayPaymentId: order.razorpayPaymentId,
+  paymentStatus: order.paymentStatus,
+  customerName: order.customerName,
+  customerPhone: order.customerPhone,
+  createdAt: order.createdAt.toISOString(),
+  updatedAt: order.updatedAt.toISOString(),
+  table: order.table
+    ? {
+        id: order.table.id,
+        tableNumber: order.table.tableNumber,
+        label: order.table.label,
+      }
+    : null,
+});
+
+const serializeOrderDetail = (order: {
+  id: string;
+  businessId: string;
+  tableId: string;
+  status: OrderStatus;
+  totalAmount: Prisma.Decimal;
+  razorpayOrderId: string | null;
+  razorpayPaymentId: string | null;
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  customerName: string;
+  customerPhone: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  table?: { id: string; tableNumber: number; label: string | null } | null;
+  items?: Array<{
+    id: string;
+    menuItemId: string;
+    quantity: number;
+    unitPrice: Prisma.Decimal;
+    specialInstructions: string | null;
+    menuItem?: { name: string } | null;
+  }>;
+}) => ({
+  ...serializeOrderSummary(order),
+  items: (order.items ?? []).map((item) => ({
+    id: item.id,
+    menuItemId: item.menuItemId,
+    name: item.menuItem?.name ?? null,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice.toString(),
+    specialInstructions: item.specialInstructions,
+  })),
+});
+
+const isValidOrderStatusTransition = (current: OrderStatus, next: OrderStatus) => {
+  if (current === next) return false;
+  if (current === "cancelled" || current === "completed") return false;
+  if (next === "cancelled") {
+    return current === "pending" || current === "confirmed";
+  }
+  return ORDER_STATUS_FLOW[current] === next;
+};
+
+const notifyUser = async (params: {
+  userId: string;
+  type: string;
+  message: string;
+  payload?: Prisma.JsonValue;
+  actorUserId?: string | null;
+  businessId?: string | null;
+}) => {
+  const event = await prisma.notificationEvent.create({
+    data: {
+      userId: params.userId,
+      actorUserId: params.actorUserId ?? null,
+      businessId: params.businessId ?? null,
+      type: params.type,
+      message: params.message,
+      payload: params.payload,
+    },
+  });
+  await prisma.notificationInbox.create({
+    data: { userId: params.userId, eventId: event.id },
+  });
+};
+
+const getOrgMembershipForUser = async (userId: string) =>
+  prisma.orgMembership.findFirst({
+    where: { userId },
+    include: { org: true },
+  });
+
+const requireOrgRole = async (
+  req: express.Request,
+  res: express.Response,
+  roles: Array<"owner" | "manager" | "staff">
+) => {
+  const membership = await getOrgMembershipForUser(req.user!.id);
+  if (!membership) {
+    sendError(res, "You must belong to an org to continue", 403, "ORG_MEMBERSHIP_REQUIRED");
+    return null;
+  }
+  if (!roles.includes(membership.role as "owner" | "manager" | "staff")) {
+    sendError(res, "You do not have permission for this org action", 403, "ORG_ROLE_FORBIDDEN");
+    return null;
+  }
+  return membership;
+};
+
+const requireBusinessRole = (
+  req: express.Request,
+  res: express.Response,
+  roles: Array<"owner" | "manager" | "staff">
+) => {
+  if (!req.businessRole || !roles.includes(req.businessRole)) {
+    sendError(res, "You do not have permission for this business action", 403, "BUSINESS_ROLE_FORBIDDEN");
+    return false;
+  }
+  return true;
+};
+
+const resolveBusinessRoleForUser = async (
+  businessId: string,
+  userId: string
+): Promise<"owner" | "manager" | "staff" | null> => {
+  const membership = await prisma.businessMembership.findFirst({
+    where: { businessId, userId },
+    select: { role: true },
+  });
+  if (membership?.role) return membership.role as "owner" | "manager" | "staff";
+
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, userId },
+    select: { id: true },
+  });
+  if (business) return "owner";
+
+  return null;
+};
+
 router.use(requireAuth, requireRole("business"));
+
+router.post(
+  "/org",
+  asyncHandler(async (req, res) => {
+    const parsed = orgCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const existingMembership = await getOrgMembershipForUser(req.user!.id);
+    if (existingMembership) {
+      sendError(res, "User already belongs to an org", 409, "ORG_ALREADY_JOINED");
+      return;
+    }
+
+    const org = await prisma.org.create({
+      data: {
+        ownerUserId: req.user!.id,
+        name: parsed.data.name,
+      },
+    });
+
+    await prisma.orgMembership.create({
+      data: {
+        orgId: org.id,
+        userId: req.user!.id,
+        role: "owner",
+      },
+    });
+
+    sendSuccess(res, {
+      org: {
+        id: org.id,
+        ownerUserId: org.ownerUserId,
+        name: org.name ?? null,
+        createdAt: org.createdAt,
+        updatedAt: org.updatedAt,
+      },
+    });
+  })
+);
 
 router.post(
   "/profile",
@@ -520,10 +754,35 @@ router.post(
     }
 
     const slug = await generateUniqueBusinessSlug(parsed.data.name);
+    const existingMembership = await getOrgMembershipForUser(req.user!.id);
+    if (existingMembership && existingMembership.role !== "owner") {
+      sendError(res, "Only org owners can create businesses", 403, "ORG_ROLE_FORBIDDEN");
+      return;
+    }
+
     try {
+      let orgId = existingMembership?.orgId ?? null;
+      if (!orgId) {
+        const org = await prisma.org.create({
+          data: {
+            ownerUserId: req.user!.id,
+            name: parsed.data.name,
+          },
+        });
+        await prisma.orgMembership.create({
+          data: {
+            orgId: org.id,
+            userId: req.user!.id,
+            role: "owner",
+          },
+        });
+        orgId = org.id;
+      }
+
       const created = await prisma.business.create({
         data: {
           userId: req.user!.id,
+          orgId,
           name: parsed.data.name,
           slug,
           currencyCode: normalizeCurrencyCode(parsed.data.currencyCode),
@@ -532,6 +791,14 @@ router.post(
           address: parsed.data.address,
           phone: parsed.data.phone,
           status: "pending",
+        },
+      });
+
+      await prisma.businessMembership.create({
+        data: {
+          businessId: created.id,
+          userId: req.user!.id,
+          role: "owner",
         },
       });
 
@@ -557,16 +824,50 @@ router.post(
 router.get(
   "/profiles",
   asyncHandler(async (req, res) => {
-    const businesses = await prisma.business.findMany({
-      where: { userId: req.user!.id },
-      include: {
-        rejections: {
-          orderBy: { createdAt: "desc" },
-          take: 3,
+    const orgMembership = await getOrgMembershipForUser(req.user!.id);
+    let businesses: RawBusiness[] = [];
+
+    if (orgMembership?.role === "owner") {
+      businesses = await prisma.business.findMany({
+        where: { orgId: orgMembership.orgId },
+        include: {
+          rejections: {
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
         },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+        orderBy: { updatedAt: "desc" },
+      });
+    } else {
+      const memberships = await prisma.businessMembership.findMany({
+        where: { userId: req.user!.id },
+        include: {
+          business: {
+            include: {
+              rejections: {
+                orderBy: { createdAt: "desc" },
+                take: 3,
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      businesses = memberships.map((membership) => membership.business as RawBusiness);
+    }
+
+    if (businesses.length === 0) {
+      businesses = await prisma.business.findMany({
+        where: { userId: req.user!.id },
+        include: {
+          rejections: {
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+    }
 
     sendSuccess(res, {
       businesses: businesses.map((business: RawBusiness) => serializeBusiness(business)),
@@ -596,6 +897,302 @@ router.get(
     sendSuccess(res, {
       business: serializeBusiness((withRejections ?? business) as RawBusiness),
     });
+  })
+);
+
+router.get(
+  "/org/membership",
+  asyncHandler(async (req, res) => {
+    const membership = await getOrgMembershipForUser(req.user!.id);
+
+    if (!membership) {
+      sendSuccess(res, { membership: null });
+      return;
+    }
+
+    sendSuccess(res, {
+      membership: {
+        id: membership.id,
+        orgId: membership.orgId,
+        role: membership.role,
+        orgName: membership.org?.name ?? null,
+      },
+    });
+  })
+);
+
+router.get(
+  "/org/invites/check",
+  asyncHandler(async (req, res) => {
+    const parsed = orgInviteCheckSchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const membership = await requireOrgRole(req, res, ["owner", "manager"]);
+    if (!membership) return;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: parsed.data.email.toLowerCase() },
+      select: { id: true },
+    });
+
+    sendSuccess(res, { exists: Boolean(existingUser) });
+  })
+);
+
+router.post(
+  "/org/invites",
+  asyncHandler(async (req, res) => {
+    const parsed = orgInviteCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const membership = await requireOrgRole(req, res, ["owner", "manager"]);
+    if (!membership) return;
+
+    const targetUser = await prisma.user.findUnique({
+      where: { email: parsed.data.email.toLowerCase() },
+      select: { id: true, email: true },
+    });
+    if (!targetUser) {
+      sendError(res, "User does not exist", 404, "USER_NOT_FOUND");
+      return;
+    }
+
+    const existingOrgMembership = await prisma.orgMembership.findFirst({
+      where: { userId: targetUser.id },
+    });
+    if (existingOrgMembership) {
+      sendError(res, "User already belongs to an org", 409, "ORG_ALREADY_JOINED");
+      return;
+    }
+
+    const existingInvite = await prisma.orgInvite.findFirst({
+      where: { orgId: membership.orgId, userId: targetUser.id, status: "pending" },
+    });
+    if (existingInvite) {
+      sendError(res, "Invite already pending", 409, "ORG_INVITE_EXISTS");
+      return;
+    }
+
+    const invite = await prisma.orgInvite.create({
+      data: {
+        orgId: membership.orgId,
+        userId: targetUser.id,
+        role: parsed.data.role,
+        status: "pending",
+      },
+    });
+
+    await notifyUser({
+      userId: targetUser.id,
+      actorUserId: req.user!.id,
+      type: "ORG_INVITE_RECEIVED",
+      message: "You have been invited to join an org.",
+      payload: { inviteId: invite.id },
+    });
+
+    sendSuccess(res, { inviteId: invite.id });
+  })
+);
+
+router.post(
+  "/org/invites/:id/accept",
+  asyncHandler(async (req, res) => {
+    const parsed = orgInviteActionSchema.safeParse({ inviteId: req.params.id });
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const invite = await prisma.orgInvite.findFirst({
+      where: { id: parsed.data.inviteId, userId: req.user!.id },
+    });
+    if (!invite) {
+      sendError(res, "Invite not found", 404, "ORG_INVITE_NOT_FOUND");
+      return;
+    }
+    if (invite.status !== "pending") {
+      sendError(res, "Invite already handled", 409, "ORG_INVITE_ALREADY_HANDLED");
+      return;
+    }
+
+    const existingMembership = await prisma.orgMembership.findFirst({
+      where: { userId: req.user!.id },
+    });
+    if (existingMembership) {
+      sendError(res, "You already belong to an org", 409, "ORG_ALREADY_JOINED");
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.orgMembership.create({
+        data: {
+          orgId: invite.orgId,
+          userId: req.user!.id,
+          role: invite.role,
+        },
+      });
+      await tx.orgInvite.update({
+        where: { id: invite.id },
+        data: { status: "accepted", respondedAt: new Date() },
+      });
+    });
+
+    const orgManagers = await prisma.orgMembership.findMany({
+      where: { orgId: invite.orgId, role: { in: ["owner", "manager"] } },
+      select: { userId: true },
+    });
+    await Promise.all(
+      orgManagers.map((member) =>
+        notifyUser({
+          userId: member.userId,
+          actorUserId: req.user!.id,
+          type: "ORG_INVITE_ACCEPTED",
+          message: "An org invite was accepted.",
+          payload: { inviteId: invite.id },
+        })
+      )
+    );
+
+    sendSuccess(res, { accepted: true });
+  })
+);
+
+router.post(
+  "/org/invites/:id/decline",
+  asyncHandler(async (req, res) => {
+    const parsed = orgInviteActionSchema.safeParse({ inviteId: req.params.id });
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const invite = await prisma.orgInvite.findFirst({
+      where: { id: parsed.data.inviteId, userId: req.user!.id },
+    });
+    if (!invite) {
+      sendError(res, "Invite not found", 404, "ORG_INVITE_NOT_FOUND");
+      return;
+    }
+    if (invite.status !== "pending") {
+      sendError(res, "Invite already handled", 409, "ORG_INVITE_ALREADY_HANDLED");
+      return;
+    }
+
+    await prisma.orgInvite.update({
+      where: { id: invite.id },
+      data: { status: "declined", respondedAt: new Date() },
+    });
+
+    const orgManagers = await prisma.orgMembership.findMany({
+      where: { orgId: invite.orgId, role: { in: ["owner", "manager"] } },
+      select: { userId: true },
+    });
+    await Promise.all(
+      orgManagers.map((member) =>
+        notifyUser({
+          userId: member.userId,
+          actorUserId: req.user!.id,
+          type: "ORG_INVITE_DECLINED",
+          message: "An org invite was declined.",
+          payload: { inviteId: invite.id },
+        })
+      )
+    );
+
+    sendSuccess(res, { declined: true });
+  })
+);
+
+router.post(
+  "/org/leave",
+  asyncHandler(async (req, res) => {
+    const membership = await getOrgMembershipForUser(req.user!.id);
+    if (!membership) {
+      sendError(res, "You are not part of an org", 404, "ORG_MEMBERSHIP_REQUIRED");
+      return;
+    }
+    if (membership.role === "owner") {
+      sendError(res, "Owners cannot leave the org", 403, "ORG_OWNER_CANNOT_LEAVE");
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.businessMembership.deleteMany({
+        where: { userId: req.user!.id },
+      });
+      await tx.orgMembership.delete({ where: { id: membership.id } });
+    });
+
+    sendSuccess(res, { left: true });
+  })
+);
+
+router.post(
+  "/memberships",
+  asyncHandler(async (req, res) => {
+    const parsed = businessMembershipCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const orgMembership = await requireOrgRole(req, res, ["owner", "manager"]);
+    if (!orgMembership) return;
+
+    if (orgMembership.role === "manager" && parsed.data.role !== "staff") {
+      sendError(res, "Managers can only add staff", 403, "BUSINESS_ROLE_FORBIDDEN");
+      return;
+    }
+
+    const business = await prisma.business.findFirst({
+      where: { id: parsed.data.businessId },
+      select: { id: true, orgId: true, name: true },
+    });
+    if (!business || !business.orgId || business.orgId !== orgMembership.orgId) {
+      sendError(res, "Business not found for your org", 404, "BUSINESS_NOT_FOUND");
+      return;
+    }
+
+    const targetOrgMembership = await prisma.orgMembership.findFirst({
+      where: { userId: parsed.data.userId, orgId: orgMembership.orgId },
+    });
+    if (!targetOrgMembership) {
+      sendError(res, "User is not part of your org", 409, "USER_NOT_IN_ORG");
+      return;
+    }
+
+    const existing = await prisma.businessMembership.findFirst({
+      where: { businessId: business.id, userId: parsed.data.userId },
+    });
+    if (existing) {
+      sendError(res, "User already has access to this business", 409, "BUSINESS_MEMBERSHIP_EXISTS");
+      return;
+    }
+
+    await prisma.businessMembership.create({
+      data: {
+        businessId: business.id,
+        userId: parsed.data.userId,
+        role: parsed.data.role,
+      },
+    });
+
+    await notifyUser({
+      userId: parsed.data.userId,
+      actorUserId: req.user!.id,
+      type: "BUSINESS_ACCESS_GRANTED",
+      message: `You were added to ${business.name}.`,
+      payload: { businessId: business.id, role: parsed.data.role },
+      businessId: business.id,
+    });
+
+    sendSuccess(res, { added: true });
   })
 );
 
@@ -723,6 +1320,12 @@ router.patch(
       sendError(res, "Business profile not found", 404, "BUSINESS_PROFILE_REQUIRED");
       return;
     }
+
+    const role = await resolveBusinessRoleForUser(business.id, req.user!.id);
+    if (role !== "owner") {
+      sendError(res, "Only owners can edit business profiles", 403, "BUSINESS_ROLE_FORBIDDEN");
+      return;
+    }
     if (business.status === "archived") {
       sendError(
         res,
@@ -843,6 +1446,12 @@ router.patch(
       return;
     }
 
+    const role = await resolveBusinessRoleForUser(business.id, req.user!.id);
+    if (role !== "owner") {
+      sendError(res, "Only owners can archive businesses", 403, "BUSINESS_ROLE_FORBIDDEN");
+      return;
+    }
+
     if (business.status === "archived") {
       sendSuccess(res, { business: serializeBusiness(business as RawBusiness) });
       return;
@@ -887,6 +1496,12 @@ router.patch(
     });
     if (!business) {
       sendError(res, "Business profile not found", 404, "BUSINESS_PROFILE_REQUIRED");
+      return;
+    }
+
+    const role = await resolveBusinessRoleForUser(business.id, req.user!.id);
+    if (role !== "owner") {
+      sendError(res, "Only owners can restore businesses", 403, "BUSINESS_ROLE_FORBIDDEN");
       return;
     }
 
@@ -953,6 +1568,12 @@ router.post(
       return;
     }
 
+    const role = await resolveBusinessRoleForUser(business.id, req.user!.id);
+    if (role !== "owner") {
+      sendError(res, "Only owners can update business logos", 403, "BUSINESS_ROLE_FORBIDDEN");
+      return;
+    }
+
     const file = req.file;
     if (!file) {
       sendError(res, "Logo image is required", 400, "IMAGE_FILE_REQUIRED");
@@ -1002,6 +1623,7 @@ router.get(
   "/categories",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const categories = await prisma.category.findMany({
       where: { businessId: req.business!.id },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -1014,6 +1636,7 @@ router.get(
   "/menu-suggestions/categories",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const categories = await prisma.category.findMany({
       where: { businessId: req.business!.id },
       select: { name: true },
@@ -1029,6 +1652,7 @@ router.get(
   "/menu-suggestions/items",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = menuItemSuggestionQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1063,6 +1687,7 @@ router.post(
   "/categories",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = categoryCreateSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1096,6 +1721,7 @@ router.patch(
   "/categories/:id",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = categoryUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1130,6 +1756,7 @@ router.post(
   "/categories/reorder",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = categoryReorderSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1157,6 +1784,7 @@ router.delete(
   "/categories/:id",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const id = req.params.id;
     const existing = await prisma.category.findFirst({
       where: { id, businessId: req.business!.id },
@@ -1188,6 +1816,7 @@ router.get(
   "/menu-items",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = menuItemListQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1234,6 +1863,7 @@ router.post(
   "/menu-items",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = menuItemCreateSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1271,6 +1901,7 @@ router.patch(
   "/menu-items/:id",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = menuItemUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1305,6 +1936,7 @@ router.post(
   "/menu-items/reorder",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = menuItemReorderSchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1332,6 +1964,7 @@ router.patch(
   "/menu-items/:id/availability",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = menuItemAvailabilitySchema.safeParse(req.body);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1358,6 +1991,7 @@ router.post(
   requireApprovedBusiness,
   uploadImageMiddleware,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const id = req.params.id;
     const existing = await prisma.menuItem.findFirst({
       where: { id, businessId: req.business!.id },
@@ -1415,6 +2049,7 @@ router.post(
   "/menu-items/:id/image/generate",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = generateItemImageSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1490,6 +2125,7 @@ router.delete(
   "/menu-items/:id",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const id = req.params.id;
     const existing = await prisma.menuItem.findFirst({
       where: { id, businessId: req.business!.id },
@@ -1512,6 +2148,7 @@ router.get(
   "/menu",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     sendSuccess(res, { items: [], businessId: req.business!.id });
   })
 );
@@ -1520,6 +2157,7 @@ router.get(
   "/tables",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = tableListQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1574,6 +2212,7 @@ router.post(
   "/tables/bulk",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = tableBulkCreateSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1681,6 +2320,7 @@ router.patch(
   "/tables/:tableId",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = tablePatchSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1733,6 +2373,7 @@ router.post(
   "/tables/:tableId/qr/regenerate",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = qrRotateSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1821,6 +2462,7 @@ router.get(
   "/tables/:tableId/qr/rotations",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsedQuery = qrRotationListQuerySchema.safeParse(req.query);
     if (!parsedQuery.success) {
       sendError(res, parsedQuery.error.message, 400, "VALIDATION_ERROR");
@@ -1869,6 +2511,7 @@ router.get(
   "/tables/:tableId/qr/download",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = qrDownloadQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1915,6 +2558,7 @@ router.post(
   "/tables/qr/download",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const parsed = qrBatchDownloadSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -1977,7 +2621,116 @@ router.get(
   "/orders",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
-    sendSuccess(res, { orders: [], businessId: req.business!.id });
+    const parsed = orderListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const where: Prisma.OrderWhereInput = {
+      businessId: req.business!.id,
+      ...(parsed.data.status ? { status: parsed.data.status } : {}),
+    };
+
+    if (parsed.data.cursor) {
+      const cursorOrder = await prisma.order.findFirst({
+        where: { id: parsed.data.cursor, businessId: req.business!.id },
+        select: { id: true, createdAt: true },
+      });
+      if (!cursorOrder) {
+        sendError(res, "Cursor order not found", 404, "ORDER_CURSOR_NOT_FOUND");
+        return;
+      }
+      where.OR = [
+        { createdAt: { lt: cursorOrder.createdAt } },
+        { createdAt: cursorOrder.createdAt, id: { lt: cursorOrder.id } },
+      ];
+    }
+
+    const take = parsed.data.limit + 1;
+    const rows = await prisma.order.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take,
+      include: {
+        table: { select: { id: true, tableNumber: true, label: true } },
+      },
+    });
+
+    const hasMore = rows.length > parsed.data.limit;
+    const trimmed = hasMore ? rows.slice(0, parsed.data.limit) : rows;
+    const nextCursor = hasMore ? trimmed[trimmed.length - 1]?.id ?? null : null;
+
+    sendSuccess(res, {
+      orders: trimmed.map((order) => serializeOrderSummary(order)),
+      nextCursor,
+      hasMore,
+      businessId: req.business!.id,
+    });
+  })
+);
+
+router.get(
+  "/orders/:id",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, businessId: req.business!.id },
+      include: {
+        table: { select: { id: true, tableNumber: true, label: true } },
+        items: { include: { menuItem: { select: { name: true } } } },
+      },
+    });
+    if (!order) {
+      sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
+      return;
+    }
+
+    sendSuccess(res, { order: serializeOrderDetail(order) });
+  })
+);
+
+router.patch(
+  "/orders/:id/status",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    const parsed = orderStatusUpdateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const existing = await prisma.order.findFirst({
+      where: { id: req.params.id, businessId: req.business!.id },
+    });
+    if (!existing) {
+      sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
+      return;
+    }
+
+    if (!isValidOrderStatusTransition(existing.status as OrderStatus, parsed.data.status)) {
+      sendError(res, "Invalid order status transition", 400, "INVALID_ORDER_STATUS_TRANSITION");
+      return;
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: existing.id },
+      data: { status: parsed.data.status },
+      include: {
+        table: { select: { id: true, tableNumber: true, label: true } },
+      },
+    });
+
+    const snapshot = await fetchOrderSnapshot(updated.id);
+    if (snapshot) {
+      await publishOrderEventBestEffort({
+        type: "order_status_updated",
+        order: snapshot.order,
+        items: snapshot.items,
+      });
+    }
+
+    sendSuccess(res, { order: serializeOrderSummary(updated) });
   })
 );
 

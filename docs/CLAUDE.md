@@ -68,3 +68,16 @@ Project documentation for architecture decisions, process notes, and operational
 - Drafted `docs/adr/ADR-035-csrf-strategy.md` to capture CSRF posture decisions (proposed, awaiting approval).
 - Scoped ADR-035 to CSRF strategy only; refresh-token implementation stays unchanged.
 - ADR-035 accepted: implement CSRF tokens for mutating routes.
+
+## Updates 2026-03-27
+- Expanded `docs/adr/ADR-036-layer8-order-management.md` to capture 6-month retention, monthly partitioning, and order-event queue → warehouse pipeline considerations.
+- Recorded ADR-036 answers for warehouse target (ClickHouse) and event schema (full snapshots with event-time gating + `eventId` dedupe).
+- Recorded ADR-036 retention delete policy: hard delete from Postgres after 6 months.
+- ADR-036 accepted with final status flow (Pending → Accepted → Preparing → Ready → Completed; Cancel allowed only pre-Preparing).
+- Clarified ADR-036 MVP filtering to status-only and updated Decision header to Accepted.
+- Marked ADR-036 as Paused pending ADR-037 (RBAC scope + invites).
+- Drafted ADR-037 (`docs/adr/ADR-037-rbac-scope-and-business-invites.md`) to define scoped business memberships and invitation flow.
+- Updated ADR-037 with org-level membership model (one org per user, owner creates org on first business).
+- Updated ADR-037 answers: org invites require existing user email, in-app user notifications, and role permission matrix.
+- ADR-037 accepted with org-invite accept/decline flow via blurred org preview page.
+- Updated ADR-037 to require a static sample org preview page (no real org references) for invite acceptance UX.

@@ -252,13 +252,13 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     <div className="flex items-center gap-2">
       {businessUser ? (
         <details className="relative" data-dropdown-root>
-          <summary className="cursor-pointer list-none rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-right">
-            <p className="max-w-[200px] truncate text-xs font-medium text-slate-800">
-              {businessUser.email}
-            </p>
-            <p className="text-[11px] text-slate-500">Business profile</p>
+          <summary className="cursor-pointer list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-xs font-medium text-slate-800">
+            <span className="max-w-[200px] truncate">{businessUser.email}</span>
           </summary>
           <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+            <div className="px-2.5 py-2 text-[11px] text-slate-500">
+              Business profile
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -283,13 +283,13 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
       )}
       {customerUser ? (
         <details className="relative" data-dropdown-root>
-          <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-right">
-            <p className="max-w-[200px] truncate text-xs font-medium text-sky-800">
-              {customerUser.email}
-            </p>
-            <p className="text-[11px] text-sky-600">Customer profile</p>
+          <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-right text-xs font-medium text-sky-800">
+            <span className="max-w-[200px] truncate">{customerUser.email}</span>
           </summary>
           <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+            <div className="px-2.5 py-2 text-[11px] text-slate-500">
+              Customer profile
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -303,14 +303,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
           </div>
         </details>
       ) : null}
-      {businessUser && !(roleCta.label === "Dashboard" && pathname?.startsWith("/dashboard")) ? (
-        <Link
-          href={roleCta.href}
-          className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
-        >
-          {roleCta.label}
-        </Link>
-      ) : null}
+      {null}
       {showLoginControls && businessLoginDropdown}
       {(businessUser || user?.role === "admin") && (
         <div className="relative" data-dropdown-root>
@@ -402,6 +395,14 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                           n.payload && typeof n.payload === "object" && !Array.isArray(n.payload)
                             ? Object.entries(n.payload as Record<string, unknown>)
                             : null;
+                        const inviteId =
+                          n.type === "ORG_INVITE_RECEIVED" &&
+                          n.payload &&
+                          typeof n.payload === "object" &&
+                          !Array.isArray(n.payload) &&
+                          "inviteId" in (n.payload as Record<string, unknown>)
+                            ? String((n.payload as Record<string, unknown>).inviteId)
+                            : null;
                         return (
                           <div key={n.id} className="space-y-1">
                             {showBusinessDivider && (
@@ -420,6 +421,14 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                                 <p className="text-[10px] text-slate-500">
                                   Actor: {n.actorUserId.slice(-6)}
                                 </p>
+                              )}
+                              {inviteId && (
+                                <Link
+                                  href={`/dashboard/org-invite/${inviteId}`}
+                                  className="mt-2 inline-flex items-center rounded border border-slate-300 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                  View org invite
+                                </Link>
                               )}
                               {payloadEntries && payloadEntries.length > 0 && (
                                 <div className="mt-1 space-y-1 text-[10px] text-slate-600">
@@ -511,12 +520,34 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
             <Link href="/home" className="font-semibold tracking-tight text-slate-900">
               Scan2Serve
             </Link>
-            <div className="truncate text-xs text-slate-500">
-              {leftMeta ?? "Menus, QR and ordering"}
-            </div>
           </div>
         </div>
         {rightSlot ?? (audience === "customer" ? customerRight : defaultRight)}
+      </div>
+      <div className="border-t border-slate-200/70">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-center px-6 py-2">
+          <div className="inline-flex rounded-full border border-slate-200 bg-white px-1 py-1 shadow-sm">
+            {[
+              { label: "Home", href: "/home", visible: true },
+              { label: "Explore", href: "/explore", visible: true },
+              { label: "Dashboard", href: "/dashboard", visible: user?.role === "business" },
+            ]
+              .filter((item) => item.visible)
+              .map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    pathname?.startsWith(item.href)
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+          </div>
+        </div>
       </div>
     </header>
   );

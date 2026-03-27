@@ -24,6 +24,10 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   businesses    Business[]
+  ownedOrgs     Org[]                      @relation("OrgOwner")
+  orgMemberships OrgMembership[]
+  orgInvites    OrgInvite[]
+  businessMemberships BusinessMembership[]
   refreshTokens RefreshToken[]
   notifications NotificationEvent[]       @relation("NotificationEventUser")
   actedNotifications NotificationEvent[]  @relation("NotificationEventActor")
@@ -45,6 +49,7 @@ enum BusinessStatus {
 model Business {
   id          String         @id @default(cuid())
   userId      String         @map("user_id")
+  orgId       String?        @map("org_id")
   name        String
   slug        String         @unique
   currencyCode String        @default("USD") @map("currency_code")
@@ -60,16 +65,19 @@ model Business {
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org        Org?       @relation(fields: [orgId], references: [id], onDelete: SetNull)
   categories Category[]
   menuItems  MenuItem[]
   tables     Table[]
   qrCodes    QrCode[]
   orders     Order[]
+  memberships BusinessMembership[]
   rejections BusinessRejection[]
   updateRequests BusinessUpdateRequest[]
   notificationEvents NotificationEvent[]
 
   @@index([status, archivedAt])
+  @@index([orgId])
   @@map("businesses")
 }
 
@@ -245,6 +253,72 @@ enum PaymentStatus {
   refunded
 }
 
+enum OrgRole {
+  owner
+  manager
+  staff
+}
+
+enum OrgInviteStatus {
+  pending
+  accepted
+  declined
+}
+
+enum BusinessRole {
+  owner
+  manager
+  staff
+}
+
+model Org {
+  id          String   @id @default(cuid())
+  ownerUserId String   @map("owner_user_id")
+  name        String?  @db.VarChar(160)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  owner       User            @relation("OrgOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  businesses  Business[]
+  memberships OrgMembership[]
+  invites     OrgInvite[]
+
+  @@index([ownerUserId])
+  @@map("orgs")
+}
+
+model OrgMembership {
+  id        String   @id @default(cuid())
+  orgId     String   @map("org_id")
+  userId    String   @map("user_id")
+  role      OrgRole
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@map("org_memberships")
+}
+
+model OrgInvite {
+  id          String          @id @default(cuid())
+  orgId       String          @map("org_id")
+  userId      String          @map("user_id")
+  role        OrgRole
+  status      OrgInviteStatus @default(pending)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  respondedAt DateTime?       @map("responded_at")
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@map("org_invites")
+}
+
 model Order {
   id              String        @id @default(cuid())
   businessId      String        @map("business_id")
@@ -266,6 +340,21 @@ model Order {
   @@index([businessId, status])
   @@index([businessId, createdAt])
   @@map("orders")
+}
+
+model BusinessMembership {
+  id         String       @id @default(cuid())
+  businessId String       @map("business_id")
+  userId     String       @map("user_id")
+  role       BusinessRole
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@map("business_memberships")
 }
 
 model OrderItem {

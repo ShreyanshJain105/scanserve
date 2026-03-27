@@ -5,6 +5,41 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 import publicRouter from "../src/routes/public";
 
+const ensureDecimal = () => {
+  if ((Prisma as unknown as { Decimal?: unknown }).Decimal) return;
+  class TestDecimal {
+    private value: number;
+
+    constructor(input: string | number) {
+      this.value = typeof input === "string" ? Number.parseFloat(input) : input;
+    }
+
+    plus(other: TestDecimal | string | number) {
+      const next =
+        other instanceof TestDecimal
+          ? other.value
+          : typeof other === "string"
+            ? Number.parseFloat(other)
+            : other;
+      return new TestDecimal(this.value + next);
+    }
+
+    mul(other: TestDecimal | number) {
+      const next = other instanceof TestDecimal ? other.value : other;
+      return new TestDecimal(this.value * next);
+    }
+
+    toString() {
+      return this.value.toFixed(2);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (Prisma as any).Decimal = TestDecimal;
+};
+
+ensureDecimal();
+
 const store = vi.hoisted(() => ({
   qrCodes: [] as any[],
   qrRotations: [] as any[],

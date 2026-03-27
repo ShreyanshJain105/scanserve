@@ -103,4 +103,38 @@ describe("AppHeader", () => {
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
     expect(screen.getByLabelText("Notifications")).toBeTruthy();
   });
+
+  it("shows org invite link from notification payload", async () => {
+    useAuthMock.mockReturnValue({
+      loading: false,
+      user: { id: "u1", email: "biz@example.com", role: "business" },
+      businessUser: { id: "u1", email: "biz@example.com", role: "business" },
+      customerUser: null,
+      logoutBusiness: vi.fn(),
+      logoutCustomer: vi.fn(),
+      logoutAll: vi.fn(),
+    });
+    apiFetchMock.mockResolvedValue({
+      scope: "unread",
+      unreadCount: 1,
+      notifications: [
+        {
+          id: "n1",
+          inboxId: "i1",
+          businessName: "Org",
+          message: "Invite",
+          type: "ORG_INVITE_RECEIVED",
+          payload: { inviteId: "invite_123" },
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    render(<AppHeader audience="default" />);
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
+    fireEvent.click(screen.getByLabelText("Notifications"));
+    await waitFor(() => {
+      expect(screen.getByText("View org invite")).toBeTruthy();
+    });
+  });
 });

@@ -40,6 +40,22 @@ export default function HomePage() {
               >
                 Start with business signup
               </Link>
+              <Link
+                href="/explore"
+                className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700"
+              >
+                Explore use cases
+              </Link>
+            </div>
+          ) : null}
+          {user && !loading ? (
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link
+                href="/explore"
+                className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700"
+              >
+                Explore use cases
+              </Link>
             </div>
           ) : null}
         </div>

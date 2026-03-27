@@ -14,6 +14,12 @@ export type OrderStatus =
 
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
+export type OrgRole = "owner" | "manager" | "staff";
+
+export type OrgInviteStatus = "pending" | "accepted" | "declined";
+
+export type BusinessRole = "owner" | "manager" | "staff";
+
 // ─── API Response Shapes ────────────────────────────────────
 
 export interface ApiError {
@@ -81,6 +87,40 @@ export interface BusinessProfile {
   rejections?: BusinessRejection[];
 }
 
+export interface Org {
+  id: string;
+  ownerUserId: string;
+  name?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrgMembership {
+  id: string;
+  orgId: string;
+  userId: string;
+  role: OrgRole;
+  createdAt: string;
+}
+
+export interface OrgInvite {
+  id: string;
+  orgId: string;
+  userId: string;
+  role: OrgRole;
+  status: OrgInviteStatus;
+  createdAt: string;
+  respondedAt?: string | null;
+}
+
+export interface BusinessMembership {
+  id: string;
+  businessId: string;
+  userId: string;
+  role: BusinessRole;
+  createdAt: string;
+}
+
 export interface BusinessRejection {
   id: string;
   reason: string | null;
@@ -118,7 +158,11 @@ export type BusinessNotificationType =
   | "BUSINESS_BLOCKED"
   | "BUSINESS_UNBLOCKED"
   | "BUSINESS_SUBMITTED"
-  | "BUSINESS_UPDATE_SUBMITTED";
+  | "BUSINESS_UPDATE_SUBMITTED"
+  | "ORG_INVITE_RECEIVED"
+  | "ORG_INVITE_ACCEPTED"
+  | "ORG_INVITE_DECLINED"
+  | "BUSINESS_ACCESS_GRANTED";
 
 export interface BusinessNotification {
   id: string;

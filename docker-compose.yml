@@ -98,9 +98,29 @@ services:
       retries: 10
       start_period: 20s
 
+  tests:
+    image: node:20-alpine
+    container_name: scan2serve-tests
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - test-node-modules:/app/node_modules
+    environment:
+      NODE_ENV: test
+      CI: "true"
+      PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
+    command: >
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api test && pnpm --filter @scan2serve/web test"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
 volumes:
   db-data:
   minio-data:
   api-node-modules:
   web-node-modules:
   web-next-cache:
+  test-node-modules:

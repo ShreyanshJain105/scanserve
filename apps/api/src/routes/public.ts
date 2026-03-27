@@ -6,6 +6,7 @@ import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { resolveImageUrl } from "../services/objectStorage";
 import { sendError, sendSuccess } from "../utils/response";
+import { fetchOrderSnapshot, publishOrderEventBestEffort } from "../services/orderEvents";
 
 const router: express.Router = express.Router();
 
@@ -214,6 +215,15 @@ router.post(
       return created;
     });
 
+    const snapshot = await fetchOrderSnapshot(order.id);
+    if (snapshot) {
+      await publishOrderEventBestEffort({
+        type: "order_created",
+        order: snapshot.order,
+        items: snapshot.items,
+      });
+    }
+
     sendSuccess(res, {
       orderId: order.id,
       amount: order.totalAmount.toString(),
@@ -324,7 +334,7 @@ router.post(
       return;
     }
 
-    await prisma.order.update({
+    const updated = await prisma.order.update({
       where: { id: order.id },
       data: {
         paymentStatus: "paid",
@@ -333,6 +343,15 @@ router.post(
         razorpayOrderId: razorpay_order_id,
       },
     });
+
+    const snapshot = await fetchOrderSnapshot(updated.id);
+    if (snapshot) {
+      await publishOrderEventBestEffort({
+        type: "order_payment_updated",
+        order: snapshot.order,
+        items: snapshot.items,
+      });
+    }
 
     sendSuccess(res, { ok: true });
   })

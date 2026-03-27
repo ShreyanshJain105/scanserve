@@ -135,6 +135,8 @@ Current API implementation (selected, high-signal routes):
 - `POST /api/auth/refresh` — rotate refresh token and re-issue cookies
 - `POST /api/auth/logout` — revoke refresh token and clear auth cookies
 - `GET  /api/auth/me` — current user profile
+- `GET  /api/auth/sessions` — dual-session snapshot for business + customer scopes
+- `GET  /api/auth/csrf` — issue CSRF token for mutating requests
 
 ### Business Onboarding
 - `POST /api/business/profile` — create profile (slug auto-generated server-side)
@@ -152,6 +154,21 @@ Current API implementation (selected, high-signal routes):
 - `POST /api/business/menu-items/:id/image/generate` — generate menu image via provider
 - `GET /api/business/menu-suggestions/categories`
 - `GET /api/business/menu-suggestions/items`
+
+### Org + Memberships
+- `POST /api/business/org` — create org (owner membership)
+- `GET /api/business/org/membership` — current user org membership (or null)
+- `GET /api/business/org/invites/check`
+- `POST /api/business/org/invites`
+- `POST /api/business/org/invites/:id/accept`
+- `POST /api/business/org/invites/:id/decline`
+- `POST /api/business/org/leave`
+- `POST /api/business/memberships` — assign business membership (owner/manager)
+
+### Order Management (Business)
+- `GET /api/business/orders` — status filter + cursor pagination
+- `GET /api/business/orders/:id` — order detail
+- `PATCH /api/business/orders/:id/status` — status transition
 
 ### AI
 - `GET /api/ai/menu/item-suggestions`
@@ -174,7 +191,6 @@ Current API implementation (selected, high-signal routes):
 
 ### Placeholders / Not fully implemented yet
 - `GET /api/business/menu` currently returns placeholder payload.
-- `GET /api/business/orders` currently returns placeholder payload.
 - Orders/payments route namespaces are not mounted yet in `apps/api/src/index.ts`.
 
 ## Feature Dependency Pyramid
@@ -299,27 +315,36 @@ Build features in this order. Each layer depends on the layers above it.
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Updates 2026-03-27
+- Added `tests` service in `docker-compose.yml` to run `pnpm --filter @scan2serve/api test` and `pnpm --filter @scan2serve/web test` inside Docker.
+- Synced root spec with org/membership and order-management API routes plus new dashboard/explore/org pages.
+- Fixed org-create submission payload to JSON.stringify (avoids `[object Object]` JSON parse errors).
+- Dashboard now auto-redirects org owners with zero businesses to `/dashboard/onboarding`.
+
 ## Key Frontend Routes
 
 | Route | Role | Purpose |
 |-------|------|---------|
 | `/` | dynamic | Root redirect entrypoint (routes by auth role/state) |
 | `/home` | public | Public landing page |
+| `/explore` | public | Use-case overview + org entry point |
 | `/login` | public | Login form |
 | `/register` | public | Business registration redirect page |
 | `/dashboard` | business | Dashboard overview + approval gating |
 | `/dashboard/onboarding` | business | Business onboarding/edit flow |
+| `/dashboard/org/create` | business | Org creation form |
+| `/dashboard/org-invite/[inviteId]` | business | Org invite preview + accept/decline |
 | `/dashboard/menu` | business | Menu/category management + image + AI assist |
+| `/dashboard/tables` | business | Tables + QR management |
 | `/admin` | admin | Moderation panel (approve/reject businesses) |
 | `/qr/[qrToken]` | public | QR entry route (resolve + redirect) |
 | `/qr/login` | public | QR-scoped customer login |
 | `/qr/register` | public | QR-scoped customer registration |
 | `/menu/[slug]` | public | Public menu placeholder route |
+| `/order/[id]` | public | Order status page |
 
 Planned but not yet present in web app routes:
-- `/dashboard/tables`
 - `/dashboard/orders`
-- `/order/[orderId]`
 
 ## Key Design Decisions
 
@@ -502,3 +527,32 @@ This section is the high-level source of truth for what is already implemented a
 - Update: colorized API logs are now on by default in all environments unless `LOG_COLOR=false`.
 - Trimmed docker-compose env overrides to keep only Docker-specific DB/S3/internal URLs.
 - Updated docker-compose to run `db:seed`, add common API envs (Razorpay/LLM/admin/QR), and load web `.env.local`.
+
+## Updates 2026-03-27
+- Expanded ADR-036 to include 6-month operational retention, monthly partitioning, and order-event queue → warehouse pipeline for Layer 8 dashboards.
+- Decision: dashboards will use Postgres for realtime queries and the warehouse for historical analytics (pending ADR Q&A confirmation).
+- Impact: `docs/adr/ADR-036-layer8-order-management.md` updated with new scope questions and consequences.
+- Update: ADR-036 answers now include ClickHouse as warehouse target and full-snapshot order events with `eventId` dedupe and `eventCreatedAt` gating for upserts.
+- Update: ADR-036 retention policy now confirmed as hard delete from Postgres after 6 months.
+- Update: ADR-036 accepted; final status flow ends at Completed and removes separate Served status.
+- Update: ADR-036 MVP filtering clarified to status-only; Decision header updated to Accepted.
+- Implemented Layer 8 API endpoints for business order listing/detail/status updates and added order-event publishing hooks (order create, payment verify, status change) with tests.
+- Update: ADR-036 is now Paused pending completion of ADR-037 (RBAC scope + invites).
+- Update: drafted ADR-037 for RBAC scoped business memberships and invite flow.
+- Update: ADR-037 now includes org-level membership model (owner creates org on first business; users belong to one org).
+- Update: ADR-037 answers now specify existing-user-only org invites, in-app notifications, and role permissions matrix.
+- Update: ADR-037 accepted with org-invite accept/decline flow via blurred org preview page.
+- Update: org-invite preview must be a static sample page with no real org data to avoid leakage.
+- Implemented ADR-037 backend schema + API scaffolding (orgs/memberships/invites, business memberships, RBAC gating) and added org invite UI preview route with tests.
+- Added org intro page and dashboard invite modal UI for org invites; updated tests accordingly.
+- Replaced dashboard org intro with `/explore` page explaining org/staff/menu/order use cases; updated tests.
+- Added navigation CTAs between `/home` and `/explore`.
+- Added a secondary navigation bar below the header with quick links (Home/Explore/Dashboard).
+- Removed top-right dashboard CTA and centered the secondary navigation bar.
+- Removed default header subtitle under Scan2Serve when no `leftMeta` is provided.
+- Simplified header user tag to show only email; profile label now appears inside dropdown.
+- Removed header subtitle entirely; product name now stands alone in header.
+- Made `/explore` public and hid Dashboard nav link until login.
+- Dashboard nav now appears only for business-role users.
+- Root route now redirects any session with access/refresh tokens (business or QR) to `/explore`.
+- Fix: added missing Prisma back-reference (`Business.memberships`) to resolve schema validation error.

@@ -1,15 +1,22 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import DashboardPage from "../src/app/dashboard/page";
 
 const pushMock = vi.fn();
+const replaceMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: pushMock,
+    replace: replaceMock,
   }),
   usePathname: () => "/dashboard",
+}));
+
+const apiFetchMock = vi.fn();
+vi.mock("../src/lib/api", () => ({
+  apiFetch: (...args: unknown[]) => apiFetchMock(...args),
 }));
 
 const useAuthMock = vi.fn();
@@ -20,10 +27,12 @@ vi.mock("../src/lib/auth-context", () => ({
 describe("DashboardPage", () => {
   beforeEach(() => {
     pushMock.mockReset();
+    replaceMock.mockReset();
     useAuthMock.mockReset();
+    apiFetchMock.mockReset();
   });
 
-  it("shows onboarding call-to-action when no business profile exists", () => {
+  it("routes users to org create page when no org exists", async () => {
     useAuthMock.mockReturnValue({
       user: { id: "u1", email: "biz@example.com", role: "business" },
       loading: false,
@@ -35,14 +44,37 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
+    apiFetchMock.mockResolvedValueOnce({ membership: null });
 
     render(<DashboardPage />);
 
-    expect(screen.getByText("Business onboarding required")).toBeTruthy();
-    expect(screen.getByText("Start onboarding")).toBeTruthy();
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith("/dashboard/org/create");
+    });
   });
 
-  it("shows locked overlay for pending business", () => {
+  it("redirects owners to onboarding when org exists but no businesses", async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: "u1", email: "biz@example.com", role: "business" },
+      loading: false,
+      logout: vi.fn(),
+      businesses: [],
+      selectedBusiness: null,
+      selectBusiness: vi.fn(),
+      businessLoading: false,
+      archiveBusinessProfile: vi.fn(),
+      restoreBusinessProfile: vi.fn(),
+    });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith("/dashboard/onboarding");
+    });
+  });
+
+  it("shows locked overlay for pending business", async () => {
     useAuthMock.mockReturnValue({
       user: { id: "u1", email: "biz@example.com", role: "business" },
       loading: false,
@@ -84,16 +116,71 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
 
     render(<DashboardPage />);
 
-    expect(screen.getAllByText("Pending admin approval").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText("Pending admin approval").length).toBeGreaterThan(0);
+    });
     expect(
       screen.getByText("Dashboard operations are disabled until this business is approved.")
     ).toBeTruthy();
   });
 
-  it("shows only archived businesses when archived filter is toggled on", () => {
+  it("opens invite dialog from quick actions", async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: "u1", email: "biz@example.com", role: "business" },
+      loading: false,
+      logout: vi.fn(),
+      businesses: [
+        {
+          id: "b1",
+          userId: "u1",
+          name: "My Cafe",
+          slug: "my-cafe",
+          currencyCode: "USD",
+          description: null,
+          logoUrl: null,
+          address: "A",
+          phone: "123456",
+          status: "approved",
+          createdAt: "",
+          updatedAt: "",
+          rejections: [],
+        },
+      ],
+      selectedBusiness: {
+        id: "b1",
+        userId: "u1",
+        name: "My Cafe",
+        slug: "my-cafe",
+        currencyCode: "USD",
+        description: null,
+        logoUrl: null,
+        address: "A",
+        phone: "123456",
+        status: "approved",
+        createdAt: "",
+        updatedAt: "",
+        rejections: [],
+      },
+      selectBusiness: vi.fn(),
+      businessLoading: false,
+      archiveBusinessProfile: vi.fn(),
+      restoreBusinessProfile: vi.fn(),
+    });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
+
+    render(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Invite team member")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Invite team member"));
+    expect(screen.getByText("Invite to org")).toBeTruthy();
+  });
+
+  it("shows only archived businesses when archived filter is toggled on", async () => {
     useAuthMock.mockReturnValue({
       user: { id: "u1", email: "biz@example.com", role: "business" },
       loading: false,
@@ -153,11 +240,14 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
 
     render(<DashboardPage />);
 
+    await waitFor(() => {
+      expect(screen.getByText("Active Cafe")).toBeTruthy();
+    });
     expect(screen.queryByText("Old Cafe")).toBeNull();
-    expect(screen.getByText("Active Cafe")).toBeTruthy();
     expect(screen.getByAltText("Active Cafe logo")).toBeTruthy();
     fireEvent.click(screen.getByText("Show archived"));
     expect(screen.getByText("Old Cafe")).toBeTruthy();

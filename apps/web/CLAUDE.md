@@ -198,11 +198,24 @@ pnpm lint   # run Next.js ESLint
 - Auth entry-surface refinement:
   - default header login dropdown now exposes only `Login as business` (`src/components/layout/app-header.tsx`),
   - customer login remains available only on customer surfaces (`headerAudience="customer"` flows).
+
+## Updates 2026-03-27
+- Added static org-invite preview page with accept/decline actions at `src/app/dashboard/org-invite/[inviteId]/page.tsx`.
+- Notifications dropdown now deep-links org invite entries to the preview page.
+- Added web tests for org invite preview and notification link (`tests/org-invite-page.test.tsx`, updated `tests/app-header.test.tsx`).
+- Added explore page at `src/app/explore/page.tsx` describing org/staff/menu/order use cases; zero-business dashboard CTA now routes to `/explore`.
+- Added invite modal UI on dashboard quick actions to call org invite endpoints.
+- Added dashboard/explore web tests (`tests/dashboard.test.tsx`, `tests/explore-page.test.tsx`).
+- Added navigation between `/home` and `/explore` (home CTA + explore back-to-home).
 - Auth route simplification:
   - removed non-dialog hero/section content from `/login`, `/register/business`, `/qr/login`, and `/qr/register`; pages now render dialog-only auth surfaces.
 - Home-page auth scope cleanup:
   - removed direct QR login/register preview links from `src/app/home/page.tsx`; home keeps business-first entry while customer auth stays in QR/menu flow.
 - Updated `tests/app-header.test.tsx` to assert business-only login in default header mode and customer-only login/logout in customer header mode.
+- Added org create page tests and dashboard/onboarding redirect coverage when no org exists (`tests/org-create-page.test.tsx`, updates in `tests/dashboard.test.tsx`, `tests/onboarding-page.test.tsx`).
+- Updated web tests for org create flow, explore auth mocking, and `apiFetch` CSRF retry expectations; web suite now passes.
+- Fixed org-create submission to JSON.stringify payload in `src/app/dashboard/org/create/page.tsx` and updated org-create test expectation.
+- Dashboard now auto-redirects org owners with zero businesses to `/dashboard/onboarding` to start creating the first business; updated dashboard tests accordingly.
 
 ## Updates 2026-03-24
 - Added notification bell/badge in `AppHeader` that fetches `/api/business/notifications`; link goes to `/dashboard/notifications`.
@@ -318,3 +331,13 @@ pnpm lint   # run Next.js ESLint
 
 ## Updates 2026-03-24
 - Public menu checkout now uses Razorpay: loads checkout script, creates Razorpay order via API, verifies payment, then redirects to `/order/[id]`.
+
+## Updates 2026-03-27
+- Added a secondary navigation bar below the header with links to Home, Explore, and Dashboard.
+- Removed top-right dashboard CTA and centered the secondary navigation bar.
+- Removed default header subtitle under Scan2Serve; now only shows when `leftMeta` is provided.
+- Simplified user tag display to show only email; profile label moved into dropdown.
+- Removed header subtitle entirely; product name now stands alone in header.
+- Made `/explore` public (no auth guard) and hid Dashboard nav until login.
+- Dashboard nav now only appears for business-role users.
+- Root redirect now sends any session with access/refresh tokens (business or QR) to `/explore`.

@@ -13,6 +13,7 @@ type BusinessRecord = {
 
 const users: UserRecord[] = [];
 const businesses: BusinessRecord[] = [];
+const businessMemberships: { id: string; businessId: string; userId: string; role: string }[] = [];
 
 const generateItemDescriptionMock = vi.fn();
 
@@ -42,6 +43,21 @@ vi.mock("../src/prisma", () => ({
         let list = [...businesses];
         if (where?.userId) list = list.filter((b) => b.userId === where.userId);
         return list;
+      }),
+    },
+    businessMembership: {
+      findFirst: vi.fn(async ({ where }) => {
+        if (!where?.businessId || !where?.userId) return null;
+        return (
+          businessMemberships.find(
+            (membership) =>
+              membership.businessId === where.businessId && membership.userId === where.userId
+          ) ?? null
+        );
+      }),
+      findMany: vi.fn(async ({ where }) => {
+        if (!where?.userId) return [];
+        return businessMemberships.filter((membership) => membership.userId === where.userId);
       }),
     },
     businessRejection: {
@@ -110,9 +126,16 @@ describe("AI routes", () => {
   beforeEach(() => {
     users.length = 0;
     businesses.length = 0;
+    businessMemberships.length = 0;
     generateItemDescriptionMock.mockReset();
     users.push({ id: "u_business", email: "biz@example.com", role: "business" });
     businesses.push({ id: "b_1", userId: "u_business", status: "approved" });
+    businessMemberships.push({
+      id: "bm_1",
+      businessId: "b_1",
+      userId: "u_business",
+      role: "owner",
+    });
   });
 
   it("generates item description from llm", async () => {

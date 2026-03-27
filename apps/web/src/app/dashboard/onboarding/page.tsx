@@ -103,6 +103,7 @@ function BusinessOnboardingPageContent() {
   const currencyDropdownRef = useRef<HTMLDivElement | null>(null);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
+  const [orgChecked, setOrgChecked] = useState(false);
   const filteredCurrencyOptions = useMemo(() => {
     const normalizedQuery = normalizeCurrencyCode(currencyQuery);
     if (!normalizedQuery) {
@@ -122,6 +123,35 @@ function BusinessOnboardingPageContent() {
       router.push("/dashboard");
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (loading || !user || user.role !== "business") return;
+    let cancelled = false;
+
+    const checkOrgMembership = async () => {
+      try {
+        const data = await apiFetch<{ membership: { id: string } | null }>(
+          "/api/business/org/membership",
+          { method: "GET" }
+        );
+        if (!data.membership && !cancelled) {
+          router.replace("/dashboard/org/create");
+        }
+      } catch {
+        // If the check fails, allow onboarding to continue to avoid blocking.
+      } finally {
+        if (!cancelled) {
+          setOrgChecked(true);
+        }
+      }
+    };
+
+    void checkOrgMembership();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user?.id, user?.role, router]);
 
   useEffect(() => {
     if (user?.role !== "business") return;
@@ -175,7 +205,7 @@ function BusinessOnboardingPageContent() {
     };
   }, [isCurrencyOpen]);
 
-  if (loading || !user || user.role !== "business") {
+  if (loading || !user || user.role !== "business" || !orgChecked) {
     return (
       <main className="min-h-screen bg-gray-50">
         <AppHeader leftMeta="Business onboarding" />

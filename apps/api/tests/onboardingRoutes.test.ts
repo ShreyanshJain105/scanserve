@@ -26,9 +26,23 @@ type Role = "business" | "admin" | "customer";
 type BusinessStatus = "pending" | "approved" | "rejected" | "archived";
 
 type UserRecord = { id: string; email: string; role: Role };
+type OrgRecord = { id: string; ownerUserId: string; name: string | null };
+type OrgMembershipRecord = {
+  id: string;
+  orgId: string;
+  userId: string;
+  role: "owner" | "manager" | "staff";
+};
+type BusinessMembershipRecord = {
+  id: string;
+  businessId: string;
+  userId: string;
+  role: "owner" | "manager" | "staff";
+};
 type BusinessRecord = {
   id: string;
   userId: string;
+  orgId?: string | null;
   name: string;
   slug: string;
   currencyCode: string;
@@ -66,6 +80,9 @@ type QrCodeRecord = {
 };
 
 const users: UserRecord[] = [];
+const orgs: OrgRecord[] = [];
+const orgMemberships: OrgMembershipRecord[] = [];
+const businessMemberships: BusinessMembershipRecord[] = [];
 const businesses: BusinessRecord[] = [];
 const rejections: RejectionRecord[] = [];
 const tables: TableRecord[] = [];
@@ -81,6 +98,51 @@ const withRejections = (business: BusinessRecord) => ({
 
 vi.mock("../src/prisma", () => ({
   prisma: {
+    org: {
+      create: vi.fn(async ({ data }) => {
+        const record: OrgRecord = {
+          id: `org_${orgs.length + 1}`,
+          ownerUserId: data.ownerUserId,
+          name: data.name ?? null,
+        };
+        orgs.push(record);
+        return record;
+      }),
+    },
+    orgMembership: {
+      findFirst: vi.fn(async ({ where, include }) => {
+        const membership = orgMemberships.find((m) =>
+          (where?.userId ? m.userId === where.userId : true) &&
+          (where?.orgId ? m.orgId === where.orgId : true)
+        );
+        if (!membership) return null;
+        if (include?.org) {
+          return { ...membership, org: orgs.find((o) => o.id === membership.orgId) ?? null };
+        }
+        return membership;
+      }),
+      create: vi.fn(async ({ data }) => {
+        const record: OrgMembershipRecord = {
+          id: `orgmem_${orgMemberships.length + 1}`,
+          orgId: data.orgId,
+          userId: data.userId,
+          role: data.role,
+        };
+        orgMemberships.push(record);
+        return record;
+      }),
+      findMany: vi.fn(async ({ where }) =>
+        orgMemberships.filter((m) =>
+          (where?.orgId ? m.orgId === where.orgId : true) &&
+          (where?.userId ? m.userId === where.userId : true)
+        )
+      ),
+      delete: vi.fn(async ({ where }) => {
+        const idx = orgMemberships.findIndex((m) => m.id === where.id);
+        if (idx >= 0) orgMemberships.splice(idx, 1);
+        return { id: where.id };
+      }),
+    },
     business: {
       create: vi.fn(async ({ data }) => {
         if (businesses.some((entry) => entry.slug === data.slug)) {
@@ -90,6 +152,7 @@ vi.mock("../src/prisma", () => ({
         const created: BusinessRecord = {
           id: `b_${businesses.length + 1}`,
           userId: data.userId,
+          orgId: data.orgId ?? null,
           name: data.name,
           slug: data.slug,
           currencyCode: data.currencyCode ?? "USD",
@@ -109,6 +172,7 @@ vi.mock("../src/prisma", () => ({
       findMany: vi.fn(async ({ where, include }) => {
         let list = [...businesses];
         if (where?.userId) list = list.filter((item) => item.userId === where.userId);
+        if (where?.orgId) list = list.filter((item) => item.orgId === where.orgId);
         if (where?.status) list = list.filter((item) => item.status === where.status);
         list.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
         return include?.rejections ? list.map(withRejections) : list;
@@ -141,6 +205,45 @@ vi.mock("../src/prisma", () => ({
         };
 
         return include?.rejections ? withRejections(businesses[index]) : businesses[index];
+      }),
+    },
+    businessMembership: {
+      findFirst: vi.fn(async ({ where }) =>
+        businessMemberships.find(
+          (m) =>
+            (!where?.businessId || m.businessId === where.businessId) &&
+            (!where?.userId || m.userId === where.userId)
+        ) ?? null
+      ),
+      findMany: vi.fn(async ({ where, include }) => {
+        const list = businessMemberships.filter((m) =>
+          (where?.userId ? m.userId === where.userId : true)
+        );
+        if (include?.business) {
+          return list.map((m) => ({
+            ...m,
+            business: businesses.find((b) => b.id === m.businessId) ?? null,
+          }));
+        }
+        return list;
+      }),
+      create: vi.fn(async ({ data }) => {
+        const record: BusinessMembershipRecord = {
+          id: `bizmem_${businessMemberships.length + 1}`,
+          businessId: data.businessId,
+          userId: data.userId,
+          role: data.role,
+        };
+        businessMemberships.push(record);
+        return record;
+      }),
+      deleteMany: vi.fn(async ({ where }) => {
+        const before = businessMemberships.length;
+        for (let i = businessMemberships.length - 1; i >= 0; i -= 1) {
+          if (where?.userId && businessMemberships[i].userId !== where.userId) continue;
+          businessMemberships.splice(i, 1);
+        }
+        return { count: before - businessMemberships.length };
       }),
     },
     businessRejection: {
@@ -353,6 +456,9 @@ const run = async (
 describe("Layer 3 onboarding routes", () => {
   beforeEach(() => {
     users.length = 0;
+    orgs.length = 0;
+    orgMemberships.length = 0;
+    businessMemberships.length = 0;
     businesses.length = 0;
     rejections.length = 0;
     tables.length = 0;

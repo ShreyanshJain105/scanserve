@@ -9,25 +9,24 @@
 
 ## Last Session
 
-**Date:** 2026-03-26
+**Date:** 2026-03-27
 **What was done:**
-- Implemented ADR-035 CSRF tokens: added API CSRF middleware, `/api/auth/csrf` token issuer, and web client auto-header support.
-- Added API tests for CSRF middleware.
-- Added close button to toast notifications in web UI.
-- Expanded docker-compose to include seed step and common envs (Razorpay, LLM, admin seed, QR auth), plus web env_file wiring.
-- Positioned toast notifications below the sticky header via dynamic offset.
-- Added colored log output in API logger for non-production TTY sessions.
-- Updated logger to colorize logs in all environments unless `LOG_COLOR=false`.
-- Trimmed docker-compose env overrides to keep only Docker-specific values (DB/S3/internal URLs).
+- Added org membership lookup + org creation API tests in `apps/api/tests/orgInviteRoutes.test.ts`.
+- Fixed API test mocks for org invites, AI routes, and public Decimal usage; API test suite now passes (16 files, 91 tests).
+- Updated web tests for org create/onboarding/dashboard redirects, apiFetch CSRF retry expectations, and explore/auth mocks; web test suite now passes (16 files, 52 tests).
+- Added `tests` service to `docker-compose.yml` to run API + web test suites in Docker.
+- Updated root `CLAUDE.md` to reflect current org/membership + order-management API routes and dashboard/explore/org pages.
+- Fixed org-create submission to JSON.stringify body to avoid invalid JSON toast.
+- Dashboard now auto-redirects org owners with zero businesses to `/dashboard/onboarding`, with updated tests.
 
 **What's NOT done yet:**
 - Live Razorpay checkout + signature verification with real keys not run (blocked: Razorpay test mode account not created yet).
-- Layer 8 order management (business-facing) not started.
+- Layer 8 dashboard UI (order list/detail/status transitions + polling) not implemented yet (ADR-036 paused).
 - Admin UI clarity improvements (admin panel UX) deferred per user request.
 
 **Next step:**
-1. Run live Razorpay checkout + signature verification with test keys.
-2. Draft ADR for Layer 8 order management and begin implementation after approval.
+1. Verify org-create flow now lands on `/dashboard/onboarding` for org owners without businesses.
+2. Resume ADR-036 and build Layer 8 dashboard UI + ClickHouse sink planning after ADR-037.
 
 **Build progress:**
 ```
@@ -799,6 +798,64 @@ Layer 11: Polish & Deploy
 ### 2026-03-26 — Session 128: Compose env trimming
 - Removed env overrides from compose for values already defined in `apps/api/.env.local` and `apps/web/.env.local`, keeping only Docker-specific DB/S3/internal URLs.
 
+### 2026-03-27 — Session 129: Layer 8 ADR expansion (retention + warehouse)
+- Updated ADR-036 to cover 6-month Postgres retention with monthly partitions and an order-event queue feeding a data warehouse for historical dashboards.
+- Captured open questions for retention scope, partitioning method, warehouse target, and event schema/idempotency.
+- Logged initial ADR-036 answers: ClickHouse target and full-snapshot events with `eventId` dedupe + event-time gated upserts.
+- Confirmed hard-delete retention policy after 6 months.
+- ADR-036 accepted with final status flow ending at Completed and no separate Served status.
+- Clarified ADR-036 MVP filtering to status-only and updated Decision header.
+
+### 2026-03-27 — Session 130: Layer 8 API + order events
+- Implemented business order management endpoints (list/detail/status update) with status transition validation.
+- Added order-event publisher service and wired best-effort event emission for order create, payment verify, and status updates.
+- Added Layer 8 API test coverage for order management routes.
+- Marked ADR-036 as Paused pending ADR-037 (RBAC scope + invites).
+
+### 2026-03-27 — Session 131: ADR-037 draft
+- Drafted ADR-037 to define scoped business memberships, invitation flow, and RBAC enforcement rules.
+- Updated ADR-037 with org-level membership model and one-org-per-user constraint.
+- Updated ADR-037 answers: existing-user-only org invites, in-app notifications, and role permission matrix.
+- Accepted ADR-037 with org-invite accept/decline flow via blurred org preview page.
+- Updated ADR-037 to require static sample org preview (no real org data) for invite acceptance UX.
+
+### 2026-03-27 — Session 132: ADR-037 implementation start
+- Added org/org-invite/business membership models in Prisma and migration.
+- Implemented org invite APIs, org leave, business membership assignment, and RBAC gating for menu/tables/profile routes.
+- Added static org-invite preview page and notification deep-link.
+- Added API and web tests covering org invite flows and role gating.
+
+### 2026-03-27 — Session 133: Org intro + invite UI
+- Added org intro page and rerouted zero-business dashboard CTA to it.
+- Added dashboard invite modal UI and tests for invite actions and org intro page.
+
+### 2026-03-27 — Session 134: Explore page
+- Replaced org intro page with `/explore` use-case overview page; updated dashboard CTA and tests.
+
+### 2026-03-27 — Session 135: Org create test coverage
+- Added org membership lookup + org creation API tests in `apps/api/tests/orgInviteRoutes.test.ts`.
+- Added web tests for org create page and redirect behavior when no org exists (`apps/web/tests/org-create-page.test.tsx`, updated dashboard/onboarding tests).
+
+### 2026-03-27 — Session 136: Full test run + fixes
+- Ran `pnpm install` with network access to fetch dependencies.
+- Fixed API test mocks (org invite hoisting, AI route membership mock, Decimal fallback) and verified `pnpm --filter @scan2serve/api test` passes.
+- Updated web tests for CSRF retry flow, explore auth mocking, and async expectations; verified `pnpm --filter @scan2serve/web test` passes (act warnings remain).
+
+### 2026-03-27 — Session 137: Docker test service
+- Added a dedicated `tests` service in `docker-compose.yml` to run `pnpm --filter @scan2serve/api test` and `pnpm --filter @scan2serve/web test`.
+
+### 2026-03-27 — Session 138: Root CLAUDE sync
+- Updated root `CLAUDE.md` to reflect org/membership endpoints, order-management APIs, and current frontend routes.
+
+### 2026-03-27 — Session 139: Org-create toast fix
+- Fixed org-create API call to send JSON string body and updated org-create test expectation.
+
+### 2026-03-27 — Session 140: Dashboard empty state
+- Switched org-without-business dashboard empty state to “Create your first business” CTA and updated dashboard tests.
+
+### 2026-03-27 — Session 141: Owner onboarding redirect
+- Updated dashboard to auto-redirect org owners with zero businesses to onboarding and refreshed dashboard tests.
+
 ---
 
 ## Decisions Log
@@ -837,6 +894,8 @@ Layer 11: Polish & Deploy
 | ADR-033 | Ordering & payments (Layer 7) — Accepted | Define order creation, Stripe checkout, webhook handling, and order status surfaces | 2026-03-24 |
 | ADR-034 | Razorpay payments (replace Stripe) — Accepted | Support UPI by replacing Stripe with Razorpay order + signature verification flow | 2026-03-24 |
 | ADR-035 | CSRF strategy for cookie-based auth — Accepted | Implement CSRF tokens for mutating routes | 2026-03-26 |
+| ADR-036 | Layer 8 order management + retention + warehouse feed — Accepted | Define order status flow, dashboard scope, 6-month retention/partitioning, and event queue → ClickHouse warehouse | 2026-03-27 |
+| ADR-037 | RBAC scope + org/business invites — Accepted | Add org model, scoped roles, invite accept/decline, and membership-gated business access | 2026-03-27 |
 
 ---
 

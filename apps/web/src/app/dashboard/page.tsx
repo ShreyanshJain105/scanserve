@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { showToast } from "../../lib/toast";
 import { AppHeader } from "../../components/layout/app-header";
 import { BodyBackButton } from "../../components/layout/body-back-button";
+import { ModalDialog } from "../../components/ui/modal-dialog";
+import { apiFetch } from "../../lib/api";
 
 const PencilIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
   <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
@@ -36,6 +38,15 @@ export default function DashboardPage() {
   const [archiveConfirmText, setArchiveConfirmText] = useState("");
   const [archiveSubmitting, setArchiveSubmitting] = useState(false);
   const [restoreSubmitting, setRestoreSubmitting] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"manager" | "staff">("staff");
+  const [inviteExists, setInviteExists] = useState<boolean | null>(null);
+  const [inviteChecking, setInviteChecking] = useState(false);
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [orgChecked, setOrgChecked] = useState(false);
+  const [hasOrg, setHasOrg] = useState(true);
+  const [orgRole, setOrgRole] = useState<"owner" | "manager" | "staff" | null>(null);
   const blockedReason = selectedBusiness?.blocked
     ? "This business is blocked by an admin. Dashboard actions are disabled until it is unblocked."
     : selectedBusiness?.status === "pending"
@@ -51,6 +62,50 @@ export default function DashboardPage() {
       router.push("/home");
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (loading || !user || user.role !== "business") {
+      setOrgChecked(true);
+      return;
+    }
+
+    let cancelled = false;
+    const checkOrg = async () => {
+      try {
+        const data = await apiFetch<{
+          membership: { id: string; role: "owner" | "manager" | "staff" } | null;
+        }>(
+          "/api/business/org/membership",
+          { method: "GET" }
+        );
+        if (!cancelled) {
+          setHasOrg(!!data.membership);
+          setOrgRole(data.membership?.role ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setHasOrg(true);
+          setOrgRole(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setOrgChecked(true);
+        }
+      }
+    };
+
+    void checkOrg();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user?.id, user?.role]);
+
+  useEffect(() => {
+    if (!loading && orgChecked && user?.role === "business" && !hasOrg) {
+      router.replace("/dashboard/org/create");
+    }
+  }, [loading, orgChecked, user?.role, hasOrg, router]);
 
   const visibleBusinesses = useMemo(
     () => {
@@ -72,7 +127,7 @@ export default function DashboardPage() {
     selectBusiness(visibleBusinesses[0].id);
   }, [visibleBusinesses, selectedBusiness, selectBusiness]);
 
-  if (loading) {
+  if (loading || !orgChecked) {
     return (
       <main className="min-h-screen bg-gray-50">
         <AppHeader leftMeta="Business dashboard" />
@@ -97,6 +152,15 @@ export default function DashboardPage() {
     );
   }
 
+  if (!hasOrg) {
+    return null;
+  }
+
+  if (!businessLoading && businesses.length === 0 && orgRole === "owner") {
+    router.replace("/dashboard/onboarding");
+    return null;
+  }
+
   if (businessLoading) {
     return (
       <main className="min-h-screen bg-gray-50">
@@ -113,16 +177,16 @@ export default function DashboardPage() {
       <main className="min-h-screen bg-gray-50">
         <AppHeader leftMeta="Business dashboard" />
         <section className="mx-auto max-w-3xl p-8">
-          <h1 className="text-3xl font-semibold">Business onboarding required</h1>
+          <h1 className="text-3xl font-semibold">Create your first business</h1>
           <p className="mt-2 text-gray-600">
-            Create your first business profile before using dashboard operations.
+            Your org is ready. Add your first business to unlock menus, tables, and orders.
           </p>
           <div className="mt-6 flex gap-3">
             <button
               onClick={() => router.push("/dashboard/onboarding")}
               className="rounded-md bg-black px-4 py-2 text-white"
             >
-              Start onboarding
+              Create business
             </button>
           </div>
         </section>
@@ -179,6 +243,64 @@ export default function DashboardPage() {
       });
     } finally {
       setRestoreSubmitting(false);
+    }
+  };
+
+  const checkInviteEmail = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email) {
+      setInviteExists(null);
+      return;
+    }
+    setInviteChecking(true);
+    try {
+      const data = await apiFetch<{ exists: boolean }>(
+        `/api/business/org/invites/check?email=${encodeURIComponent(email)}`,
+        { method: "GET" }
+      );
+      setInviteExists(data.exists);
+      if (!data.exists) {
+        showToast({ variant: "error", message: "User does not exist." });
+      }
+    } catch (err) {
+      setInviteExists(null);
+      showToast({
+        variant: "error",
+        message: err instanceof Error ? err.message : "Failed to validate user email.",
+      });
+    } finally {
+      setInviteChecking(false);
+    }
+  };
+
+  const submitInvite = async () => {
+    if (inviteSubmitting || inviteChecking) return;
+    if (!inviteEmail.trim()) {
+      showToast({ variant: "error", message: "Enter a valid email." });
+      return;
+    }
+    if (inviteExists === false) {
+      showToast({ variant: "error", message: "User does not exist." });
+      return;
+    }
+    setInviteSubmitting(true);
+    try {
+      await apiFetch("/api/business/org/invites", {
+        method: "POST",
+        body: { email: inviteEmail.trim(), role: inviteRole },
+      });
+      showToast({ variant: "success", message: "Invite sent." });
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteExists(null);
+      setInviteRole("staff");
+    } catch (err) {
+      showToast({
+        variant: "error",
+        message: err instanceof Error ? err.message : "Failed to send invite.",
+      });
+    } finally {
+      setInviteSubmitting(false);
     }
   };
 
@@ -289,6 +411,15 @@ export default function DashboardPage() {
               >
                 <p className="text-xl font-semibold text-slate-900">Manage tables and QR</p>
                 <p className="mt-1 text-sm text-slate-700">Create tables, rotate codes, and export downloads.</p>
+              </button>
+              <button
+                onClick={() => setInviteDialogOpen(true)}
+                className="w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-100 to-slate-50 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+              >
+                <p className="text-xl font-semibold text-slate-900">Invite team member</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Add managers or staff to your org and businesses.
+                </p>
               </button>
               <div className="flex items-start gap-2">
                 <button
@@ -424,6 +555,62 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+        <ModalDialog
+          open={inviteDialogOpen}
+          title="Invite to org"
+          subtitle="Only existing users can be invited."
+          onClose={() => setInviteDialogOpen(false)}
+        >
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">
+              Email
+              <input
+                value={inviteEmail}
+                onChange={(event) => {
+                  setInviteEmail(event.target.value);
+                  setInviteExists(null);
+                }}
+                onBlur={() => void checkInviteEmail()}
+                type="email"
+                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="person@example.com"
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-700">
+              Role
+              <select
+                value={inviteRole}
+                onChange={(event) => setInviteRole(event.target.value as "manager" | "staff")}
+                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="staff">Staff</option>
+                <option value="manager">Manager</option>
+              </select>
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={submitInvite}
+                disabled={
+                  inviteSubmitting ||
+                  inviteChecking ||
+                  !inviteEmail.trim() ||
+                  inviteExists === false
+                }
+                className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {inviteSubmitting ? "Sending..." : "Send invite"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteDialogOpen(false)}
+                className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalDialog>
       </section>
       {archiveDialogOpen && selectedBusiness && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">

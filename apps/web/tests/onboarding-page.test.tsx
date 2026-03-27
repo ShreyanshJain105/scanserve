@@ -4,9 +4,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import BusinessOnboardingPage from "../src/app/dashboard/onboarding/page";
 
 const pushMock = vi.fn();
+const replaceMock = vi.fn();
 const searchParamsMockState = { value: "" };
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, replace: replaceMock }),
   usePathname: () => "/dashboard/onboarding",
   useSearchParams: () => new URLSearchParams(searchParamsMockState.value),
 }));
@@ -28,6 +29,7 @@ vi.mock("../src/lib/toast", () => ({
 describe("BusinessOnboardingPage", () => {
   beforeEach(() => {
     pushMock.mockReset();
+    replaceMock.mockReset();
     useAuthMock.mockReset();
     apiFetchMock.mockReset();
     searchParamsMockState.value = "";
@@ -47,13 +49,16 @@ describe("BusinessOnboardingPage", () => {
       updateBusinessProfile: vi.fn(),
       refreshBusinessProfiles: vi.fn(),
     });
+    apiFetchMock.mockResolvedValueOnce({
+      membership: { id: "m1", orgId: "o1", role: "owner", orgName: "Org" },
+    });
 
     render(<BusinessOnboardingPage />);
 
-    const slugInput = screen.getByDisplayValue("business") as HTMLInputElement;
+    const slugInput = (await screen.findByDisplayValue("business")) as HTMLInputElement;
     expect(slugInput.disabled).toBe(true);
 
-    fireEvent.change(screen.getByPlaceholderText("Example: Green Leaf Cafe"), {
+    fireEvent.change(await screen.findByPlaceholderText("Example: Green Leaf Cafe"), {
       target: { value: "Green Leaf Cafe" },
     });
 
@@ -70,10 +75,10 @@ describe("BusinessOnboardingPage", () => {
     expect(screen.queryByRole("option", { name: "INR" })).toBeNull();
     expect(screen.getByLabelText("Currency code")).toHaveValue("INR");
 
-    fireEvent.change(screen.getByPlaceholderText("Street, area, city"), {
+    fireEvent.change(await screen.findByPlaceholderText("Street, area, city"), {
       target: { value: "12 Main St" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Business support number"), {
+    fireEvent.change(await screen.findByPlaceholderText("Business support number"), {
       target: { value: "+91-111-111-1111" },
     });
     fireEvent.click(screen.getByText("Create profile"));
@@ -99,17 +104,21 @@ describe("BusinessOnboardingPage", () => {
       refreshBusinessProfiles: vi.fn(),
     });
 
-    apiFetchMock.mockResolvedValue({ business: { id: "b_logo" } });
+    apiFetchMock
+      .mockResolvedValueOnce({
+        membership: { id: "m1", orgId: "o1", role: "owner", orgName: "Org" },
+      })
+      .mockResolvedValueOnce({ business: { id: "b_logo" } });
 
     render(<BusinessOnboardingPage />);
 
-    fireEvent.change(screen.getByPlaceholderText("Example: Green Leaf Cafe"), {
+    fireEvent.change(await screen.findByPlaceholderText("Example: Green Leaf Cafe"), {
       target: { value: "Logo Cafe" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Street, area, city"), {
+    fireEvent.change(await screen.findByPlaceholderText("Street, area, city"), {
       target: { value: "12 Main St" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Business support number"), {
+    fireEvent.change(await screen.findByPlaceholderText("Business support number"), {
       target: { value: "+1-222-222-2222" },
     });
 
@@ -153,14 +162,35 @@ describe("BusinessOnboardingPage", () => {
       updateBusinessProfile: vi.fn(),
       refreshBusinessProfiles: vi.fn(),
     });
+    apiFetchMock.mockResolvedValueOnce({
+      membership: { id: "m1", orgId: "o1", role: "owner", orgName: "Org" },
+    });
 
     render(<BusinessOnboardingPage />);
 
-    const nameInput = screen.getByDisplayValue("Locked Cafe") as HTMLInputElement;
-    const slugInput = screen.getByDisplayValue("locked-cafe") as HTMLInputElement;
+    const nameInput = (await screen.findByDisplayValue("Locked Cafe")) as HTMLInputElement;
+    const slugInput = (await screen.findByDisplayValue("locked-cafe")) as HTMLInputElement;
 
     expect(nameInput.disabled).toBe(true);
     expect(slugInput.disabled).toBe(true);
     expect(screen.getByText("Business name is locked after profile creation.")).toBeTruthy();
+  });
+
+  it("redirects to org create page when no org exists", async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: "u1", email: "biz@example.com", role: "business" },
+      loading: false,
+      businesses: [],
+      createBusinessProfile: vi.fn(),
+      updateBusinessProfile: vi.fn(),
+      refreshBusinessProfiles: vi.fn(),
+    });
+    apiFetchMock.mockResolvedValueOnce({ membership: null });
+
+    render(<BusinessOnboardingPage />);
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith("/dashboard/org/create");
+    });
   });
 });

@@ -63,16 +63,24 @@ type DeletedAssetCleanupRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
+type BusinessMembershipRecord = {
+  id: string;
+  businessId: string;
+  userId: string;
+  role: "owner" | "manager" | "staff";
+};
 
 const users: UserRecord[] = [];
 const businesses: BusinessRecord[] = [];
 const categories: CategoryRecord[] = [];
 const menuItems: MenuItemRecord[] = [];
 const deletedAssetCleanups: DeletedAssetCleanupRecord[] = [];
+const businessMemberships: BusinessMembershipRecord[] = [];
 
 const nextCategoryId = () => `cat_${categories.length + 1}`;
 const nextItemId = () => `item_${menuItems.length + 1}`;
 const nextCleanupId = () => `cleanup_${deletedAssetCleanups.length + 1}`;
+const nextBizMembershipId = () => `bizmem_${businessMemberships.length + 1}`;
 
 vi.mock("../src/prisma", () => ({
   prisma: {
@@ -98,6 +106,37 @@ vi.mock("../src/prisma", () => ({
     },
     businessRejection: {
       findFirst: vi.fn(async () => null),
+    },
+    businessMembership: {
+      findMany: vi.fn(async ({ where, include }) => {
+        const list = businessMemberships.filter(
+          (m) => (!where?.userId ? true : m.userId === where.userId)
+        );
+        if (include?.business) {
+          return list.map((m) => ({
+            ...m,
+            business: businesses.find((b) => b.id === m.businessId) ?? null,
+          }));
+        }
+        return list;
+      }),
+      findFirst: vi.fn(async ({ where }) =>
+        businessMemberships.find(
+          (m) =>
+            (!where?.businessId || m.businessId === where.businessId) &&
+            (!where?.userId || m.userId === where.userId)
+        ) ?? null
+      ),
+      create: vi.fn(async ({ data }) => {
+        const record = {
+          id: nextBizMembershipId(),
+          businessId: data.businessId,
+          userId: data.userId,
+          role: data.role,
+        };
+        businessMemberships.push(record);
+        return record;
+      }),
     },
     category: {
       findMany: vi.fn(async ({ where }) =>
@@ -353,11 +392,27 @@ describe("Layer 4 menu routes", () => {
     categories.length = 0;
     menuItems.length = 0;
     deletedAssetCleanups.length = 0;
+    businessMemberships.length = 0;
 
     users.push({ id: "u_business", email: "biz@example.com", role: "business" });
     businesses.push({ id: "b_1", userId: "u_business", status: "approved" });
     uploadImageObjectMock.mockReset();
     generateMenuItemImageMock.mockReset();
+  });
+
+  it("blocks staff from menu item access", async () => {
+    const user = users[0];
+    businessMemberships.push({
+      id: nextBizMembershipId(),
+      businessId: "b_1",
+      userId: user.id,
+      role: "staff",
+    });
+
+    const res = await run("GET", "/menu-items", { user });
+    const body = JSON.parse(res._getData());
+    expect(res.statusCode).toBe(403);
+    expect(body.error.code).toBe("BUSINESS_ROLE_FORBIDDEN");
   });
 
   it("supports category CRUD and blocks deleting non-empty category", async () => {
