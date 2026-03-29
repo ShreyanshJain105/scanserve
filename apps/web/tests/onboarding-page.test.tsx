@@ -50,7 +50,7 @@ describe("BusinessOnboardingPage", () => {
       refreshBusinessProfiles: vi.fn(),
     });
     apiFetchMock.mockResolvedValueOnce({
-      membership: { id: "m1", orgId: "o1", role: "owner", orgName: "Org" },
+      membership: { id: "m1", orgId: "o1", isOwner: true, orgName: "Org" },
     });
 
     render(<BusinessOnboardingPage />);
@@ -106,7 +106,7 @@ describe("BusinessOnboardingPage", () => {
 
     apiFetchMock
       .mockResolvedValueOnce({
-        membership: { id: "m1", orgId: "o1", role: "owner", orgName: "Org" },
+        membership: { id: "m1", orgId: "o1", isOwner: true, orgName: "Org" },
       })
       .mockResolvedValueOnce({ business: { id: "b_logo" } });
 
@@ -163,7 +163,7 @@ describe("BusinessOnboardingPage", () => {
       refreshBusinessProfiles: vi.fn(),
     });
     apiFetchMock.mockResolvedValueOnce({
-      membership: { id: "m1", orgId: "o1", role: "owner", orgName: "Org" },
+      membership: { id: "m1", orgId: "o1", isOwner: true, orgName: "Org" },
     });
 
     render(<BusinessOnboardingPage />);

@@ -556,3 +556,26 @@ This section is the high-level source of truth for what is already implemented a
 - Dashboard nav now appears only for business-role users.
 - Root route now redirects any session with access/refresh tokens (business or QR) to `/explore`.
 - Fix: added missing Prisma back-reference (`Business.memberships`) to resolve schema validation error.
+- Added business-role gating on order management endpoints so only `owner`/`manager`/`staff` can list, view, or update orders.
+
+## Updates 2026-03-29
+- Added org-member and business-membership listing endpoints plus business-role annotations on `/api/business/profiles` for RBAC assignment UI.
+- Dashboard now includes a “Manage business access” modal for owners/managers to grant business membership roles.
+- Staff are redirected away from menu/tables pages with toast guidance to contact an owner/manager.
+- Stabilized API tests: mocked Prisma client in `apps/api/tests/publicRoutes.test.ts` and fixed org-invite test mocks to include business owner ids in membership listings.
+- Fixed Vitest mock hoisting in `apps/api/tests/publicRoutes.test.ts` by moving Decimal mock into `vi.hoisted`.
+- Fixed dashboard hook order regression by moving member-map `useMemo` above early returns.
+- Org-invite preview page now uses `useParams` to read `inviteId` instead of direct params prop access (Promise params warning fix).
+- Dashboard now shows a waiting-for-access message for non-owners with no assigned businesses (instead of showing create-business CTA).
+- Org invites now default org role to `staff` (no role selection at invite); business roles are assigned when granting business access.
+- Updated org-invite web tests to mock `useParams` after switching invite page to hook-based params access.
+- Added business membership removal endpoint and UI controls to revoke access from the manage-business-access modal.
+- Manage-business-access modal now hides removal controls for self and non-owner/manager users (staff get read-only view).
+- Staff-facing dashboard now hides management actions (add business, archive/restore, edit/resubmit, archive toggle).
+- Staff-facing dashboard now hides the quick-action panel (invite/manage access cards).
+- Added dashboard action guards (role + business status) to block invalid actions with toasts before navigation.
+- Drafted ADR-038 to remove org roles and drive all permissions from business-level roles only.
+- Implemented ADR-038 roleless org membership: org membership now only stores orgId, org owner is defined by `orgs.owner_user_id`, and org invites are authorized by org owner or any business owner/manager in the org.
+- Business access management and dashboard permissions now depend on the selected business role only (owner/manager), not org roles; org member summaries now expose `isOwner` instead of role.
+- Added migration `20260329120000_roleless_org_memberships` dropping org role columns and updated shared types/tests accordingly.
+- Fixed dashboard tables QR download CSRF failures by exporting CSRF helpers and attaching `x-csrf-token` to binary download POSTs (apps/web/src/lib/api.ts, apps/web/src/app/dashboard/tables/page.tsx).

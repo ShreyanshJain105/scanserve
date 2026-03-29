@@ -260,6 +260,16 @@ export default function DashboardMenuPage() {
   }, [loading, user, router]);
 
   useEffect(() => {
+    if (!loading && user?.role === "business" && selectedBusiness?.businessRole === "staff") {
+      showToast({
+        variant: "error",
+        message: "Staff members cannot manage menus. Contact an owner or manager.",
+      });
+      router.push("/dashboard");
+    }
+  }, [loading, user?.role, selectedBusiness?.businessRole, router]);
+
+  useEffect(() => {
     if (!error) return;
     showToast({ variant: "error", message: error });
   }, [error]);

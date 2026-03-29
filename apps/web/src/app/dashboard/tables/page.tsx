@@ -3,7 +3,7 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth-context";
-import { apiFetch } from "../../../lib/api";
+import { apiFetch, CSRF_HEADER_NAME, ensureCsrfToken } from "../../../lib/api";
 import { showToast } from "../../../lib/toast";
 import { AppHeader } from "../../../components/layout/app-header";
 import { BodyBackButton } from "../../../components/layout/body-back-button";
@@ -92,6 +92,16 @@ export default function DashboardTablesPage() {
   }, [loading, user, router]);
 
   useEffect(() => {
+    if (!loading && user?.role === "business" && selectedBusiness?.businessRole === "staff") {
+      showToast({
+        variant: "error",
+        message: "Staff members cannot manage tables. Contact an owner or manager.",
+      });
+      router.push("/dashboard");
+    }
+  }, [loading, user?.role, selectedBusiness?.businessRole, router]);
+
+  useEffect(() => {
     if (blocked) return;
     loadTables(1).catch((err) =>
       showToast({ variant: "error", message: err instanceof Error ? err.message : "Failed to load tables" })
@@ -178,6 +188,8 @@ export default function DashboardTablesPage() {
     body?: string;
   }) => {
     if (!headers || blocked) return;
+    const needsCsrf = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
+    const csrfToken = needsCsrf ? await ensureCsrfToken() : null;
     const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     const response = await fetch(`${base}${endpoint}`, {
       method,
@@ -186,6 +198,7 @@ export default function DashboardTablesPage() {
       headers: {
         ...headers,
         ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {}),
       },
     });
     if (!response.ok) {

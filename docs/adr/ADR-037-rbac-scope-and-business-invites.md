@@ -26,7 +26,9 @@
    - Owners retain full access; non-owners have restricted actions per scope.
 
 4) **Invite Flow**
-   - Business owners (and optionally managers) can invite users by email with a scoped role.
+   - Business owners (and optionally managers) can invite users by email (no role selection at invite).
+   - Invites add the user to the org as `staff` by default.
+   - Business-level roles are assigned when granting access to a specific business.
    - Invites can be accepted by existing users or via registration.
    - Invites may expire (duration TBD).
 
@@ -64,7 +66,7 @@
 - Q8: Should invite accept/decline trigger notifications to the owner?
 
 ### Answers (to be filled by user)
-- A1: owner, manager, staff
+- A1: owner, manager, staff (business roles assigned per business; org invites default to staff)
 - A2: owners and managers
 - A3: Org invites require existing user email; UI checks DB and disables invite if user does not exist. Existing users must accept via an in-app button; notification deep-links to a **static sample org preview page** (no real org data) with blurred content and Accept/Decline actions.
 - A4: It will never expire cause it is used immediately after its creations

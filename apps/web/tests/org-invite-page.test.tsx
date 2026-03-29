@@ -19,8 +19,10 @@ vi.mock("../src/lib/toast", () => ({
 }));
 
 const replaceMock = vi.fn();
+const useParamsMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock, push: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useParams: () => useParamsMock(),
 }));
 
 describe("OrgInvitePage", () => {
@@ -34,11 +36,13 @@ describe("OrgInvitePage", () => {
     apiFetchMock.mockReset();
     showToastMock.mockReset();
     replaceMock.mockReset();
+    useParamsMock.mockReset();
   });
 
   it("renders static preview and accepts invite", async () => {
     apiFetchMock.mockResolvedValue({ accepted: true });
-    render(<OrgInvitePage params={{ inviteId: "invite_1" }} />);
+    useParamsMock.mockReturnValue({ inviteId: "invite_1" });
+    render(<OrgInvitePage />);
 
     expect(screen.getByText("Sample Org Overview")).toBeTruthy();
     fireEvent.click(screen.getByText("Accept Invite"));
@@ -54,7 +58,8 @@ describe("OrgInvitePage", () => {
 
   it("declines invite", async () => {
     apiFetchMock.mockResolvedValue({ declined: true });
-    render(<OrgInvitePage params={{ inviteId: "invite_2" }} />);
+    useParamsMock.mockReturnValue({ inviteId: "invite_2" });
+    render(<OrgInvitePage />);
 
     fireEvent.click(screen.getByText("Decline Invite"));
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
@@ -65,4 +70,3 @@ describe("OrgInvitePage", () => {
     expect(showToastMock).toHaveBeenCalled();
   });
 });
-

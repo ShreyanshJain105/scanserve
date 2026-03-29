@@ -14,8 +14,6 @@ export type OrderStatus =
 
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
-export type OrgRole = "owner" | "manager" | "staff";
-
 export type OrgInviteStatus = "pending" | "accepted" | "declined";
 
 export type BusinessRole = "owner" | "manager" | "staff";
@@ -85,6 +83,7 @@ export interface BusinessProfile {
   createdAt: string;
   updatedAt: string;
   rejections?: BusinessRejection[];
+  businessRole?: BusinessRole | null;
 }
 
 export interface Org {
@@ -99,18 +98,31 @@ export interface OrgMembership {
   id: string;
   orgId: string;
   userId: string;
-  role: OrgRole;
   createdAt: string;
+  orgName?: string | null;
+  isOwner?: boolean;
 }
 
 export interface OrgInvite {
   id: string;
   orgId: string;
   userId: string;
-  role: OrgRole;
   status: OrgInviteStatus;
   createdAt: string;
   respondedAt?: string | null;
+}
+
+export interface OrgMemberSummary {
+  userId: string;
+  email: string;
+  isOwner: boolean;
+}
+
+export interface BusinessMemberSummary {
+  businessId: string;
+  userId: string;
+  email: string;
+  role: BusinessRole;
 }
 
 export interface BusinessMembership {

@@ -65,13 +65,35 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
 
     render(<DashboardPage />);
 
     await waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith("/dashboard/onboarding");
     });
+  });
+
+  it("shows waiting message for non-owners with no businesses", async () => {
+    useAuthMock.mockReturnValue({
+      user: { id: "u1", email: "staff@example.com", role: "business" },
+      loading: false,
+      logout: vi.fn(),
+      businesses: [],
+      selectedBusiness: null,
+      selectBusiness: vi.fn(),
+      businessLoading: false,
+      archiveBusinessProfile: vi.fn(),
+      restoreBusinessProfile: vi.fn(),
+    });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: false } });
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Waiting for business access")).toBeTruthy();
+    });
+    expect(screen.queryByText("Create your first business")).toBeNull();
   });
 
   it("shows locked overlay for pending business", async () => {
@@ -116,7 +138,7 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
 
     render(<DashboardPage />);
 
@@ -170,7 +192,7 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
 
     render(<DashboardPage />);
     await waitFor(() => {
@@ -240,7 +262,7 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", role: "owner" } });
+    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
 
     render(<DashboardPage />);
 

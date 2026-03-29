@@ -218,7 +218,6 @@ const orgInviteCheckSchema = z.object({
 });
 const orgInviteCreateSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["manager", "staff"]),
 });
 const orgInviteActionSchema = z.object({
   inviteId: z.string().min(1),
@@ -230,6 +229,13 @@ const businessMembershipCreateSchema = z.object({
   businessId: z.string().min(1),
   userId: z.string().min(1),
   role: z.enum(["manager", "staff"]),
+});
+const businessMembershipRemoveSchema = z.object({
+  businessId: z.string().min(1),
+  userId: z.string().min(1),
+});
+const businessMembershipListSchema = z.object({
+  businessId: z.string().min(1),
 });
 const orderStatusSchema = z.enum([
   "pending",
@@ -289,6 +295,7 @@ type SerializedBusiness = {
   createdAt: string;
   updatedAt: string;
   rejections?: { id: string; reason: string | null; createdAt: string }[];
+  businessRole?: "owner" | "manager" | "staff" | null;
 };
 
 const serializeBusiness = (business: RawBusiness): SerializedBusiness => {
@@ -648,21 +655,67 @@ const getOrgMembershipForUser = async (userId: string) =>
     include: { org: true },
   });
 
-const requireOrgRole = async (
-  req: express.Request,
-  res: express.Response,
-  roles: Array<"owner" | "manager" | "staff">
-) => {
+const requireOrgMembership = async (req: express.Request, res: express.Response) => {
   const membership = await getOrgMembershipForUser(req.user!.id);
   if (!membership) {
     sendError(res, "You must belong to an org to continue", 403, "ORG_MEMBERSHIP_REQUIRED");
     return null;
   }
-  if (!roles.includes(membership.role as "owner" | "manager" | "staff")) {
-    sendError(res, "You do not have permission for this org action", 403, "ORG_ROLE_FORBIDDEN");
+  return membership;
+};
+
+const isOrgOwner = (membership: Awaited<ReturnType<typeof getOrgMembershipForUser>>, userId: string) =>
+  Boolean(membership?.org?.ownerUserId && membership.org.ownerUserId === userId);
+
+const canInviteForOrg = async (
+  membership: Awaited<ReturnType<typeof getOrgMembershipForUser>>,
+  userId: string
+) => {
+  if (!membership) return false;
+  if (isOrgOwner(membership, userId)) return true;
+
+  const [ownerBusiness, managerMembership] = await Promise.all([
+    prisma.business.findFirst({
+      where: { orgId: membership.orgId, userId },
+      select: { id: true },
+    }),
+    prisma.businessMembership.findFirst({
+      where: {
+        userId,
+        role: { in: ["owner", "manager"] },
+        business: { orgId: membership.orgId },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  return Boolean(ownerBusiness || managerMembership);
+};
+
+const requireBusinessAccessManager = async (
+  req: express.Request,
+  res: express.Response,
+  businessId: string
+) => {
+  const orgMembership = await requireOrgMembership(req, res);
+  if (!orgMembership) return null;
+
+  const business = await prisma.business.findFirst({
+    where: { id: businessId },
+    select: { id: true, orgId: true, userId: true, name: true },
+  });
+  if (!business || !business.orgId || business.orgId !== orgMembership.orgId) {
+    sendError(res, "Business not found for your org", 404, "BUSINESS_NOT_FOUND");
     return null;
   }
-  return membership;
+
+  const role = await resolveBusinessRoleForUser(business.id, req.user!.id);
+  if (!role || !["owner", "manager"].includes(role)) {
+    sendError(res, "You do not have permission for this business action", 403, "BUSINESS_ROLE_FORBIDDEN");
+    return null;
+  }
+
+  return { orgMembership, business, role };
 };
 
 const requireBusinessRole = (
@@ -724,7 +777,6 @@ router.post(
       data: {
         orgId: org.id,
         userId: req.user!.id,
-        role: "owner",
       },
     });
 
@@ -755,7 +807,7 @@ router.post(
 
     const slug = await generateUniqueBusinessSlug(parsed.data.name);
     const existingMembership = await getOrgMembershipForUser(req.user!.id);
-    if (existingMembership && existingMembership.role !== "owner") {
+    if (existingMembership && !isOrgOwner(existingMembership, req.user!.id)) {
       sendError(res, "Only org owners can create businesses", 403, "ORG_ROLE_FORBIDDEN");
       return;
     }
@@ -773,7 +825,6 @@ router.post(
           data: {
             orgId: org.id,
             userId: req.user!.id,
-            role: "owner",
           },
         });
         orgId = org.id;
@@ -827,7 +878,7 @@ router.get(
     const orgMembership = await getOrgMembershipForUser(req.user!.id);
     let businesses: RawBusiness[] = [];
 
-    if (orgMembership?.role === "owner") {
+    if (orgMembership && isOrgOwner(orgMembership, req.user!.id)) {
       businesses = await prisma.business.findMany({
         where: { orgId: orgMembership.orgId },
         include: {
@@ -869,8 +920,21 @@ router.get(
       });
     }
 
+    const membershipRows = await prisma.businessMembership.findMany({
+      where: { userId: req.user!.id },
+      select: { businessId: true, role: true },
+    });
+    const membershipMap = new Map(
+      membershipRows.map((row) => [row.businessId, row.role as "owner" | "manager" | "staff"])
+    );
+
     sendSuccess(res, {
-      businesses: businesses.map((business: RawBusiness) => serializeBusiness(business)),
+      businesses: businesses.map((business: RawBusiness) => {
+        const role =
+          membershipMap.get(business.id) ??
+          (business.userId === req.user!.id ? "owner" : null);
+        return { ...serializeBusiness(business), businessRole: role };
+      }),
     });
   })
 );
@@ -914,9 +978,38 @@ router.get(
       membership: {
         id: membership.id,
         orgId: membership.orgId,
-        role: membership.role,
         orgName: membership.org?.name ?? null,
+        isOwner: isOrgOwner(membership, req.user!.id),
       },
+    });
+  })
+);
+
+router.get(
+  "/org/members",
+  asyncHandler(async (req, res) => {
+    const membership = await requireOrgMembership(req, res);
+    if (!membership) return;
+    const canInvite = await canInviteForOrg(membership, req.user!.id);
+    if (!canInvite) {
+      sendError(res, "You do not have permission for this org action", 403, "ORG_ROLE_FORBIDDEN");
+      return;
+    }
+
+    const members = await prisma.orgMembership.findMany({
+      where: { orgId: membership.orgId },
+      include: {
+        user: { select: { id: true, email: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    sendSuccess(res, {
+      members: members.map((member) => ({
+        userId: member.userId,
+        email: member.user.email,
+        isOwner: Boolean(membership.org?.ownerUserId === member.userId),
+      })),
     });
   })
 );
@@ -930,8 +1023,13 @@ router.get(
       return;
     }
 
-    const membership = await requireOrgRole(req, res, ["owner", "manager"]);
+    const membership = await requireOrgMembership(req, res);
     if (!membership) return;
+    const canInvite = await canInviteForOrg(membership, req.user!.id);
+    if (!canInvite) {
+      sendError(res, "You do not have permission for this org action", 403, "ORG_ROLE_FORBIDDEN");
+      return;
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { email: parsed.data.email.toLowerCase() },
@@ -951,8 +1049,13 @@ router.post(
       return;
     }
 
-    const membership = await requireOrgRole(req, res, ["owner", "manager"]);
+    const membership = await requireOrgMembership(req, res);
     if (!membership) return;
+    const canInvite = await canInviteForOrg(membership, req.user!.id);
+    if (!canInvite) {
+      sendError(res, "You do not have permission for this org action", 403, "ORG_ROLE_FORBIDDEN");
+      return;
+    }
 
     const targetUser = await prisma.user.findUnique({
       where: { email: parsed.data.email.toLowerCase() },
@@ -983,7 +1086,6 @@ router.post(
       data: {
         orgId: membership.orgId,
         userId: targetUser.id,
-        role: parsed.data.role,
         status: "pending",
       },
     });
@@ -1034,7 +1136,6 @@ router.post(
         data: {
           orgId: invite.orgId,
           userId: req.user!.id,
-          role: invite.role,
         },
       });
       await tx.orgInvite.update({
@@ -1043,14 +1144,26 @@ router.post(
       });
     });
 
-    const orgManagers = await prisma.orgMembership.findMany({
-      where: { orgId: invite.orgId, role: { in: ["owner", "manager"] } },
+    const org = await prisma.org.findUnique({
+      where: { id: invite.orgId },
+      select: { ownerUserId: true },
+    });
+    const businessOwners = await prisma.business.findMany({
+      where: { orgId: invite.orgId },
       select: { userId: true },
     });
+    const businessManagers = await prisma.businessMembership.findMany({
+      where: { role: { in: ["owner", "manager"] }, business: { orgId: invite.orgId } },
+      select: { userId: true },
+    });
+    const notifyTargets = new Set<string>();
+    if (org?.ownerUserId) notifyTargets.add(org.ownerUserId);
+    businessOwners.forEach((entry) => notifyTargets.add(entry.userId));
+    businessManagers.forEach((entry) => notifyTargets.add(entry.userId));
     await Promise.all(
-      orgManagers.map((member) =>
+      Array.from(notifyTargets).map((userId) =>
         notifyUser({
-          userId: member.userId,
+          userId,
           actorUserId: req.user!.id,
           type: "ORG_INVITE_ACCEPTED",
           message: "An org invite was accepted.",
@@ -1089,14 +1202,26 @@ router.post(
       data: { status: "declined", respondedAt: new Date() },
     });
 
-    const orgManagers = await prisma.orgMembership.findMany({
-      where: { orgId: invite.orgId, role: { in: ["owner", "manager"] } },
+    const org = await prisma.org.findUnique({
+      where: { id: invite.orgId },
+      select: { ownerUserId: true },
+    });
+    const businessOwners = await prisma.business.findMany({
+      where: { orgId: invite.orgId },
       select: { userId: true },
     });
+    const businessManagers = await prisma.businessMembership.findMany({
+      where: { role: { in: ["owner", "manager"] }, business: { orgId: invite.orgId } },
+      select: { userId: true },
+    });
+    const notifyTargets = new Set<string>();
+    if (org?.ownerUserId) notifyTargets.add(org.ownerUserId);
+    businessOwners.forEach((entry) => notifyTargets.add(entry.userId));
+    businessManagers.forEach((entry) => notifyTargets.add(entry.userId));
     await Promise.all(
-      orgManagers.map((member) =>
+      Array.from(notifyTargets).map((userId) =>
         notifyUser({
-          userId: member.userId,
+          userId,
           actorUserId: req.user!.id,
           type: "ORG_INVITE_DECLINED",
           message: "An org invite was declined.",
@@ -1117,7 +1242,7 @@ router.post(
       sendError(res, "You are not part of an org", 404, "ORG_MEMBERSHIP_REQUIRED");
       return;
     }
-    if (membership.role === "owner") {
+    if (isOrgOwner(membership, req.user!.id)) {
       sendError(res, "Owners cannot leave the org", 403, "ORG_OWNER_CANNOT_LEAVE");
       return;
     }
@@ -1133,6 +1258,54 @@ router.post(
   })
 );
 
+router.get(
+  "/memberships",
+  asyncHandler(async (req, res) => {
+    const parsed = businessMembershipListSchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const access = await requireBusinessAccessManager(req, res, parsed.data.businessId);
+    if (!access) return;
+    const { business } = access;
+
+    const members = await prisma.businessMembership.findMany({
+      where: { businessId: business.id },
+      include: { user: { select: { id: true, email: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const payload = members.map((member) => ({
+      businessId: business.id,
+      userId: member.userId,
+      email: member.user.email,
+      role: member.role,
+    }));
+
+    const owner = await prisma.user.findUnique({
+      where: { id: business.userId },
+      select: { id: true, email: true },
+    });
+    if (owner) {
+      const existing = payload.find((member) => member.userId === owner.id);
+      if (existing) {
+        existing.role = "owner";
+      } else {
+        payload.unshift({
+          businessId: business.id,
+          userId: owner.id,
+          email: owner.email,
+          role: "owner",
+        });
+      }
+    }
+
+    sendSuccess(res, { members: payload });
+  })
+);
+
 router.post(
   "/memberships",
   asyncHandler(async (req, res) => {
@@ -1142,20 +1315,12 @@ router.post(
       return;
     }
 
-    const orgMembership = await requireOrgRole(req, res, ["owner", "manager"]);
-    if (!orgMembership) return;
+    const access = await requireBusinessAccessManager(req, res, parsed.data.businessId);
+    if (!access) return;
+    const { business, role, orgMembership } = access;
 
-    if (orgMembership.role === "manager" && parsed.data.role !== "staff") {
+    if (role === "manager" && parsed.data.role !== "staff") {
       sendError(res, "Managers can only add staff", 403, "BUSINESS_ROLE_FORBIDDEN");
-      return;
-    }
-
-    const business = await prisma.business.findFirst({
-      where: { id: parsed.data.businessId },
-      select: { id: true, orgId: true, name: true },
-    });
-    if (!business || !business.orgId || business.orgId !== orgMembership.orgId) {
-      sendError(res, "Business not found for your org", 404, "BUSINESS_NOT_FOUND");
       return;
     }
 
@@ -1193,6 +1358,45 @@ router.post(
     });
 
     sendSuccess(res, { added: true });
+  })
+);
+
+router.delete(
+  "/memberships",
+  asyncHandler(async (req, res) => {
+    const parsed = businessMembershipRemoveSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const access = await requireBusinessAccessManager(req, res, parsed.data.businessId);
+    if (!access) return;
+    const { business, role } = access;
+
+    if (business.userId === parsed.data.userId) {
+      sendError(res, "Business owner access cannot be removed", 403, "BUSINESS_ROLE_FORBIDDEN");
+      return;
+    }
+
+    const existing = await prisma.businessMembership.findFirst({
+      where: { businessId: business.id, userId: parsed.data.userId },
+    });
+    if (!existing) {
+      sendError(res, "Business membership not found", 404, "BUSINESS_MEMBERSHIP_NOT_FOUND");
+      return;
+    }
+
+    if (role === "manager" && existing.role !== "staff") {
+      sendError(res, "Managers can only remove staff", 403, "BUSINESS_ROLE_FORBIDDEN");
+      return;
+    }
+
+    await prisma.businessMembership.delete({
+      where: { id: existing.id },
+    });
+
+    sendSuccess(res, { removed: true });
   })
 );
 
@@ -2621,6 +2825,7 @@ router.get(
   "/orders",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
     const parsed = orderListQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
@@ -2674,6 +2879,7 @@ router.get(
   "/orders/:id",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
     const order = await prisma.order.findFirst({
       where: { id: req.params.id, businessId: req.business!.id },
       include: {
@@ -2694,6 +2900,7 @@ router.patch(
   "/orders/:id/status",
   requireApprovedBusiness,
   asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
     const parsed = orderStatusUpdateSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");

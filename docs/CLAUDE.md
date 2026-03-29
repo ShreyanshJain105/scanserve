@@ -81,3 +81,7 @@ Project documentation for architecture decisions, process notes, and operational
 - Updated ADR-037 answers: org invites require existing user email, in-app user notifications, and role permission matrix.
 - ADR-037 accepted with org-invite accept/decline flow via blurred org preview page.
 - Updated ADR-037 to require a static sample org preview page (no real org references) for invite acceptance UX.
+
+## Updates 2026-03-29
+- Drafted `docs/adr/ADR-038-org-membership-roleless.md` proposing roleless org membership and business-role-only permissions.
+- ADR-038 accepted and implemented: org memberships are roleless, org invites authorized by org owner or any business owner/manager, and business access management is scoped to selected-business roles only.

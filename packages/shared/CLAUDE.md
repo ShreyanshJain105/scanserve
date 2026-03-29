@@ -38,3 +38,7 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 ## Updates 2026-03-27
 - Added shared org/business RBAC types (`OrgRole`, `OrgInviteStatus`, `BusinessRole`) plus org/membership interfaces.
 - Extended notification type union to include org invite and business-access events.
+
+## Updates 2026-03-29
+- Added `BusinessProfile.businessRole` plus `OrgMemberSummary` and `BusinessMemberSummary` types to support RBAC assignment UI.
+- Removed `OrgRole` and org role fields from shared types; org membership and org member summaries now expose `isOwner` instead of role to support roleless org membership.

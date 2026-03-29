@@ -253,12 +253,6 @@ enum PaymentStatus {
   refunded
 }
 
-enum OrgRole {
-  owner
-  manager
-  staff
-}
-
 enum OrgInviteStatus {
   pending
   accepted
@@ -291,7 +285,6 @@ model OrgMembership {
   id        String   @id @default(cuid())
   orgId     String   @map("org_id")
   userId    String   @map("user_id")
-  role      OrgRole
   createdAt DateTime @default(now()) @map("created_at")
 
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -306,7 +299,6 @@ model OrgInvite {
   id          String          @id @default(cuid())
   orgId       String          @map("org_id")
   userId      String          @map("user_id")
-  role        OrgRole
   status      OrgInviteStatus @default(pending)
   createdAt   DateTime        @default(now()) @map("created_at")
   respondedAt DateTime?       @map("responded_at")

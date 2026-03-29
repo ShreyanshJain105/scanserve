@@ -176,6 +176,16 @@ pnpm db:studio    # open Prisma Studio GUI
 - Fixed Prisma schema relation by adding `Business.memberships` for `BusinessMembership`.
 - Added org membership lookup + org creation API tests in `tests/orgInviteRoutes.test.ts`.
 - Stabilized API tests: added business membership mocks in `tests/aiRoutes.test.ts`, hoisted org-invite prisma store, and added Decimal fallback setup in `tests/publicRoutes.test.ts`.
+- Added business-role gating for order management endpoints so only `owner`/`manager`/`staff` can list, view, or update orders.
+
+## Updates 2026-03-29
+- Added org-member listing endpoint (`GET /api/business/org/members`) and business membership listing (`GET /api/business/memberships?businessId=...`) for RBAC assignment UI.
+- `/api/business/profiles` now includes `businessRole` per business (membership role or owner fallback) for frontend gating.
+- Extended org-invite API tests to cover org-member listing and business membership listing responses.
+- Stabilized API tests: mocked `@prisma/client` in `tests/publicRoutes.test.ts` to avoid missing generated client errors and updated org-invite mocks to include `business.userId` for membership listing.
+- Fixed Vitest mock hoisting error by moving Decimal mock into `vi.hoisted` in `tests/publicRoutes.test.ts`.
+- Org invites no longer accept a role; invite creation now defaults org role to `staff` and business roles are assigned at business-access grant time.
+- Added business membership removal endpoint (`DELETE /api/business/memberships`) with owner/manager role constraints and test coverage.
 
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.
@@ -226,3 +236,8 @@ pnpm db:studio    # open Prisma Studio GUI
 - Replaced Stripe checkout/webhook flow with Razorpay order creation + signature verification (`/api/public/orders/:id/checkout`, `/api/public/orders/:id/verify-payment`).
 - Removed Stripe service/router and raw-body webhook mount; added Razorpay service (`src/services/razorpay.ts`) and Razorpay env vars in `.env.example`.
 - Order schema now stores `razorpay_order_id` + `razorpay_payment_id` (migration `20260324180000_razorpay_payments`); public route tests cover Razorpay checkout + verify.
+
+## Updates 2026-03-29
+- Implemented ADR-038 roleless org membership: removed org role checks, org invites now require org owner or any business owner/manager in the org, and org membership responses now include `isOwner` (apps/api/src/routes/business.ts).
+- Business access management now requires owner/manager role for the selected business (managers limited to staff) and org owner checks use `org.ownerUserId` instead of membership roles.
+- Prisma schema + migration updated to drop `OrgRole` and role columns from org memberships/invites (apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20260329120000_roleless_org_memberships).

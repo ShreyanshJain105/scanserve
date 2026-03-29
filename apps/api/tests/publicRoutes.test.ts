@@ -1,44 +1,52 @@
 import { EventEmitter } from "events";
 import { createHmac } from "crypto";
 import { createMocks } from "node-mocks-http";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const TestDecimal = vi.hoisted(
+  () =>
+    class TestDecimal {
+      private value: number;
+
+      constructor(input: string | number) {
+        this.value = typeof input === "string" ? Number.parseFloat(input) : input;
+      }
+
+      plus(other: TestDecimal | string | number) {
+        const next =
+          other instanceof TestDecimal
+            ? other.value
+            : typeof other === "string"
+              ? Number.parseFloat(other)
+              : other;
+        return new TestDecimal(this.value + next);
+      }
+
+      mul(other: TestDecimal | number) {
+        const next = other instanceof TestDecimal ? other.value : other;
+        return new TestDecimal(this.value * next);
+      }
+
+      toString() {
+        return this.value.toFixed(2);
+      }
+    }
+);
+
+vi.mock("@prisma/client", () => ({
+  Prisma: {
+    Decimal: TestDecimal,
+  },
+}));
+
 import { Prisma } from "@prisma/client";
-import publicRouter from "../src/routes/public";
 
-const ensureDecimal = () => {
-  if ((Prisma as unknown as { Decimal?: unknown }).Decimal) return;
-  class TestDecimal {
-    private value: number;
+let publicRouter: any;
 
-    constructor(input: string | number) {
-      this.value = typeof input === "string" ? Number.parseFloat(input) : input;
-    }
-
-    plus(other: TestDecimal | string | number) {
-      const next =
-        other instanceof TestDecimal
-          ? other.value
-          : typeof other === "string"
-            ? Number.parseFloat(other)
-            : other;
-      return new TestDecimal(this.value + next);
-    }
-
-    mul(other: TestDecimal | number) {
-      const next = other instanceof TestDecimal ? other.value : other;
-      return new TestDecimal(this.value * next);
-    }
-
-    toString() {
-      return this.value.toFixed(2);
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (Prisma as any).Decimal = TestDecimal;
-};
-
-ensureDecimal();
+beforeAll(async () => {
+  const module = await import("../src/routes/public");
+  publicRouter = module.default;
+});
 
 const store = vi.hoisted(() => ({
   qrCodes: [] as any[],

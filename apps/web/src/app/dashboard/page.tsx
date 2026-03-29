@@ -9,6 +9,7 @@ import { AppHeader } from "../../components/layout/app-header";
 import { BodyBackButton } from "../../components/layout/body-back-button";
 import { ModalDialog } from "../../components/ui/modal-dialog";
 import { apiFetch } from "../../lib/api";
+import type { BusinessMemberSummary, OrgMemberSummary } from "@scan2serve/shared";
 
 const PencilIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
   <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
@@ -40,13 +41,20 @@ export default function DashboardPage() {
   const [restoreSubmitting, setRestoreSubmitting] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"manager" | "staff">("staff");
   const [inviteExists, setInviteExists] = useState<boolean | null>(null);
   const [inviteChecking, setInviteChecking] = useState(false);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [orgMembers, setOrgMembers] = useState<OrgMemberSummary[]>([]);
+  const [businessMembers, setBusinessMembers] = useState<BusinessMemberSummary[]>([]);
+  const [memberRoleSelections, setMemberRoleSelections] = useState<
+    Record<string, "manager" | "staff">
+  >({});
+  const [assigningMemberId, setAssigningMemberId] = useState<string | null>(null);
   const [orgChecked, setOrgChecked] = useState(false);
   const [hasOrg, setHasOrg] = useState(true);
-  const [orgRole, setOrgRole] = useState<"owner" | "manager" | "staff" | null>(null);
+  const [isOrgOwner, setIsOrgOwner] = useState(false);
   const blockedReason = selectedBusiness?.blocked
     ? "This business is blocked by an admin. Dashboard actions are disabled until it is unblocked."
     : selectedBusiness?.status === "pending"
@@ -73,19 +81,19 @@ export default function DashboardPage() {
     const checkOrg = async () => {
       try {
         const data = await apiFetch<{
-          membership: { id: string; role: "owner" | "manager" | "staff" } | null;
+          membership: { id: string; isOwner: boolean } | null;
         }>(
           "/api/business/org/membership",
           { method: "GET" }
         );
         if (!cancelled) {
           setHasOrg(!!data.membership);
-          setOrgRole(data.membership?.role ?? null);
+          setIsOrgOwner(Boolean(data.membership?.isOwner));
         }
       } catch {
         if (!cancelled) {
           setHasOrg(true);
-          setOrgRole(null);
+          setIsOrgOwner(false);
         }
       } finally {
         if (!cancelled) {
@@ -106,6 +114,25 @@ export default function DashboardPage() {
       router.replace("/dashboard/org/create");
     }
   }, [loading, orgChecked, user?.role, hasOrg, router]);
+
+  const businessMemberMap = useMemo(
+    () =>
+      new Map(
+        businessMembers.map((member) => [member.userId, member.role as "owner" | "manager" | "staff"])
+      ),
+    [businessMembers]
+  );
+  const selectedBusinessRole =
+    selectedBusiness?.businessRole ?? (selectedBusiness?.userId === user?.id ? "owner" : null);
+  const canManageAccess =
+    selectedBusinessRole === "owner" || selectedBusinessRole === "manager";
+
+  useEffect(() => {
+    if (!teamDialogOpen) return;
+    if (!selectedBusiness) return;
+    if (!canManageAccess) return;
+    void loadTeamData();
+  }, [teamDialogOpen, selectedBusiness?.id, canManageAccess]);
 
   const visibleBusinesses = useMemo(
     () => {
@@ -156,7 +183,7 @@ export default function DashboardPage() {
     return null;
   }
 
-  if (!businessLoading && businesses.length === 0 && orgRole === "owner") {
+  if (!businessLoading && businesses.length === 0 && isOrgOwner) {
     router.replace("/dashboard/onboarding");
     return null;
   }
@@ -173,6 +200,22 @@ export default function DashboardPage() {
   }
 
   if (businesses.length === 0) {
+    if (!isOrgOwner) {
+      return (
+        <main className="min-h-screen bg-gray-50">
+          <AppHeader leftMeta="Business dashboard" />
+          <section className="mx-auto max-w-3xl p-8">
+            <h1 className="text-3xl font-semibold">Waiting for business access</h1>
+            <p className="mt-2 text-gray-600">
+              You are part of an org, but you have not been assigned to a business yet.
+            </p>
+            <p className="mt-3 text-sm text-gray-500">
+              Ask an owner or manager to grant access to a business.
+            </p>
+          </section>
+        </main>
+      );
+    }
     return (
       <main className="min-h-screen bg-gray-50">
         <AppHeader leftMeta="Business dashboard" />
@@ -208,8 +251,75 @@ export default function DashboardPage() {
           ? "Archived - restore within 30 days"
           : "Approved";
   const showQuickActions = !showArchived && selectedBusiness?.status !== "archived";
+  const canManageMenuAndTables =
+    selectedBusinessRole === "owner" || selectedBusinessRole === "manager";
+  const canManageBusiness = selectedBusinessRole === "owner";
+  const canInvite =
+    isOrgOwner ||
+    businesses.some((business) => {
+      const role =
+        business.businessRole ?? (business.userId === user?.id ? "owner" : null);
+      return role === "owner" || role === "manager";
+    });
+  const showActionPanel =
+    showQuickActions &&
+    (canManageMenuAndTables || canInvite || canManageBusiness);
+  const canAssignManagerRole = selectedBusinessRole === "owner";
+
+  const guardOrgOwner = (message: string) => {
+    if (!isOrgOwner) {
+      showToast({ variant: "error", message });
+      return false;
+    }
+    return true;
+  };
+
+  const guardBusinessOwner = (message: string) => {
+    if (selectedBusinessRole !== "owner") {
+      showToast({ variant: "error", message });
+      return false;
+    }
+    return true;
+  };
+
+  const guardBusinessManager = (message: string) => {
+    if (selectedBusinessRole !== "owner" && selectedBusinessRole !== "manager") {
+      showToast({ variant: "error", message });
+      return false;
+    }
+    return true;
+  };
+
+  const guardOrgInvite = (message: string) => {
+    if (!canInvite) {
+      showToast({ variant: "error", message });
+      return false;
+    }
+    return true;
+  };
+
+  const guardBusinessActive = () => {
+    if (!selectedBusiness) {
+      showToast({ variant: "error", message: "Select a business to continue." });
+      return false;
+    }
+    if (
+      selectedBusiness.blocked ||
+      selectedBusiness.status === "pending" ||
+      selectedBusiness.status === "rejected" ||
+      selectedBusiness.status === "archived"
+    ) {
+      showToast({
+        variant: "error",
+        message: "This business is not active. Update or restore it before continuing.",
+      });
+      return false;
+    }
+    return true;
+  };
 
   const runArchive = async () => {
+    if (!guardBusinessOwner("Only owners can archive businesses.")) return;
     if (!selectedBusiness) return;
     setArchiveSubmitting(true);
     try {
@@ -231,6 +341,7 @@ export default function DashboardPage() {
   };
 
   const runRestore = async () => {
+    if (!guardBusinessOwner("Only owners can restore businesses.")) return;
     if (!selectedBusiness) return;
     setRestoreSubmitting(true);
     try {
@@ -287,13 +398,12 @@ export default function DashboardPage() {
     try {
       await apiFetch("/api/business/org/invites", {
         method: "POST",
-        body: { email: inviteEmail.trim(), role: inviteRole },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
       });
       showToast({ variant: "success", message: "Invite sent." });
       setInviteDialogOpen(false);
       setInviteEmail("");
       setInviteExists(null);
-      setInviteRole("staff");
     } catch (err) {
       showToast({
         variant: "error",
@@ -301,6 +411,83 @@ export default function DashboardPage() {
       });
     } finally {
       setInviteSubmitting(false);
+    }
+  };
+
+  const loadTeamData = async () => {
+    if (!selectedBusiness) return;
+    setTeamLoading(true);
+    try {
+      const [orgData, membershipData] = await Promise.all([
+        apiFetch<{ members: OrgMemberSummary[] }>("/api/business/org/members", {
+          method: "GET",
+        }),
+        apiFetch<{ members: BusinessMemberSummary[] }>(
+          `/api/business/memberships?businessId=${selectedBusiness.id}`,
+          { method: "GET" }
+        ),
+      ]);
+      setOrgMembers(orgData.members ?? []);
+      setBusinessMembers(membershipData.members ?? []);
+      setMemberRoleSelections((current) => {
+        const next = { ...current };
+        (orgData.members ?? []).forEach((member) => {
+          if (!next[member.userId]) {
+            next[member.userId] = "staff";
+          }
+        });
+        return next;
+      });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        message: error instanceof Error ? error.message : "Failed to load team members",
+      });
+      setOrgMembers([]);
+      setBusinessMembers([]);
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const assignMemberToBusiness = async (userId: string) => {
+    if (!selectedBusiness) return;
+    const role = memberRoleSelections[userId] ?? "staff";
+    setAssigningMemberId(userId);
+    try {
+      await apiFetch("/api/business/memberships", {
+        method: "POST",
+        body: JSON.stringify({ businessId: selectedBusiness.id, userId, role }),
+      });
+      showToast({ variant: "success", message: "Access granted." });
+      await loadTeamData();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        message: error instanceof Error ? error.message : "Failed to add member",
+      });
+    } finally {
+      setAssigningMemberId(null);
+    }
+  };
+
+  const removeMemberFromBusiness = async (userId: string) => {
+    if (!selectedBusiness) return;
+    setAssigningMemberId(userId);
+    try {
+      await apiFetch("/api/business/memberships", {
+        method: "DELETE",
+        body: JSON.stringify({ businessId: selectedBusiness.id, userId }),
+      });
+      showToast({ variant: "success", message: "Access removed." });
+      await loadTeamData();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        message: error instanceof Error ? error.message : "Failed to remove access",
+      });
+    } finally {
+      setAssigningMemberId(null);
     }
   };
 
@@ -319,14 +506,19 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-semibold">Business Dashboard</h1>
             <p className="text-sm text-gray-600">Manage businesses, archive state, and operations.</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => router.push("/dashboard/onboarding")}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            >
-              Add business
-            </button>
-          </div>
+          {isOrgOwner && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (!guardOrgOwner("Only org owners can add businesses.")) return;
+                  router.push("/dashboard/onboarding");
+                }}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              >
+                Add business
+              </button>
+            </div>
+          )}
         </header>
 
         <div
@@ -337,12 +529,17 @@ export default function DashboardPage() {
           <section className="rounded-xl border bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-medium">Your businesses</p>
-              <button
-                onClick={() => setShowArchived((current) => !current)}
-                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium"
-              >
-                {showArchived ? "Show active" : "Show archived"}
-              </button>
+              {isOrgOwner && (
+                <button
+                  onClick={() => {
+                    if (!guardOrgOwner("Only org owners can view archived businesses.")) return;
+                    setShowArchived((current) => !current);
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium"
+                >
+                  {showArchived ? "Show active" : "Show archived"}
+                </button>
+              )}
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {visibleBusinesses.map((business) => (
@@ -394,53 +591,93 @@ export default function DashboardPage() {
               )}
             </div>
           </section>
-          {showQuickActions && (
+          {showActionPanel && (
             <div className="space-y-3">
-              <button
-                onClick={() => router.push("/dashboard/menu")}
-                className="w-full rounded-xl border border-orange-200 bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 p-5 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
-              >
-                <p className="text-2xl font-semibold text-slate-900">Manage menu</p>
-                <p className="mt-2 text-sm text-slate-700">
-                  Edit categories, prices, availability, and images.
-                </p>
-              </button>
-              <button
-                onClick={() => router.push("/dashboard/tables")}
-                className="w-full rounded-xl border border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-100 to-teal-100 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
-              >
-                <p className="text-xl font-semibold text-slate-900">Manage tables and QR</p>
-                <p className="mt-1 text-sm text-slate-700">Create tables, rotate codes, and export downloads.</p>
-              </button>
-              <button
-                onClick={() => setInviteDialogOpen(true)}
-                className="w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-100 to-slate-50 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
-              >
-                <p className="text-xl font-semibold text-slate-900">Invite team member</p>
-                <p className="mt-1 text-sm text-slate-700">
-                  Add managers or staff to your org and businesses.
-                </p>
-              </button>
-              <div className="flex items-start gap-2">
+              {canManageMenuAndTables && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (!guardBusinessManager("Only owners or managers can manage menus.")) return;
+                      if (!guardBusinessActive()) return;
+                      router.push("/dashboard/menu");
+                    }}
+                    className="w-full rounded-xl border border-orange-200 bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 p-5 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  >
+                    <p className="text-2xl font-semibold text-slate-900">Manage menu</p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      Edit categories, prices, availability, and images.
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!guardBusinessManager("Only owners or managers can manage tables.")) return;
+                      if (!guardBusinessActive()) return;
+                      router.push("/dashboard/tables");
+                    }}
+                    className="w-full rounded-xl border border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-100 to-teal-100 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  >
+                    <p className="text-xl font-semibold text-slate-900">Manage tables and QR</p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      Create tables, rotate codes, and export downloads.
+                    </p>
+                  </button>
+                </>
+              )}
+              {canInvite && (
                 <button
-                  onClick={() => setArchiveDialogOpen(true)}
-                  className="rounded-lg border border-red-200 bg-gradient-to-br from-rose-100 via-red-100 to-orange-100 px-4 py-3 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  onClick={() => {
+                    if (!guardOrgInvite("Only org owners or managers can invite team members.")) return;
+                    setInviteDialogOpen(true);
+                  }}
+                  className="w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-100 to-slate-50 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
                 >
-                  <p className="text-base font-semibold text-red-800">Archive business</p>
+                  <p className="text-xl font-semibold text-slate-900">Invite team member</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Add managers or staff to your org and businesses.
+                  </p>
                 </button>
+              )}
+              {canManageAccess && (
                 <button
-                  onClick={() =>
-                    selectedBusiness
-                      ? router.push(`/dashboard/onboarding?businessId=${selectedBusiness.id}`)
-                      : null
-                  }
-                  aria-label="Edit business details"
-                  title="Edit business details"
-                  className="rounded-lg border border-slate-300 bg-white p-3 text-slate-800 shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  onClick={() => {
+                    if (!guardBusinessManager("Only owners or managers can manage access.")) return;
+                    setTeamDialogOpen(true);
+                  }}
+                  className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-100 via-sky-100 to-white p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
                 >
-                  <PencilIcon />
+                  <p className="text-xl font-semibold text-slate-900">Manage business access</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Grant staff access to the selected business.
+                  </p>
                 </button>
-              </div>
+              )}
+              {canManageBusiness && (
+                <div className="flex items-start gap-2">
+                  <button
+                    onClick={() => {
+                      if (!guardBusinessOwner("Only owners can archive businesses.")) return;
+                      setArchiveDialogOpen(true);
+                    }}
+                    className="rounded-lg border border-red-200 bg-gradient-to-br from-rose-100 via-red-100 to-orange-100 px-4 py-3 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  >
+                    <p className="text-base font-semibold text-red-800">Archive business</p>
+                  </button>
+                  <button
+                    onClick={() =>
+                      (() => {
+                        if (!guardBusinessOwner("Only owners can edit business details.")) return;
+                        if (!selectedBusiness) return;
+                        router.push(`/dashboard/onboarding?businessId=${selectedBusiness.id}`);
+                      })()
+                    }
+                    aria-label="Edit business details"
+                    title="Edit business details"
+                    className="rounded-lg border border-slate-300 bg-white p-3 text-slate-800 shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  >
+                    <PencilIcon />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -455,7 +692,7 @@ export default function DashboardPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Active business overview</h2>
             <div className="flex items-center gap-2">
-              {selectedBusiness?.status === "archived" ? (
+              {selectedBusiness?.status === "archived" && canManageBusiness ? (
                 <button
                   onClick={runRestore}
                   disabled={restoreSubmitting}
@@ -535,14 +772,18 @@ export default function DashboardPage() {
                     </div>
                   )}
                 {selectedBusiness?.status === "rejected" && (
-                  <button
-                    onClick={() => router.push(`/dashboard/onboarding?businessId=${selectedBusiness.id}`)}
-                    className="mt-4 rounded-md bg-black px-3 py-2 text-sm text-white"
-                  >
-                    Edit and resubmit
-                  </button>
+                  canManageBusiness && (
+                    <button
+                      onClick={() =>
+                        router.push(`/dashboard/onboarding?businessId=${selectedBusiness.id}`)
+                      }
+                      className="mt-4 rounded-md bg-black px-3 py-2 text-sm text-white"
+                    >
+                      Edit and resubmit
+                    </button>
+                  )
                 )}
-                {selectedBusiness?.status === "archived" && (
+                {selectedBusiness?.status === "archived" && canManageBusiness && (
                   <button
                     onClick={runRestore}
                     disabled={restoreSubmitting}
@@ -576,17 +817,6 @@ export default function DashboardPage() {
                 placeholder="person@example.com"
               />
             </label>
-            <label className="block text-sm font-medium text-slate-700">
-              Role
-              <select
-                value={inviteRole}
-                onChange={(event) => setInviteRole(event.target.value as "manager" | "staff")}
-                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="staff">Staff</option>
-                <option value="manager">Manager</option>
-              </select>
-            </label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -609,6 +839,153 @@ export default function DashboardPage() {
                 Cancel
               </button>
             </div>
+          </div>
+        </ModalDialog>
+        <ModalDialog
+          open={teamDialogOpen}
+          title="Manage business access"
+          subtitle="Assign org members to the selected business."
+          onClose={() => setTeamDialogOpen(false)}
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <p className="font-medium">Selected business</p>
+              <p className="mt-1 text-slate-600">
+                {selectedBusiness ? `${selectedBusiness.name} (${selectedBusiness.slug})` : "No business selected"}
+              </p>
+            </div>
+
+            {teamLoading && (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
+                Loading team members...
+              </div>
+            )}
+
+            {!teamLoading && orgMembers.length === 0 && (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
+                No org members found yet.
+              </div>
+            )}
+
+            {!teamLoading && orgMembers.length > 0 && !canManageAccess && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Only business owners or managers can grant or revoke business access.
+              </div>
+            )}
+
+            {!teamLoading && orgMembers.length > 0 && !canManageAccess && (
+              <div className="space-y-3">
+                {orgMembers.map((member) => {
+                  const existingRole = businessMemberMap.get(member.userId) ?? null;
+                  const displayRole = existingRole ?? null;
+
+                  return (
+                    <div
+                      key={member.userId}
+                      className="rounded-lg border border-slate-200 bg-white p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-900">{member.email}</p>
+                          <p className="text-xs text-slate-500">
+                            {member.isOwner ? "Org owner" : "Org member"}
+                          </p>
+                        </div>
+                        {displayRole ? (
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                            Has access ({displayRole})
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                            No access
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!teamLoading && orgMembers.length > 0 && canManageAccess && (
+              <div className="space-y-3">
+                {orgMembers.map((member) => {
+                  const existingRole = businessMemberMap.get(member.userId) ?? null;
+                  const displayRole = existingRole ?? null;
+                  const selectedRole = memberRoleSelections[member.userId] ?? "staff";
+                  const canAssign =
+                    !displayRole &&
+                    selectedBusiness &&
+                    canManageAccess;
+                  const canRemove =
+                    !!displayRole &&
+                    displayRole !== "owner" &&
+                    member.userId !== user?.id &&
+                    (selectedBusinessRole === "owner" ||
+                      (selectedBusinessRole === "manager" && displayRole === "staff"));
+
+                  return (
+                    <div
+                      key={member.userId}
+                      className="rounded-lg border border-slate-200 bg-white p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-900">{member.email}</p>
+                          <p className="text-xs text-slate-500">
+                            {member.isOwner ? "Org owner" : "Org member"}
+                          </p>
+                        </div>
+                        {displayRole ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                              Has access ({displayRole})
+                            </span>
+                            {canRemove && (
+                              <button
+                                type="button"
+                                onClick={() => removeMemberFromBusiness(member.userId)}
+                                disabled={assigningMemberId === member.userId}
+                                className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {assigningMemberId === member.userId ? "Removing..." : "Remove access"}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <select
+                              value={selectedRole}
+                              onChange={(event) =>
+                                setMemberRoleSelections((current) => ({
+                                  ...current,
+                                  [member.userId]: event.target.value as "manager" | "staff",
+                                }))
+                              }
+                              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                              disabled={!canAssign}
+                            >
+                              <option value="staff">Staff</option>
+                              <option value="manager" disabled={!canAssignManagerRole}>
+                                Manager
+                              </option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => assignMemberToBusiness(member.userId)}
+                              disabled={!canAssign || assigningMemberId === member.userId}
+                              className="rounded-md bg-slate-900 px-3 py-1 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                            >
+                              {assigningMemberId === member.userId ? "Adding..." : "Grant access"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </ModalDialog>
       </section>

@@ -9,24 +9,23 @@
 
 ## Last Session
 
-**Date:** 2026-03-27
+**Date:** 2026-03-29
 **What was done:**
-- Added org membership lookup + org creation API tests in `apps/api/tests/orgInviteRoutes.test.ts`.
-- Fixed API test mocks for org invites, AI routes, and public Decimal usage; API test suite now passes (16 files, 91 tests).
-- Updated web tests for org create/onboarding/dashboard redirects, apiFetch CSRF retry expectations, and explore/auth mocks; web test suite now passes (16 files, 52 tests).
-- Added `tests` service to `docker-compose.yml` to run API + web test suites in Docker.
-- Updated root `CLAUDE.md` to reflect current org/membership + order-management API routes and dashboard/explore/org pages.
-- Fixed org-create submission to JSON.stringify body to avoid invalid JSON toast.
-- Dashboard now auto-redirects org owners with zero businesses to `/dashboard/onboarding`, with updated tests.
+- Implemented ADR-038 roleless org membership: removed org roles from schema, added migration, and updated API org-permission checks to use org owner + business roles only.
+- Updated business-access management to require owner/manager on the selected business (manager can only add/remove staff) and org membership responses to include `isOwner`.
+- Updated shared types and dashboard UI/guards to use roleless org membership; org invites now rely on org owner or any business owner/manager.
+- Adjusted API/web tests for new membership shape (`isOwner`) and roleless org membership.
+- Fixed INVALID_CSRF on QR ZIP download by attaching CSRF token to binary download POSTs in tables dashboard.
 
 **What's NOT done yet:**
 - Live Razorpay checkout + signature verification with real keys not run (blocked: Razorpay test mode account not created yet).
 - Layer 8 dashboard UI (order list/detail/status transitions + polling) not implemented yet (ADR-036 paused).
 - Admin UI clarity improvements (admin panel UX) deferred per user request.
+- API/web test suites not re-run after ADR-038 + CSRF download changes.
 
 **Next step:**
-1. Verify org-create flow now lands on `/dashboard/onboarding` for org owners without businesses.
-2. Resume ADR-036 and build Layer 8 dashboard UI + ClickHouse sink planning after ADR-037.
+1. Run `pnpm --filter @scan2serve/api test` and `pnpm --filter @scan2serve/web test`.
+2. Continue Layer 8 dashboard UI once tests are green.
 
 **Build progress:**
 ```
@@ -856,6 +855,62 @@ Layer 11: Polish & Deploy
 ### 2026-03-27 — Session 141: Owner onboarding redirect
 - Updated dashboard to auto-redirect org owners with zero businesses to onboarding and refreshed dashboard tests.
 
+### 2026-03-27 — Session 142: Order management RBAC gating
+- Added business-role gating for order management endpoints (list/detail/status) so only `owner`/`manager`/`staff` can access them.
+- Updated root and API CLAUDE notes with the RBAC gating change.
+
+### 2026-03-29 — Session 143: RBAC assignment UI + staff gating
+- Added org-member and business-membership listing endpoints and exposed `businessRole` in business profiles.
+- Built dashboard “Manage business access” modal to grant business memberships to org members.
+- Redirected staff away from menu/tables pages with toast guidance.
+- Extended org-invite API tests for membership listing.
+
+### 2026-03-29 — Session 144: Test mock stabilization
+- Mocked Prisma client in `apps/api/tests/publicRoutes.test.ts` to avoid missing generated client errors.
+- Fixed org-invite test mocks to include business owner ids for membership listing.
+- Moved Decimal mock into `vi.hoisted` to satisfy Vitest module hoisting constraints.
+
+### 2026-03-29 — Session 145: Dashboard hook order fix
+- Moved business-member `useMemo` above early-return branches to avoid hook-order runtime errors in web tests.
+
+### 2026-03-29 — Session 146: Org invite params fix
+- Updated org-invite preview page to use `useParams` for `inviteId` to avoid Next.js Promise params warning.
+
+### 2026-03-29 — Session 147: Non-owner empty-state
+- Dashboard now shows waiting-for-access messaging for non-owners with zero assigned businesses.
+
+### 2026-03-29 — Session 148: Invite role removal
+- Org invite creation no longer accepts a role; invites default to staff and business roles are assigned per-business.
+
+### 2026-03-29 — Session 149: Org invite test mock update
+- Updated org-invite page tests to mock `useParams` after switching invite page to hook-based params access.
+
+### 2026-03-29 — Session 150: Remove business access
+- Added `DELETE /api/business/memberships` to revoke business access and wired remove-access controls in the dashboard modal.
+
+### 2026-03-29 — Session 151: Staff access UI guard
+- Manage-business-access modal now prevents self-removal and hides controls for non-owner/manager users.
+
+### 2026-03-29 — Session 152: Staff dashboard lock-down
+- Staff-facing dashboard now hides management actions, leaving only order visibility.
+
+### 2026-03-29 — Session 153: Staff quick-action guard
+- Staff-facing dashboard now hides the quick-action panel (invite/manage access cards).
+
+### 2026-03-29 — Session 154: Dashboard action validation
+- Added role/status guard checks before dashboard actions to prevent invalid operations.
+
+### 2026-03-29 — Session 155: ADR-038 drafted
+- Drafted ADR-038 to remove org roles and rely on business-level roles for permissions.
+
+### 2026-03-29 — Session 156: ADR-038 implemented
+- Removed org roles from Prisma schema and added migration `20260329120000_roleless_org_memberships`.
+- Updated org permission checks to use org owner + business roles; business access management is now scoped to selected-business roles only.
+- Updated shared types and dashboard UI/guards for roleless org membership; updated API/web tests to use `isOwner` membership shape.
+
+### 2026-03-29 — Session 157: Tables download CSRF fix
+- Exported CSRF helpers for client use and attached `x-csrf-token` to binary download POSTs in the tables dashboard, fixing INVALID_CSRF on QR ZIP downloads.
+
 ---
 
 ## Decisions Log
@@ -896,6 +951,7 @@ Layer 11: Polish & Deploy
 | ADR-035 | CSRF strategy for cookie-based auth — Accepted | Implement CSRF tokens for mutating routes | 2026-03-26 |
 | ADR-036 | Layer 8 order management + retention + warehouse feed — Accepted | Define order status flow, dashboard scope, 6-month retention/partitioning, and event queue → ClickHouse warehouse | 2026-03-27 |
 | ADR-037 | RBAC scope + org/business invites — Accepted | Add org model, scoped roles, invite accept/decline, and membership-gated business access | 2026-03-27 |
+| ADR-038 | Roleless org membership (business roles only) — Accepted | Remove org roles; org ownership tracked on org; permissions derive from business roles | 2026-03-29 |
 
 ---
 

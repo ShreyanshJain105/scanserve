@@ -341,3 +341,22 @@ pnpm lint   # run Next.js ESLint
 - Made `/explore` public (no auth guard) and hid Dashboard nav until login.
 - Dashboard nav now only appears for business-role users.
 - Root redirect now sends any session with access/refresh tokens (business or QR) to `/explore`.
+
+## Updates 2026-03-29
+- Dashboard now exposes “Manage business access” modal for owners/managers to grant business memberships using org members.
+- Invite submit payload now JSON stringifies body to align with API content-type expectations.
+- Staff users are redirected away from menu/tables pages with toast guidance to contact an owner/manager.
+- Fixed dashboard hook order regression by moving `useMemo` (business member map) above early-return branches.
+- Org-invite preview page now uses `useParams` to read `inviteId` instead of direct params prop access (Next.js Promise params warning fix).
+- Dashboard now shows a waiting-for-access message for non-owners with no assigned businesses (instead of showing create-business CTA).
+- Invite modal no longer collects a role; org invites default to staff and roles are assigned when granting business access.
+- Updated org-invite page tests to mock `useParams` after switching invite page to hook-based params access.
+- Added remove-access controls in the manage-business-access modal (owners/managers can revoke staff access).
+- Removed self-removal and non-owner/manager controls in the manage-business-access modal; staff now see read-only access status.
+- Staff-facing dashboard now hides all management actions (no add business, no archive/restore, no edit/resubmit, no archive toggle).
+- Staff-facing dashboard now hides the quick-action panel entirely (no invite or access-management cards).
+- Added dashboard action guards to validate role + business status before navigation or mutations, showing toasts on invalid actions.
+- Updated dashboard to use roleless org membership (`isOwner`) and business roles for permissions; org invites now rely on org owner or any business owner/manager, while access management is scoped to selected business owners/managers (apps/web/src/app/dashboard/page.tsx).
+- Manage-access modal now labels org members as owner/member (no org role text) and respects business-role-only assignment/removal rules.
+- Updated dashboard/org/onboarding/org-create tests to mock `isOwner` in org membership responses (apps/web/tests/*).
+- Tables QR download now includes CSRF token for POST downloads, fixing INVALID_CSRF errors on bulk ZIP download (apps/web/src/app/dashboard/tables/page.tsx, apps/web/src/lib/api.ts).

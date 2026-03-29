@@ -9,7 +9,7 @@ const defaultHeaders = {
 };
 
 const CSRF_COOKIE_NAME = "csrf_token";
-const CSRF_HEADER_NAME = "x-csrf-token";
+export const CSRF_HEADER_NAME = "x-csrf-token";
 
 let cachedCsrfToken: string | null = null;
 
@@ -29,7 +29,7 @@ const getCsrfToken = () => {
   return cachedCsrfToken;
 };
 
-const ensureCsrfToken = async () => {
+export const ensureCsrfToken = async () => {
   const existing = getCsrfToken();
   if (existing) return existing;
   const response = await fetch(`${API_URL}/api/auth/csrf`, {

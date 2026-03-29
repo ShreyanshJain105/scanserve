@@ -31,7 +31,6 @@ type OrgMembershipRecord = {
   id: string;
   orgId: string;
   userId: string;
-  role: "owner" | "manager" | "staff";
 };
 type BusinessMembershipRecord = {
   id: string;
@@ -126,7 +125,6 @@ vi.mock("../src/prisma", () => ({
           id: `orgmem_${orgMemberships.length + 1}`,
           orgId: data.orgId,
           userId: data.userId,
-          role: data.role,
         };
         orgMemberships.push(record);
         return record;

@@ -5,18 +5,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import businessRouter from "../src/routes/business";
 
 type UserRole = "business" | "admin" | "customer";
-type OrgRole = "owner" | "manager" | "staff";
 type OrgInviteStatus = "pending" | "accepted" | "declined";
 type BusinessRole = "owner" | "manager" | "staff";
 
 type UserRecord = { id: string; email: string; role: UserRole };
 type OrgRecord = { id: string; ownerUserId: string; name: string | null };
-type OrgMembershipRecord = { id: string; orgId: string; userId: string; role: OrgRole };
+type OrgMembershipRecord = { id: string; orgId: string; userId: string };
 type OrgInviteRecord = {
   id: string;
   orgId: string;
   userId: string;
-  role: OrgRole;
   status: OrgInviteStatus;
   respondedAt: Date | null;
 };
@@ -87,13 +85,19 @@ const prismaMock = vi.hoisted(() => {
         }
         return membership;
       }),
-      findMany: vi.fn(async ({ where, select }) => {
+      findMany: vi.fn(async ({ where, select, include }) => {
         const list = store.orgMemberships.filter((m) =>
           (where?.orgId ? m.orgId === where.orgId : true) &&
-          (where?.role?.in ? where.role.in.includes(m.role) : true)
+          (where?.userId ? m.userId === where.userId : true)
         );
         if (select?.userId) {
           return list.map((m) => ({ userId: m.userId }));
+        }
+        if (include?.user) {
+          return list.map((m) => ({
+            ...m,
+            user: store.users.find((u) => u.id === m.userId) ?? null,
+          }));
         }
         return list;
       }),
@@ -102,7 +106,6 @@ const prismaMock = vi.hoisted(() => {
           id: nextId("orgmem", store.orgMemberships),
           orgId: data.orgId,
           userId: data.userId,
-          role: data.role,
         };
         store.orgMemberships.push(record);
         return record;
@@ -129,7 +132,6 @@ const prismaMock = vi.hoisted(() => {
           id: nextId("invite", store.orgInvites),
           orgId: data.orgId,
           userId: data.userId,
-          role: data.role,
           status: data.status ?? "pending",
           respondedAt: null,
         };
@@ -147,23 +149,70 @@ const prismaMock = vi.hoisted(() => {
       findFirst: vi.fn(async ({ where, select }) => {
         const business = store.businesses.find((b) =>
           (where?.id ? b.id === where.id : true) &&
-          (where?.orgId ? b.orgId === where.orgId : true)
+          (where?.orgId ? b.orgId === where.orgId : true) &&
+          (where?.userId ? b.userId === where.userId : true)
         );
         if (!business) return null;
         if (select) {
-          return { id: business.id, orgId: business.orgId, name: business.name };
+          return {
+            id: business.id,
+            orgId: business.orgId,
+            name: business.name,
+            userId: business.userId,
+          };
         }
         return business;
+      }),
+      findMany: vi.fn(async ({ where, select }) => {
+        const list = store.businesses.filter((b) =>
+          (where?.orgId ? b.orgId === where.orgId : true) &&
+          (where?.userId ? b.userId === where.userId : true)
+        );
+        if (select?.userId) {
+          return list.map((b) => ({ userId: b.userId }));
+        }
+        return list;
       }),
     },
     businessMembership: {
       findFirst: vi.fn(async ({ where }) => {
+        if (where?.business?.orgId) {
+          const businessIds = store.businesses
+            .filter((b) => b.orgId === where.business.orgId)
+            .map((b) => b.id);
+          return (
+            store.businessMemberships.find((m) =>
+              (where?.userId ? m.userId === where.userId : true) &&
+              (where?.role?.in ? where.role.in.includes(m.role) : true) &&
+              businessIds.includes(m.businessId)
+            ) ?? null
+          );
+        }
         return (
           store.businessMemberships.find((m) =>
             (where?.businessId ? m.businessId === where.businessId : true) &&
             (where?.userId ? m.userId === where.userId : true)
           ) ?? null
         );
+      }),
+      findMany: vi.fn(async ({ where, include }) => {
+        const list = store.businessMemberships.filter((m) => {
+          if (where?.businessId && m.businessId !== where.businessId) return false;
+          if (where?.userId && m.userId !== where.userId) return false;
+          if (where?.role?.in && !where.role.in.includes(m.role)) return false;
+          if (where?.business?.orgId) {
+            const business = store.businesses.find((b) => b.id === m.businessId);
+            if (!business || business.orgId !== where.business.orgId) return false;
+          }
+          return true;
+        });
+        if (include?.user) {
+          return list.map((m) => ({
+            ...m,
+            user: store.users.find((u) => u.id === m.userId) ?? null,
+          }));
+        }
+        return list;
       }),
       create: vi.fn(async ({ data }) => {
         const record = {
@@ -174,6 +223,14 @@ const prismaMock = vi.hoisted(() => {
         };
         store.businessMemberships.push(record);
         return record;
+      }),
+      delete: vi.fn(async ({ where }) => {
+        const idx = store.businessMemberships.findIndex((m) => m.id === where.id);
+        if (idx >= 0) {
+          store.businessMemberships.splice(idx, 1);
+          return { id: where.id };
+        }
+        return null;
       }),
       deleteMany: vi.fn(async ({ where }) => {
         const before = store.businessMemberships.length;
@@ -279,7 +336,7 @@ describe("Org invites and memberships", () => {
     store.users.push({ id: "u_owner", email: "owner@example.com", role: "business" });
     store.users.push({ id: "u_target", email: "target@example.com", role: "business" });
     store.orgs.push({ id: "org_1", ownerUserId: "u_owner", name: "Owner Org" });
-    store.orgMemberships.push({ id: "orgmem_1", orgId: "org_1", userId: "u_owner", role: "owner" });
+    store.orgMemberships.push({ id: "orgmem_1", orgId: "org_1", userId: "u_owner" });
     store.businesses.push({ id: "biz_1", orgId: "org_1", userId: "u_owner", name: "Cafe" });
   });
 
@@ -295,7 +352,7 @@ describe("Org invites and memberships", () => {
   it("creates org invite and notifies user", async () => {
     const res = await run("POST", "/org/invites", {
       user: store.users[0],
-      body: { email: "target@example.com", role: "staff" },
+      body: { email: "target@example.com" },
     });
     const body = JSON.parse(res._getData());
     expect(res.statusCode).toBe(200);
@@ -305,10 +362,10 @@ describe("Org invites and memberships", () => {
   });
 
   it("rejects invite when user already in org", async () => {
-    store.orgMemberships.push({ id: "orgmem_2", orgId: "org_2", userId: "u_target", role: "staff" });
+    store.orgMemberships.push({ id: "orgmem_2", orgId: "org_2", userId: "u_target" });
     const res = await run("POST", "/org/invites", {
       user: store.users[0],
-      body: { email: "target@example.com", role: "staff" },
+      body: { email: "target@example.com" },
     });
     const body = JSON.parse(res._getData());
     expect(res.statusCode).toBe(409);
@@ -320,7 +377,6 @@ describe("Org invites and memberships", () => {
       id: "invite_1",
       orgId: "org_1",
       userId: "u_target",
-      role: "staff",
       status: "pending",
       respondedAt: null,
     });
@@ -338,7 +394,6 @@ describe("Org invites and memberships", () => {
       id: "invite_2",
       orgId: "org_1",
       userId: "u_target",
-      role: "staff",
       status: "pending",
       respondedAt: null,
     });
@@ -351,8 +406,40 @@ describe("Org invites and memberships", () => {
     expect(store.orgInvites.find((inv) => inv.id === "invite_2")?.status).toBe("declined");
   });
 
+  it("lists org members for owner", async () => {
+    store.orgMemberships.push({ id: "orgmem_2", orgId: "org_1", userId: "u_target" });
+
+    const res = await run("GET", "/org/members", { user: store.users[0] });
+    const body = JSON.parse(res._getData());
+
+    expect(res.statusCode).toBe(200);
+    expect(body.data.members).toHaveLength(2);
+    expect(body.data.members.map((m: { email: string }) => m.email)).toContain("owner@example.com");
+    expect(body.data.members.map((m: { email: string }) => m.email)).toContain("target@example.com");
+  });
+
+  it("lists business memberships and includes owner", async () => {
+    store.businessMemberships.push({
+      id: "bizmem_1",
+      businessId: "biz_1",
+      userId: "u_target",
+      role: "staff",
+    });
+
+    const res = await run("GET", "/memberships?businessId=biz_1", { user: store.users[0] });
+    const body = JSON.parse(res._getData());
+
+    expect(res.statusCode).toBe(200);
+    expect(body.data.members).toHaveLength(2);
+    const rolesByEmail = new Map(
+      body.data.members.map((member: { email: string; role: string }) => [member.email, member.role])
+    );
+    expect(rolesByEmail.get("owner@example.com")).toBe("owner");
+    expect(rolesByEmail.get("target@example.com")).toBe("staff");
+  });
+
   it("allows staff to leave org and removes business memberships", async () => {
-    store.orgMemberships.push({ id: "orgmem_3", orgId: "org_1", userId: "u_target", role: "staff" });
+    store.orgMemberships.push({ id: "orgmem_3", orgId: "org_1", userId: "u_target" });
     store.businessMemberships.push({
       id: "bizmem_1",
       businessId: "biz_1",
@@ -374,7 +461,13 @@ describe("Org invites and memberships", () => {
   });
 
   it("manager can add staff to business but not manager", async () => {
-    store.orgMemberships.push({ id: "orgmem_4", orgId: "org_1", userId: "u_target", role: "manager" });
+    store.orgMemberships.push({ id: "orgmem_4", orgId: "org_1", userId: "u_target" });
+    store.businessMemberships.push({
+      id: "bizmem_mgr",
+      businessId: "biz_1",
+      userId: "u_target",
+      role: "manager",
+    });
 
     const addManager = await run("POST", "/memberships", {
       user: store.users[1],
@@ -390,6 +483,25 @@ describe("Org invites and memberships", () => {
     });
     expect(addStaff.statusCode).toBe(200);
     expect(store.businessMemberships.some((m) => m.role === "staff")).toBe(true);
+  });
+
+  it("owner can remove business access for staff", async () => {
+    store.orgMemberships.push({ id: "orgmem_3", orgId: "org_1", userId: "u_target" });
+    store.businessMemberships.push({
+      id: "bizmem_1",
+      businessId: "biz_1",
+      userId: "u_target",
+      role: "staff",
+    });
+
+    const res = await run("DELETE", "/memberships", {
+      user: store.users[0],
+      body: { businessId: "biz_1", userId: "u_target" },
+    });
+    const body = JSON.parse(res._getData());
+    expect(res.statusCode).toBe(200);
+    expect(body.data.removed).toBe(true);
+    expect(store.businessMemberships.some((m) => m.userId === "u_target")).toBe(false);
   });
 });
 
@@ -416,13 +528,14 @@ describe("Org create and membership lookup", () => {
 
   it("returns membership and org name when user belongs to org", async () => {
     store.orgs.push({ id: "org_1", ownerUserId: "u_owner", name: "Owner Org" });
-    store.orgMemberships.push({ id: "orgmem_1", orgId: "org_1", userId: "u_owner", role: "owner" });
+    store.orgMemberships.push({ id: "orgmem_1", orgId: "org_1", userId: "u_owner" });
 
     const res = await run("GET", "/org/membership", { user: store.users[0] });
     const body = JSON.parse(res._getData());
     expect(res.statusCode).toBe(200);
     expect(body.data.membership.orgId).toBe("org_1");
     expect(body.data.membership.orgName).toBe("Owner Org");
+    expect(body.data.membership.isOwner).toBe(true);
   });
 
   it("creates org and owner membership", async () => {
@@ -435,12 +548,11 @@ describe("Org create and membership lookup", () => {
     expect(body.data.org.id).toBeTruthy();
     expect(store.orgs).toHaveLength(1);
     expect(store.orgMemberships).toHaveLength(1);
-    expect(store.orgMemberships[0].role).toBe("owner");
   });
 
   it("rejects org creation when user already belongs to org", async () => {
     store.orgs.push({ id: "org_1", ownerUserId: "u_owner", name: "Owner Org" });
-    store.orgMemberships.push({ id: "orgmem_1", orgId: "org_1", userId: "u_owner", role: "owner" });
+    store.orgMemberships.push({ id: "orgmem_1", orgId: "org_1", userId: "u_owner" });
 
     const res = await run("POST", "/org", {
       user: store.users[0],

@@ -1,17 +1,15 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "../../../../lib/api";
 import { useAuth } from "../../../../lib/auth-context";
 import { showToast } from "../../../../lib/toast";
 
-type OrgInvitePageProps = {
-  params: { inviteId: string };
-};
-
-export default function OrgInvitePage({ params }: OrgInvitePageProps) {
+export default function OrgInvitePage() {
   const router = useRouter();
+  const params = useParams<{ inviteId?: string }>();
+  const inviteId = typeof params?.inviteId === "string" ? params.inviteId : "";
   const { user, loading } = useAuth();
   const [busy, setBusy] = React.useState<"accept" | "decline" | null>(null);
 
@@ -24,9 +22,13 @@ export default function OrgInvitePage({ params }: OrgInvitePageProps) {
 
   const handleAction = async (action: "accept" | "decline") => {
     if (busy) return;
+    if (!inviteId) {
+      showToast({ variant: "error", message: "Invite link is invalid." });
+      return;
+    }
     setBusy(action);
     try {
-      await apiFetch(`/api/business/org/invites/${params.inviteId}/${action}`, {
+      await apiFetch(`/api/business/org/invites/${inviteId}/${action}`, {
         method: "POST",
       });
       showToast({
@@ -110,4 +112,3 @@ export default function OrgInvitePage({ params }: OrgInvitePageProps) {
     </div>
   );
 }
-

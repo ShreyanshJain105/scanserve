@@ -69,7 +69,7 @@ describe("OrgCreatePage", () => {
       loading: false,
     });
     apiFetchMock.mockResolvedValueOnce({
-      membership: { id: "m1", orgId: "org_1", role: "owner" },
+      membership: { id: "m1", orgId: "org_1", isOwner: true },
     });
 
     render(<OrgCreatePage />);
