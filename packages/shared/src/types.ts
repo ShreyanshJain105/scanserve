@@ -12,7 +12,8 @@ export type OrderStatus =
   | "completed"
   | "cancelled";
 
-export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+export type PaymentStatus = "pending" | "unpaid" | "paid" | "failed" | "refunded";
+export type PaymentMethod = "razorpay" | "cash";
 
 export type OrgInviteStatus = "pending" | "accepted" | "declined";
 
@@ -40,13 +41,15 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 // ─── Auth ───────────────────────────────────────────────────
 
 export interface LoginRequest {
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
   qrToken?: string;
 }
 
 export interface RegisterRequest {
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
   role: "customer" | "business";
   qrToken?: string;
@@ -55,6 +58,7 @@ export interface RegisterRequest {
 export interface UserProfile {
   id: string;
   email: string;
+  phone?: string | null;
   role: UserRole;
   createdAt: string;
 }
@@ -219,6 +223,7 @@ export interface Order {
   razorpayOrderId?: string | null;
   razorpayPaymentId: string | null;
   paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
   customerName: string;
   customerPhone: string | null;
   createdAt: string;
@@ -233,11 +238,30 @@ export interface OrderItem {
   specialInstructions: string | null;
 }
 
+export interface CustomerOrderSummary {
+  id: string;
+  businessId: string;
+  tableId: string;
+  status: OrderStatus;
+  totalAmount: string;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  createdAt: string;
+  updatedAt: string;
+  business: { id: string; name: string; currencyCode: string } | null;
+}
+
+export interface CustomerOrdersListResponse {
+  orders: CustomerOrderSummary[];
+  nextCursor: string | null;
+}
+
 export interface CreateOrderRequest {
   businessId: string;
   tableId: string;
   customerName: string;
   customerPhone?: string;
+  paymentMethod: PaymentMethod;
   items: {
     menuItemId: string;
     quantity: number;

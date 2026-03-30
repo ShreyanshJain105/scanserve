@@ -2,6 +2,7 @@ import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { logger } from "../utils/logger";
+import { enqueueOrderEventOutbox } from "./orderEventOutbox";
 
 export type OrderEventType = "order_created" | "order_status_updated" | "order_payment_updated";
 
@@ -16,6 +17,7 @@ export type OrderSnapshot = {
   paymentStatus: string;
   customerName: string;
   customerPhone: string | null;
+  statusActors: Record<string, string> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -39,6 +41,7 @@ export const buildOrderSnapshot = (order: {
   paymentStatus: string;
   customerName: string;
   customerPhone: string | null;
+  statusActors?: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
 }): OrderSnapshot => ({
@@ -52,6 +55,10 @@ export const buildOrderSnapshot = (order: {
   paymentStatus: order.paymentStatus,
   customerName: order.customerName,
   customerPhone: order.customerPhone,
+  statusActors:
+    order.statusActors && typeof order.statusActors === "object" && !Array.isArray(order.statusActors)
+      ? (order.statusActors as Record<string, string>)
+      : null,
   createdAt: order.createdAt.toISOString(),
   updatedAt: order.updatedAt.toISOString(),
 });
@@ -72,8 +79,9 @@ export const buildItemSnapshots = (items: Array<{
   }));
 
 export const fetchOrderSnapshot = async (orderId: string) => {
-  const order = await prisma.order.findUnique({
+  const order = await prisma.order.findFirst({
     where: { id: orderId },
+    orderBy: { createdAt: "desc" },
     include: { items: true },
   });
   if (!order) return null;
@@ -98,8 +106,16 @@ export const publishOrderEvent = async (params: {
     items: params.items,
   };
 
-  // TODO: replace with real queue producer (Kafka/SQS/etc.) feeding ClickHouse pipeline.
-  logger.info("order.event.published", payload);
+  await enqueueOrderEventOutbox({
+    eventId: payload.eventId,
+    eventType: payload.eventType,
+    orderId: params.order.id,
+    businessId: params.order.businessId,
+    payload,
+    eventCreatedAt,
+  });
+
+  logger.info("order.event.enqueued", payload);
   return payload;
 };
 

@@ -37,6 +37,20 @@ model User {
   @@map("users")
 }
 
+model CustomerUser {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens CustomerRefreshToken[]
+  orders        Order[]
+
+  @@map("customer_users")
+}
+
 // ─── Business ───────────────────────────────────────────────
 
 enum BusinessStatus {
@@ -248,9 +262,22 @@ enum OrderStatus {
 
 enum PaymentStatus {
   pending
+  unpaid
   paid
   failed
   refunded
+}
+
+enum PaymentMethod {
+  razorpay
+  cash
+}
+
+enum OrderEventOutboxStatus {
+  pending
+  processing
+  failed
+  done
 }
 
 enum OrgInviteStatus {
@@ -312,25 +339,31 @@ model OrgInvite {
 }
 
 model Order {
-  id              String        @id @default(cuid())
+  id              String        @default(cuid())
   businessId      String        @map("business_id")
   tableId         String        @map("table_id")
+  customerUserId  String?       @map("customer_user_id")
   status          OrderStatus   @default(pending)
   totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
   razorpayOrderId String?       @map("razorpay_order_id")
   razorpayPaymentId String?     @map("razorpay_payment_id")
   paymentStatus   PaymentStatus @default(pending) @map("payment_status")
+  paymentMethod   PaymentMethod @default(razorpay) @map("payment_method")
   customerName    String        @map("customer_name")
   customerPhone   String?       @map("customer_phone")
+  statusActors    Json?         @map("status_actors")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   business Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerUser CustomerUser? @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
   table    Table       @relation(fields: [tableId], references: [id])
   items    OrderItem[]
 
+  @@id([id, createdAt])
   @@index([businessId, status])
   @@index([businessId, createdAt])
+  @@index([customerUserId])
   @@map("orders")
 }
 
@@ -350,17 +383,45 @@ model BusinessMembership {
 }
 
 model OrderItem {
-  id                  String  @id @default(cuid())
-  orderId             String  @map("order_id")
-  menuItemId          String  @map("menu_item_id")
+  id                  String   @default(cuid())
+  orderId             String   @map("order_id")
+  orderCreatedAt      DateTime @map("order_created_at")
+  menuItemId          String   @map("menu_item_id")
   quantity            Int
-  unitPrice           Decimal @map("unit_price") @db.Decimal(10, 2)
-  specialInstructions String? @map("special_instructions")
+  unitPrice           Decimal  @map("unit_price") @db.Decimal(10, 2)
+  specialInstructions String?  @map("special_instructions")
 
-  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId, orderCreatedAt], references: [id, createdAt], onDelete: Cascade)
   menuItem MenuItem @relation(fields: [menuItemId], references: [id])
 
+  @@id([id, orderCreatedAt])
+  @@index([orderId, orderCreatedAt])
   @@map("order_items")
+}
+
+// ─── Order Event Outbox ─────────────────────────────────────
+
+model OrderEventOutbox {
+  id            String                @id @default(cuid())
+  eventId       String                @map("event_id")
+  eventType     String                @map("event_type")
+  orderId       String                @map("order_id")
+  businessId    String                @map("business_id")
+  payload       Json
+  eventCreatedAt DateTime             @map("event_created_at")
+  status        OrderEventOutboxStatus @default(pending)
+  attemptCount  Int                   @default(0) @map("attempt_count")
+  nextAttemptAt DateTime?             @map("next_attempt_at")
+  lastError     String?               @map("last_error")
+  processedAt   DateTime?             @map("processed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+
+  @@unique([eventId])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([orderId])
+  @@index([businessId])
+  @@map("order_event_outbox")
 }
 
 // ─── Auth Refresh Tokens ─────────────────────────────────────
@@ -378,6 +439,21 @@ model RefreshToken {
   @@index([userId])
   @@unique([tokenHash])
   @@map("refresh_tokens")
+}
+
+model CustomerRefreshToken {
+  id             String   @id @default(cuid())
+  customerUserId String   @map("customer_user_id")
+  tokenHash      String   @map("token_hash")
+  expiresAt      DateTime @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  customerUser CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+
+  @@index([customerUserId])
+  @@unique([tokenHash])
+  @@map("customer_refresh_tokens")
 }
 
 // ─── Asset Cleanup Queue ────────────────────────────────────

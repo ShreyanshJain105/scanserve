@@ -178,6 +178,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setError(message);
       throw new Error(message);
     }
+    if (!input.email) {
+      const message = "Email is required for business login.";
+      setError(message);
+      throw new Error(message);
+    }
     try {
       const data = await apiFetch<{ user: UserProfile }>("/api/auth/login", {
         method: "POST",
@@ -202,6 +207,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setError(null);
     if (businessUser) {
       const message = `Already logged in as ${businessUser.email}`;
+      setError(message);
+      throw new Error(message);
+    }
+    if (!input.email) {
+      const message = "Email is required for business registration.";
       setError(message);
       throw new Error(message);
     }
@@ -254,6 +264,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       await loginCustomerFromQr({
         email: input.email,
+        phone: input.phone,
         password: input.password,
         qrToken: input.qrToken,
       });

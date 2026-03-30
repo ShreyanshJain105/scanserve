@@ -17,7 +17,8 @@ type OrderRecord = {
   totalAmount: string;
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
-  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  paymentStatus: "pending" | "unpaid" | "paid" | "failed" | "refunded";
+  paymentMethod: "razorpay" | "cash";
   customerName: string;
   customerPhone: string | null;
   createdAt: Date;
@@ -26,6 +27,7 @@ type OrderRecord = {
 type OrderItemRecord = {
   id: string;
   orderId: string;
+  orderCreatedAt?: Date;
   menuItemId: string;
   quantity: number;
   unitPrice: string;
@@ -186,7 +188,8 @@ vi.mock("../src/prisma", () => ({
         return limited;
       }),
       update: vi.fn(async ({ where, data, include }) => {
-        const order = orders.find((o) => o.id === where.id);
+        const targetId = where?.id_createdAt?.id ?? where?.id;
+        const order = orders.find((o) => o.id === targetId);
         if (!order) return null;
         Object.assign(order, data, { updatedAt: new Date() });
         const table = tables.find((t) => t.id === order.tableId) ?? null;
@@ -285,6 +288,7 @@ describe("Layer 8 order management routes", () => {
       razorpayOrderId: null,
       razorpayPaymentId: null,
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       customerName: "Asha",
       customerPhone: null,
       createdAt: new Date("2026-03-27T10:00:00Z"),
@@ -299,6 +303,7 @@ describe("Layer 8 order management routes", () => {
       razorpayOrderId: null,
       razorpayPaymentId: null,
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       customerName: "Ravi",
       customerPhone: null,
       createdAt: new Date("2026-03-27T09:00:00Z"),
@@ -313,6 +318,7 @@ describe("Layer 8 order management routes", () => {
       razorpayOrderId: null,
       razorpayPaymentId: null,
       paymentStatus: "paid",
+      paymentMethod: "razorpay",
       customerName: "Meera",
       customerPhone: null,
       createdAt: new Date("2026-03-27T08:00:00Z"),
@@ -349,6 +355,7 @@ describe("Layer 8 order management routes", () => {
       razorpayOrderId: null,
       razorpayPaymentId: null,
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       customerName: "Priya",
       customerPhone: "999999",
       createdAt: new Date("2026-03-27T10:00:00Z"),
@@ -382,6 +389,7 @@ describe("Layer 8 order management routes", () => {
       razorpayOrderId: null,
       razorpayPaymentId: null,
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       customerName: "Priya",
       customerPhone: null,
       createdAt: new Date("2026-03-27T10:00:00Z"),
@@ -409,6 +417,7 @@ describe("Layer 8 order management routes", () => {
       razorpayOrderId: null,
       razorpayPaymentId: null,
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       customerName: "Priya",
       customerPhone: null,
       createdAt: new Date("2026-03-27T10:00:00Z"),
@@ -423,5 +432,58 @@ describe("Layer 8 order management routes", () => {
     const body = JSON.parse(res._getData());
     expect(res.statusCode).toBe(200);
     expect(body.data.order.status).toBe("cancelled");
+  });
+
+  it("marks cash orders as paid", async () => {
+    const orderId = nextOrderId();
+    orders.push({
+      id: orderId,
+      businessId: "b_1",
+      tableId: "t_1",
+      status: "pending",
+      totalAmount: "75.00",
+      razorpayOrderId: null,
+      razorpayPaymentId: null,
+      paymentStatus: "unpaid",
+      paymentMethod: "cash",
+      customerName: "Rina",
+      customerPhone: null,
+      createdAt: new Date("2026-03-27T10:00:00Z"),
+      updatedAt: new Date("2026-03-27T10:00:00Z"),
+    });
+
+    const user = users[0];
+    const res = await run("PATCH", `/orders/${orderId}/mark-paid`, { user });
+    const body = JSON.parse(res._getData());
+    expect(res.statusCode).toBe(200);
+    expect(body.data.order.paymentStatus).toBe("paid");
+  });
+
+  it("rejects completing unpaid orders", async () => {
+    const orderId = nextOrderId();
+    orders.push({
+      id: orderId,
+      businessId: "b_1",
+      tableId: "t_1",
+      status: "ready",
+      totalAmount: "55.00",
+      razorpayOrderId: null,
+      razorpayPaymentId: null,
+      paymentStatus: "unpaid",
+      paymentMethod: "cash",
+      customerName: "Rina",
+      customerPhone: null,
+      createdAt: new Date("2026-03-27T10:00:00Z"),
+      updatedAt: new Date("2026-03-27T10:00:00Z"),
+    });
+
+    const user = users[0];
+    const res = await run("PATCH", `/orders/${orderId}/status`, {
+      user,
+      body: { status: "completed" },
+    });
+    const body = JSON.parse(res._getData());
+    expect(res.statusCode).toBe(400);
+    expect(body.error.code).toBe("ORDER_NOT_PAID");
   });
 });

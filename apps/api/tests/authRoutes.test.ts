@@ -6,7 +6,9 @@ import { __resetQrAuthRateLimitForTests } from "../src/middleware/qrAuthRateLimi
 import { signAccessToken } from "../src/services/authService";
 
 const users: any[] = [];
+const customerUsers: any[] = [];
 const refreshTokens: any[] = [];
+const customerRefreshTokens: any[] = [];
 const qrCodes: any[] = [
   {
     id: "qr1",
@@ -33,6 +35,27 @@ vi.mock("../src/prisma", () => ({
         return user;
       }),
     },
+    customerUser: {
+      findUnique: vi.fn(async ({ where: { id } }) => {
+        if (id) return customerUsers.find((u) => u.id === id) || null;
+        return null;
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        const matches = customerUsers.filter((u) =>
+          where?.OR?.some((cond: any) => {
+            if (cond.email) return u.email === cond.email;
+            if (cond.phone) return u.phone === cond.phone;
+            return false;
+          })
+        );
+        return matches[0] || null;
+      }),
+      create: vi.fn(async ({ data }) => {
+        const user = { id: `c-${customerUsers.length + 1}`, ...data };
+        customerUsers.push(user);
+        return user;
+      }),
+    },
     qrCode: {
       findUnique: vi.fn(async ({ where: { uniqueCode } }) =>
         qrCodes.find((q) => q.uniqueCode === uniqueCode) || null
@@ -56,6 +79,28 @@ vi.mock("../src/prisma", () => ({
         refreshTokens.forEach((t, i) => {
           if (t.tokenHash === tokenHash) {
             refreshTokens[i] = { ...t, ...data };
+          }
+        });
+      }),
+    },
+    customerRefreshToken: {
+      create: vi.fn(async ({ data }) => {
+        const rec = { id: `cr-${customerRefreshTokens.length + 1}`, ...data };
+        customerRefreshTokens.push(rec);
+        return rec;
+      }),
+      findUnique: vi.fn(async ({ where: { tokenHash } }) =>
+        customerRefreshTokens.find((t) => t.tokenHash === tokenHash) || null
+      ),
+      update: vi.fn(async ({ where: { id }, data }) => {
+        const idx = customerRefreshTokens.findIndex((t) => t.id === id);
+        if (idx >= 0) customerRefreshTokens[idx] = { ...customerRefreshTokens[idx], ...data };
+        return customerRefreshTokens[idx];
+      }),
+      updateMany: vi.fn(async ({ where: { tokenHash }, data }) => {
+        customerRefreshTokens.forEach((t, i) => {
+          if (t.tokenHash === tokenHash) {
+            customerRefreshTokens[i] = { ...t, ...data };
           }
         });
       }),
@@ -136,7 +181,9 @@ const run = async (
 describe("auth routes", () => {
   beforeEach(() => {
     users.length = 0;
+    customerUsers.length = 0;
     refreshTokens.length = 0;
+    customerRefreshTokens.length = 0;
     qrCodes.splice(
       0,
       qrCodes.length,
@@ -263,9 +310,14 @@ describe("auth routes", () => {
 
   it("returns both valid sessions from /sessions", async () => {
     users.push(
-      { id: "b-user", email: "biz@x.com", role: "business", passwordHash: "x" },
-      { id: "c-user", email: "cust@x.com", role: "customer", passwordHash: "x" }
+      { id: "b-user", email: "biz@x.com", role: "business", passwordHash: "x" }
     );
+    customerUsers.push({
+      id: "c-user",
+      email: "cust@x.com",
+      phone: null,
+      passwordHash: "x",
+    });
 
     const businessAccess = signAccessToken({
       id: "b-user",

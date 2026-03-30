@@ -1,8 +1,10 @@
 "use client";
 
 import React from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "../../lib/api";
 import { showToast } from "../../lib/toast";
+import { useAuth } from "../../lib/auth-context";
 
 type PublicMenuItem = {
   id: string;
@@ -111,11 +113,15 @@ const formatPrice = (price: string, currency: string) => {
 };
 
 export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
+  const { customerUser } = useAuth();
+  const searchParams = useSearchParams();
+  const qrToken = searchParams.get("token") ?? searchParams.get("qrToken");
   const [cart, setCart] = React.useState<CartItem[]>([]);
   const [limitNotice, setLimitNotice] = React.useState<string | null>(null);
   const [cartOpen, setCartOpen] = React.useState(false);
   const [customerName, setCustomerName] = React.useState("");
   const [customerPhone, setCustomerPhone] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState<"razorpay" | "cash">("razorpay");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
@@ -182,6 +188,15 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
     cart.length > 0 && hasTable && customerName.trim().length > 0 && !isSubmitting;
 
   const handleCheckout = async () => {
+    if (!customerUser) {
+      showToast({ variant: "error", message: "Please log in to place your order." });
+      if (qrToken) {
+        window.location.assign(`/qr/login?token=${encodeURIComponent(qrToken)}`);
+      } else {
+        window.location.assign("/qr/login");
+      }
+      return;
+    }
     if (!hasTable) {
       showToast({
         variant: "error",
@@ -204,6 +219,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
         orderId: string;
         amount: string;
         paymentStatus: string;
+        paymentMethod: string;
       }>("/api/public/orders", {
         method: "POST",
         body: JSON.stringify({
@@ -211,12 +227,22 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
           tableId: data.table!.id,
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim() ? customerPhone.trim() : undefined,
+          paymentMethod,
           items: cart.map((item) => ({
             menuItemId: item.id,
             quantity: item.quantity,
           })),
         }),
       });
+
+      if (paymentMethod === "cash") {
+        clearCart();
+        setCartOpen(false);
+        showToast({ variant: "success", message: "Cash order placed." });
+        setIsSubmitting(false);
+        window.location.assign(`/orders?orderId=${encodeURIComponent(order.orderId)}`);
+        return;
+      }
 
       const checkout = await apiFetch<RazorpayCheckoutResponse>(
         `/api/public/orders/${order.orderId}/checkout`,
@@ -250,7 +276,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
             });
             clearCart();
             setCartOpen(false);
-            window.location.assign(`/order/${order.orderId}`);
+            window.location.assign(`/orders?orderId=${encodeURIComponent(order.orderId)}`);
           } catch (error) {
             showToast({
               variant: "error",
@@ -556,6 +582,35 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                   </div>
                 </div>
               </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Payment method
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      value="razorpay"
+                      checked={paymentMethod === "razorpay"}
+                      onChange={() => setPaymentMethod("razorpay")}
+                      className="h-4 w-4 text-slate-900"
+                    />
+                    Pay online (Razorpay)
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      value="cash"
+                      checked={paymentMethod === "cash"}
+                      onChange={() => setPaymentMethod("cash")}
+                      className="h-4 w-4 text-slate-900"
+                    />
+                    Pay with cash
+                  </label>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleCheckout}
@@ -566,7 +621,11 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                     : "cursor-not-allowed bg-slate-300"
                 }`}
               >
-                {isSubmitting ? "Starting checkout..." : "Order & pay"}
+                {isSubmitting
+                  ? "Starting checkout..."
+                  : paymentMethod === "cash"
+                    ? "Place cash order"
+                    : "Order & pay"}
               </button>
             </div>
           )}

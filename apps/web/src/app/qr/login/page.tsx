@@ -15,7 +15,7 @@ function QrLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qrToken = searchParams.get("token") ?? "";
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -33,9 +33,20 @@ function QrLoginContent() {
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!qrToken) return;
+    const trimmedIdentifier = identifier.trim();
+    if (!trimmedIdentifier) {
+      showToast({ variant: "error", message: "Enter email or phone to continue." });
+      return;
+    }
+    const isEmail = trimmedIdentifier.includes("@");
     setLoading(true);
     try {
-      await loginCustomerFromQr({ email, password, qrToken });
+      await loginCustomerFromQr({
+        email: isEmail ? trimmedIdentifier : undefined,
+        phone: isEmail ? undefined : trimmedIdentifier,
+        password,
+        qrToken,
+      });
       router.push(`/qr/${encodeURIComponent(qrToken)}`);
     } catch {
       // handled in auth context
@@ -80,12 +91,12 @@ function QrLoginContent() {
         ) : (
           <form className="space-y-4" onSubmit={onSubmit}>
             <div>
-              <label className="block text-sm font-medium text-slate-700">Email</label>
+              <label className="block text-sm font-medium text-slate-700">Email or phone</label>
               <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
+                type="text"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                placeholder="Email or phone"
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none ring-amber-200 transition focus:ring-2"
               />
             </div>

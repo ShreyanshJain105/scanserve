@@ -12,6 +12,9 @@ import { requireCsrf } from "./middleware/csrf";
 import { logger } from "./utils/logger";
 import { startDeletedAssetCleanupWorker } from "./services/deletedAssetCleanup";
 import { startArchivedBusinessCleanupWorker } from "./services/archivedBusinessCleanup";
+import { startOrderEventOutboxWorker } from "./services/orderEventOutbox";
+import { startOrderEventQueueConsumer } from "./services/orderEventQueueConsumer";
+import { startOrderPartitionMaintenance } from "./services/orderPartitionMaintenance";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -140,6 +143,9 @@ app.use(
 if (process.env.NODE_ENV !== "test") {
   startDeletedAssetCleanupWorker();
   startArchivedBusinessCleanupWorker();
+  startOrderEventOutboxWorker();
+  startOrderEventQueueConsumer();
+  startOrderPartitionMaintenance();
   app.listen(PORT, () => {
     logger.info("api.server.started", {
       port: Number(PORT),

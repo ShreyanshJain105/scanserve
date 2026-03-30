@@ -22,13 +22,13 @@
    - Webhook endpoint `POST /api/payments/webhook` to confirm payment and set order status `confirmed`.
 4) **Customer order status**
    - `GET /api/public/orders/:id` returns status, items, and totals.
-   - Public order status page `/order/[id]` polls or refreshes periodically.
+   - Customer order hub page `/orders` shows list + selected order detail and refreshes as needed.
 5) **Gating**
    - Block order creation if business is not approved or is blocked/archived.
    - Table must be active and belong to business.
 6) **Tests**
    - API tests for order creation validation, totals, and status transitions.
-   - Web tests for order status page rendering + polling.
+   - Web tests for orders hub rendering + selection behavior.
 
 ## Consequences
 - Introduces payment dependency (Stripe keys + webhook secret).

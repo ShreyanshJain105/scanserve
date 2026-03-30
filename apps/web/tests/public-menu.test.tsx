@@ -1,7 +1,17 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { PublicMenuClient } from "../src/components/public/public-menu-client";
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("token=valid-qr-token-123"),
+}));
+
+vi.mock("../src/lib/auth-context", () => ({
+  useAuth: () => ({
+    customerUser: { id: "c1", email: "cust@example.com", role: "customer" },
+  }),
+}));
 
 const baseData = {
   business: { id: "b1", name: "Cafe Aurora", slug: "cafe-aurora", currencyCode: "USD" },

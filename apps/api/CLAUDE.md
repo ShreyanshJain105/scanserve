@@ -184,8 +184,9 @@ pnpm db:studio    # open Prisma Studio GUI
 - Extended org-invite API tests to cover org-member listing and business membership listing responses.
 - Stabilized API tests: mocked `@prisma/client` in `tests/publicRoutes.test.ts` to avoid missing generated client errors and updated org-invite mocks to include `business.userId` for membership listing.
 - Fixed Vitest mock hoisting error by moving Decimal mock into `vi.hoisted` in `tests/publicRoutes.test.ts`.
-- Org invites no longer accept a role; invite creation now defaults org role to `staff` and business roles are assigned at business-access grant time.
+- Org memberships are now roleless: org owner is stored on `orgs.owner_user_id`, org invites carry no role, and all permissions derive from business-level roles.
 - Added business membership removal endpoint (`DELETE /api/business/memberships`) with owner/manager role constraints and test coverage.
+- Synced API CLAUDE notes to reflect roleless org membership and org-owner-only attribution model.
 
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.
@@ -241,3 +242,37 @@ pnpm db:studio    # open Prisma Studio GUI
 - Implemented ADR-038 roleless org membership: removed org role checks, org invites now require org owner or any business owner/manager in the org, and org membership responses now include `isOwner` (apps/api/src/routes/business.ts).
 - Business access management now requires owner/manager role for the selected business (managers limited to staff) and org owner checks use `org.ownerUserId` instead of membership roles.
 - Prisma schema + migration updated to drop `OrgRole` and role columns from org memberships/invites (apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20260329120000_roleless_org_memberships).
+- Fixed org-invite API tests by adding `prisma.org.findUnique` mock to cover new notification lookup during invite accept/decline (apps/api/tests/orgInviteRoutes.test.ts).
+- Added cash payment support and payment-gated order creation: orders now require `paymentMethod`, Razorpay orders are blocked when not configured, and cash orders default to `paymentStatus="unpaid"` (apps/api/src/routes/public.ts, apps/api/prisma/schema.prisma).
+- Added business endpoint to mark cash orders as paid (`PATCH /api/business/orders/:id/mark-paid`) and included `paymentMethod` in order summaries/details (apps/api/src/routes/business.ts).
+
+## Updates 2026-03-30
+- Orders list endpoint now supports server-side date filtering via `date` + `tzOffset` and applies the window on `updatedAt` for browser-timezone queries (apps/api/src/routes/business.ts).
+
+## Updates 2026-03-30
+- Blocked order completion unless `paymentStatus="paid"`; status update now returns `ORDER_NOT_PAID` if unpaid (apps/api/src/routes/business.ts).
+
+## Updates 2026-03-30
+- Added separate `customer_users` + `customer_refresh_tokens` tables and required customer auth for public order creation/checkout/verification (apps/api/prisma/schema.prisma, apps/api/src/routes/auth.ts, apps/api/src/routes/public.ts).
+- Orders now reference `customer_user_id` and public order status requires authenticated customer ownership.
+- Added `GET /api/public/orders` to list customer orders across businesses with cursor pagination (apps/api/src/routes/public.ts).
+- Fixed public route test mock to include `prisma.order.findFirst` for cursor pagination lookups (`apps/api/tests/publicRoutes.test.ts`).
+- Ran API tests: `pnpm --filter @scan2serve/api test` (16 files, 99 tests; AI key warnings expected).
+- Added `order_event_outbox` schema + migration and wired `publishOrderEvent` to enqueue outbox rows (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260330123000_order_event_outbox/migration.sql`, `apps/api/src/services/orderEvents.ts`).
+- Added ClickHouse outbox worker + bootstrap (`apps/api/src/services/orderEventOutbox.ts`) and started it on API boot (`apps/api/src/index.ts`).
+- Added ClickHouse + outbox env knobs in `apps/api/.env.example`.
+
+## Updates 2026-03-30
+- Switched the order-event warehouse pipeline to outbox → Redis Streams → ClickHouse consumer (`src/services/orderEventOutbox.ts`, `src/services/orderEventQueue.ts`, `src/services/orderEventQueueConsumer.ts`).
+- Added Redis Streams env configuration in `.env.example` and started the queue consumer from API bootstrap.
+- Added Redis client dependency for queue publishing/consuming (`apps/api/package.json`).
+
+## Updates 2026-03-30
+- Implemented native partitioning for `orders` and `order_items` with composite primary keys in Prisma schema (`apps/api/prisma/schema.prisma`) and added a migration to convert existing tables/records (`apps/api/prisma/migrations/20260330170000_order_partitions/migration.sql`).
+- Added `order_created_at` to `order_items` and updated order creation + update paths to use composite keys (`apps/api/src/routes/public.ts`, `apps/api/src/routes/business.ts`).
+- Added partition maintenance worker to auto-create/drop monthly partitions (`apps/api/src/services/orderPartitionMaintenance.ts`) and wired it into API boot (`apps/api/src/index.ts`).
+- Added partition maintenance env knobs in `apps/api/.env.example`.
+
+## Updates 2026-03-30
+- Added `status_actors` JSONB column on orders with migration and included status actors in order snapshots/responses (`apps/api/prisma/migrations/20260330193000_order_status_actors/migration.sql`, `apps/api/src/routes/business.ts`, `apps/api/src/services/orderEvents.ts`).
+- Order status updates now record per-phase actor labels in `statusActors` for accountability.

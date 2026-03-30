@@ -247,9 +247,32 @@ const orderStatusSchema = z.enum([
 ]);
 const orderListQuerySchema = z.object({
   status: orderStatusSchema.optional(),
+  date: z.enum(["today", "yesterday", "all"]).optional(),
+  tzOffset: z.preprocess((value) => {
+    if (value === undefined) return undefined;
+    if (typeof value === "string" && value.trim() !== "") return Number(value);
+    return value;
+  }, z.number().int().optional()),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.string().min(1).optional(),
 });
+const resolveDateWindow = (date: "today" | "yesterday", tzOffsetMinutes: number) => {
+  const now = new Date();
+  const offsetMs = tzOffsetMinutes * 60_000;
+  const localNow = new Date(now.getTime() - offsetMs);
+  const localStartUtc = Date.UTC(
+    localNow.getUTCFullYear(),
+    localNow.getUTCMonth(),
+    localNow.getUTCDate()
+  );
+  const startUtc = new Date(localStartUtc + offsetMs);
+  const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
+  if (date === "today") {
+    return { start: startUtc, end: endUtc };
+  }
+  const yesterdayStart = new Date(startUtc.getTime() - 24 * 60 * 60 * 1000);
+  return { start: yesterdayStart, end: startUtc };
+};
 const orderStatusUpdateSchema = z.object({
   status: orderStatusSchema,
 });
@@ -555,9 +578,11 @@ const serializeOrderSummary = (order: {
   totalAmount: Prisma.Decimal;
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
-  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  paymentStatus: "pending" | "unpaid" | "paid" | "failed" | "refunded";
+  paymentMethod: "razorpay" | "cash";
   customerName: string;
   customerPhone: string | null;
+  statusActors?: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
   table?: { id: string; tableNumber: number; label: string | null } | null;
@@ -570,8 +595,13 @@ const serializeOrderSummary = (order: {
   razorpayOrderId: order.razorpayOrderId,
   razorpayPaymentId: order.razorpayPaymentId,
   paymentStatus: order.paymentStatus,
+  paymentMethod: order.paymentMethod,
   customerName: order.customerName,
   customerPhone: order.customerPhone,
+  statusActors:
+    order.statusActors && typeof order.statusActors === "object" && !Array.isArray(order.statusActors)
+      ? (order.statusActors as Record<string, string>)
+      : null,
   createdAt: order.createdAt.toISOString(),
   updatedAt: order.updatedAt.toISOString(),
   table: order.table
@@ -591,9 +621,11 @@ const serializeOrderDetail = (order: {
   totalAmount: Prisma.Decimal;
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
-  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  paymentStatus: "pending" | "unpaid" | "paid" | "failed" | "refunded";
+  paymentMethod: "razorpay" | "cash";
   customerName: string;
   customerPhone: string | null;
+  statusActors?: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
   table?: { id: string; tableNumber: number; label: string | null } | null;
@@ -625,6 +657,26 @@ const isValidOrderStatusTransition = (current: OrderStatus, next: OrderStatus) =
   }
   return ORDER_STATUS_FLOW[current] === next;
 };
+
+const resolveStatusActorKey = (status: OrderStatus) => {
+  switch (status) {
+    case "confirmed":
+      return "confirmedBy";
+    case "preparing":
+      return "preparingBy";
+    case "ready":
+      return "readyBy";
+    case "completed":
+      return "completedBy";
+    case "cancelled":
+      return "cancelledBy";
+    default:
+      return null;
+  }
+};
+
+const resolveStatusActorLabel = (req: express.Request) =>
+  req.user?.name ?? req.user?.email ?? "Unknown";
 
 const notifyUser = async (params: {
   userId: string;
@@ -2836,6 +2888,14 @@ router.get(
       businessId: req.business!.id,
       ...(parsed.data.status ? { status: parsed.data.status } : {}),
     };
+    if (parsed.data.date && parsed.data.date !== "all") {
+      const offsetMinutes =
+        typeof parsed.data.tzOffset === "number"
+          ? parsed.data.tzOffset
+          : -new Date().getTimezoneOffset();
+      const window = resolveDateWindow(parsed.data.date, offsetMinutes);
+      where.updatedAt = { gte: window.start, lt: window.end };
+    }
 
     if (parsed.data.cursor) {
       const cursorOrder = await prisma.order.findFirst({
@@ -2919,10 +2979,24 @@ router.patch(
       sendError(res, "Invalid order status transition", 400, "INVALID_ORDER_STATUS_TRANSITION");
       return;
     }
+    if (parsed.data.status === "completed" && existing.paymentStatus !== "paid") {
+      sendError(res, "Order must be paid before completion", 400, "ORDER_NOT_PAID");
+      return;
+    }
+
+    const actorKey = resolveStatusActorKey(parsed.data.status);
+    const actorLabel = resolveStatusActorLabel(req);
+    const currentActors =
+      existing.statusActors && typeof existing.statusActors === "object" && !Array.isArray(existing.statusActors)
+        ? (existing.statusActors as Record<string, string>)
+        : {};
 
     const updated = await prisma.order.update({
-      where: { id: existing.id },
-      data: { status: parsed.data.status },
+      where: { id_createdAt: { id: existing.id, createdAt: existing.createdAt } },
+      data: {
+        status: parsed.data.status,
+        statusActors: actorKey ? { ...currentActors, [actorKey]: actorLabel } : currentActors,
+      },
       include: {
         table: { select: { id: true, tableNumber: true, label: true } },
       },
@@ -2932,6 +3006,48 @@ router.patch(
     if (snapshot) {
       await publishOrderEventBestEffort({
         type: "order_status_updated",
+        order: snapshot.order,
+        items: snapshot.items,
+      });
+    }
+
+    sendSuccess(res, { order: serializeOrderSummary(updated) });
+  })
+);
+
+router.patch(
+  "/orders/:id/mark-paid",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, businessId: req.business!.id },
+    });
+    if (!order) {
+      sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
+      return;
+    }
+    if (order.paymentMethod !== "cash") {
+      sendError(res, "Order is not a cash payment", 400, "PAYMENT_METHOD_INVALID");
+      return;
+    }
+    if (order.paymentStatus === "paid") {
+      sendError(res, "Order already paid", 409, "ORDER_ALREADY_PAID");
+      return;
+    }
+
+    const updated = await prisma.order.update({
+      where: { id_createdAt: { id: order.id, createdAt: order.createdAt } },
+      data: { paymentStatus: "paid" },
+      include: {
+        table: { select: { id: true, tableNumber: true, label: true } },
+      },
+    });
+
+    const snapshot = await fetchOrderSnapshot(updated.id);
+    if (snapshot) {
+      await publishOrderEventBestEffort({
+        type: "order_payment_updated",
         order: snapshot.order,
         items: snapshot.items,
       });

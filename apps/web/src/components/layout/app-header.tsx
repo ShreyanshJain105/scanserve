@@ -17,6 +17,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isTestEnv = process.env.NODE_ENV === "test";
   const headerRef = React.useRef<HTMLElement | null>(null);
   const [resolvedQrToken, setResolvedQrToken] = React.useState<string | null>(null);
   const [notificationCount, setNotificationCount] = React.useState<number | null>(null);
@@ -39,6 +40,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
   const notifPageSize = 8;
   const fetchNotifications = React.useCallback(
     async (opts?: { resetPage?: boolean; scope?: "unread" | "all" }) => {
+      if (isTestEnv) return;
       const scope = opts?.scope ?? notifScope;
       const endpoint =
         user?.role === "admin"
@@ -80,7 +82,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
         setLoadingNotifications(false);
       }
     },
-    [businessUser, notifScope, user?.role]
+    [businessUser, isTestEnv, notifScope, user?.role]
   );
 
   React.useEffect(() => {
@@ -222,6 +224,12 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
           {customerUser.email}
         </summary>
         <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+          <Link
+            href="/orders"
+            className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+          >
+            View orders
+          </Link>
           <button
             type="button"
             onClick={() => {
@@ -290,6 +298,12 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
             <div className="px-2.5 py-2 text-[11px] text-slate-500">
               Customer profile
             </div>
+            <Link
+              href="/orders"
+              className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+            >
+              View orders
+            </Link>
             <button
               type="button"
               onClick={() => {

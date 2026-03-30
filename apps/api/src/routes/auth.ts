@@ -74,12 +74,22 @@ const readUserFromAccessToken = async (
   if (!token) return null;
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (expectedScope === "customer") {
+      const customer = await prisma.customerUser.findUnique({
+        where: { id: decoded.sub },
+      });
+      if (!customer) return null;
+      return {
+        id: customer.id,
+        email: customer.email ?? customer.phone ?? "",
+        role: "customer" as UserRole,
+      };
+    }
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
     });
     if (!user) return null;
-    if (expectedScope === "customer" && user.role !== "customer") return null;
-    if (expectedScope === "business" && user.role === "customer") return null;
+    if (user.role === "customer") return null;
     return user;
   } catch {
     return null;
@@ -185,12 +195,17 @@ const assertQrRateLimit = (
   return true;
 };
 
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  role: z.enum(["customer", "business"] as [UserRole, ...UserRole[]]).optional(),
-  qrToken: z.string().min(12).optional(),
-});
+const registerSchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(7).max(20).optional(),
+    password: z.string().min(8),
+    role: z.enum(["customer", "business"] as [UserRole, ...UserRole[]]).optional(),
+    qrToken: z.string().min(12).optional(),
+  })
+  .refine((data) => Boolean(data.email || data.phone), {
+    message: "Email or phone is required",
+  });
 
 router.post(
   "/register",
@@ -199,7 +214,7 @@ router.post(
     if (!parse.success) {
       return sendError(res, parse.error.message, 400, "VALIDATION_ERROR");
     }
-    const { email, password, role, qrToken } = parse.data;
+    const { email, phone, password, role, qrToken } = parse.data;
     const scope = await resolveAuthScope(req, qrToken);
     if (role === "customer" && scope !== "customer") {
       return sendError(res, "Customer auth is only allowed in QR flow", 403, "CUSTOMER_AUTH_QR_ONLY");
@@ -207,11 +222,42 @@ router.post(
     if (scope === "customer") {
       if (!assertQrRateLimit(req, res, qrToken, email)) return;
     }
+    if (scope === "customer") {
+      const existingCustomer = await prisma.customerUser.findFirst({
+        where: {
+          OR: [
+            ...(email ? [{ email }] : []),
+            ...(phone ? [{ phone }] : []),
+          ],
+        },
+      });
+      if (existingCustomer) {
+        return sendError(res, "Account already registered", 400, "ACCOUNT_EXISTS");
+      }
+      const passwordHash = await hashPassword(password);
+      const customer = await prisma.customerUser.create({
+        data: { email: email ?? null, phone: phone ?? null, passwordHash },
+      });
+      return sendSuccess(
+        res,
+        {
+          user: {
+            id: customer.id,
+            email: customer.email ?? customer.phone ?? "",
+            role: "customer",
+          },
+        },
+        201
+      );
+    }
+    if (!email) {
+      return sendError(res, "Email is required for business registration", 400, "EMAIL_REQUIRED");
+    }
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return sendError(res, "Email already registered", 400, "EMAIL_EXISTS");
     }
-    const resolvedRole: UserRole = scope === "customer" ? "customer" : "business";
+    const resolvedRole: UserRole = "business";
     const passwordHash = await hashPassword(password);
     const user = await prisma.user.create({
       data: { email, passwordHash, role: resolvedRole },
@@ -230,11 +276,16 @@ router.get(
   })
 );
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  qrToken: z.string().min(12).optional(),
-});
+const loginSchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(7).max(20).optional(),
+    password: z.string().min(8),
+    qrToken: z.string().min(12).optional(),
+  })
+  .refine((data) => Boolean(data.email || data.phone), {
+    message: "Email or phone is required",
+  });
 
 router.post(
   "/login",
@@ -243,21 +294,80 @@ router.post(
     if (!parse.success) {
       return sendError(res, parse.error.message, 400, "VALIDATION_ERROR");
     }
-    const { email, password, qrToken } = parse.data;
+    const { email, phone, password, qrToken } = parse.data;
     const scope = await resolveAuthScope(req, qrToken);
+    if (scope === "customer") {
+      if (!assertQrRateLimit(req, res, qrToken, email)) return;
+      const customer = await prisma.customerUser.findFirst({
+        where: {
+          OR: [
+            ...(email ? [{ email }] : []),
+            ...(phone ? [{ phone }] : []),
+          ],
+        },
+      });
+      if (!customer) return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
+
+      const valid = await verifyPassword(password, customer.passwordHash);
+      if (!valid) return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
+
+      const accessToken = signAccessToken({
+        id: customer.id,
+        email: customer.email ?? customer.phone ?? "",
+        role: "customer",
+      });
+      const refreshToken = await mintRefreshToken(customer.id, "customer");
+
+      const { accessCookieName, refreshCookieName, accessOptions, refreshOptions } =
+        getScopedCookieNames(scope);
+
+      res.cookie(accessCookieName, accessToken, {
+        ...accessOptions,
+        maxAge: 1000 * 60 * Number(process.env.ACCESS_TOKEN_TTL_MINUTES || 15),
+      });
+      res.cookie(refreshCookieName, refreshToken.plain, {
+        ...refreshOptions,
+        expires: refreshToken.record.expiresAt,
+      });
+
+      return sendSuccess(res, {
+        user: {
+          id: customer.id,
+          email: customer.email ?? customer.phone ?? "",
+          role: "customer",
+        },
+      });
+    }
+
+    if (!email) {
+      return sendError(res, "Email is required", 400, "EMAIL_REQUIRED");
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
+    if (!user) {
+      const customer = await prisma.customerUser.findFirst({
+        where: {
+          OR: [
+            ...(email ? [{ email }] : []),
+            ...(phone ? [{ phone }] : []),
+          ],
+        },
+      });
+      if (customer) {
+        return sendError(
+          res,
+          "Customer auth is only allowed in QR flow",
+          403,
+          "CUSTOMER_AUTH_QR_ONLY"
+        );
+      }
+      return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
+    }
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid)
       return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
-
-    if (scope === "customer") {
-      if (!assertQrRateLimit(req, res, qrToken, email)) return;
-      if (user.role !== "customer") {
-        return sendError(res, "Invalid credentials", 401, "INVALID_CREDENTIALS");
-      }
-    } else if (user.role === "customer") {
+    if (user.role === "customer") {
       return sendError(res, "Customer auth is only allowed in QR flow", 403, "CUSTOMER_AUTH_QR_ONLY");
     }
 
@@ -266,7 +376,7 @@ router.post(
       email: user.email,
       role: user.role,
     });
-    const refreshToken = await mintRefreshToken(user.id);
+    const refreshToken = await mintRefreshToken(user.id, "business");
 
     const { accessCookieName, refreshCookieName, accessOptions, refreshOptions } =
       getScopedCookieNames(scope);
@@ -298,7 +408,37 @@ router.post(
     if (!incoming) return sendError(res, "Missing refresh token", 401, "NO_REFRESH_TOKEN");
 
     try {
-      const rotated = await rotateRefreshToken(incoming);
+      const rotated = await rotateRefreshToken(incoming, scope);
+
+      if (scope === "customer") {
+        const customer = await prisma.customerUser.findUnique({
+          where: { id: rotated.record.customerUserId },
+        });
+        if (!customer) throw new Error("User not found");
+
+        const accessToken = signAccessToken({
+          id: customer.id,
+          email: customer.email ?? customer.phone ?? "",
+          role: "customer",
+        });
+
+        res.cookie(accessCookieName, accessToken, {
+          ...accessOptions,
+          maxAge: 1000 * 60 * Number(process.env.ACCESS_TOKEN_TTL_MINUTES || 15),
+        });
+        res.cookie(refreshCookieName, rotated.plain, {
+          ...refreshOptions,
+          expires: rotated.record.expiresAt,
+        });
+
+        return sendSuccess(res, {
+          user: {
+            id: customer.id,
+            email: customer.email ?? customer.phone ?? "",
+            role: "customer",
+          },
+        });
+      }
 
       const user = await prisma.user.findUnique({ where: { id: rotated.record.userId } });
       if (!user) throw new Error("User not found");
@@ -308,13 +448,6 @@ router.post(
         email: user.email,
         role: user.role,
       });
-
-      if (scope === "customer" && user.role !== "customer") {
-        return sendError(res, "Invalid or expired refresh token", 401, "INVALID_REFRESH");
-      }
-      if (scope === "business" && user.role === "customer") {
-        return sendError(res, "Invalid or expired refresh token", 401, "INVALID_REFRESH");
-      }
 
       res.cookie(accessCookieName, accessToken, {
         ...accessOptions,
@@ -351,13 +484,13 @@ router.post(
     const qr = req.cookies?.qr_customer_refresh as string | undefined;
 
     if (targetScope === "customer" || targetScope === "all") {
-      if (qr) await revokeRefreshToken(qr);
+      if (qr) await revokeRefreshToken(qr, "customer");
       res.clearCookie("qr_customer_access", qrAccessCookieOptions);
       res.clearCookie("qr_customer_refresh", qrRefreshCookieOptions);
     }
 
     if (targetScope === "business" || targetScope === "all") {
-      if (standard) await revokeRefreshToken(standard);
+      if (standard) await revokeRefreshToken(standard, "business");
       res.clearCookie("access_token", accessCookieOptions);
       res.clearCookie("refresh_token", refreshCookieOptions);
     }
@@ -382,14 +515,25 @@ router.get(
       return sendError(res, "Unauthorized", 401, "UNAUTHORIZED");
     }
 
+    if (scope === "customer") {
+      const customer = await prisma.customerUser.findUnique({
+        where: { id: decoded.sub },
+      });
+      if (!customer) return sendError(res, "User not found", 404, "USER_NOT_FOUND");
+      return sendSuccess(res, {
+        user: {
+          id: customer.id,
+          email: customer.email ?? customer.phone ?? "",
+          role: "customer",
+        },
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
     });
     if (!user) return sendError(res, "User not found", 404, "USER_NOT_FOUND");
-    if (scope === "customer" && user.role !== "customer") {
-      return sendError(res, "Unauthorized", 401, "UNAUTHORIZED");
-    }
-    if (scope === "business" && user.role === "customer") {
+    if (user.role === "customer") {
       return sendError(res, "Unauthorized", 401, "UNAUTHORIZED");
     }
     return sendSuccess(res, {

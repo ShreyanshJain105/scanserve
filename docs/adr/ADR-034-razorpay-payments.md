@@ -30,7 +30,7 @@
 6) **Frontend**
    - Load Razorpay Checkout script in the menu flow (on-demand).
    - Use Razorpay order id + key id from API to initiate payment.
-   - After success, call verify endpoint then redirect to `/order/[id]`.
+   - After success, call verify endpoint then redirect to `/orders?orderId=...`.
 7) **Tests**
    - Replace Stripe tests with Razorpay order creation + signature verification tests.
    - Update web tests to mock Razorpay flow triggers and verify calls.

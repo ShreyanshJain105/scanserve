@@ -48,25 +48,33 @@ export const signAccessToken = (user: {
   );
 };
 
-export const mintRefreshToken = async (userId: string) => {
+type RefreshScope = "business" | "customer";
+
+const getRefreshModel = (scope: RefreshScope) => {
+  return scope === "customer" ? prisma.customerRefreshToken : prisma.refreshToken;
+};
+
+export const mintRefreshToken = async (userId: string, scope: RefreshScope = "business") => {
   const plain = crypto.randomUUID();
   const tokenHash = hashRefreshToken(plain);
   const expiresAt = addDays(REFRESH_TOKEN_TTL_DAYS);
 
-  const record = await prisma.refreshToken.create({
-    data: {
-      userId,
-      tokenHash,
-      expiresAt,
-    },
+  const record = await getRefreshModel(scope).create({
+    data:
+      scope === "customer"
+        ? { customerUserId: userId, tokenHash, expiresAt }
+        : { userId, tokenHash, expiresAt },
   });
 
   return { plain, record };
 };
 
-export const rotateRefreshToken = async (incomingToken: string) => {
+export const rotateRefreshToken = async (
+  incomingToken: string,
+  scope: RefreshScope = "business"
+) => {
   const incomingHash = hashRefreshToken(incomingToken);
-  const stored = await prisma.refreshToken.findUnique({
+  const stored = await getRefreshModel(scope).findUnique({
     where: { tokenHash: incomingHash },
   });
 
@@ -78,18 +86,23 @@ export const rotateRefreshToken = async (incomingToken: string) => {
     throw new Error("Invalid refresh token");
   }
 
-  await prisma.refreshToken.update({
+  await getRefreshModel(scope).update({
     where: { id: stored.id },
     data: { revokedAt: new Date() },
   });
 
-  return mintRefreshToken(stored.userId);
+  const targetUserId =
+    scope === "customer" ? (stored as { customerUserId: string }).customerUserId : stored.userId;
+  return mintRefreshToken(targetUserId, scope);
 };
 
-export const revokeRefreshToken = async (token?: string) => {
+export const revokeRefreshToken = async (
+  token?: string,
+  scope: RefreshScope = "business"
+) => {
   if (!token) return;
   const tokenHash = hashRefreshToken(token);
-  await prisma.refreshToken.updateMany({
+  await getRefreshModel(scope).updateMany({
     where: { tokenHash, revokedAt: null },
     data: { revokedAt: new Date() },
   });

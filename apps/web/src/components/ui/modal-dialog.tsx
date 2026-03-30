@@ -8,14 +8,24 @@ type ModalDialogProps = {
   subtitle?: string;
   onClose?: () => void;
   children: React.ReactNode;
+  maxWidthClass?: string;
 };
 
-export function ModalDialog({ open, title, subtitle, onClose, children }: ModalDialogProps) {
+export function ModalDialog({
+  open,
+  title,
+  subtitle,
+  onClose,
+  children,
+  maxWidthClass = "max-w-md",
+}: ModalDialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[1px]">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/35 p-4 backdrop-blur-[1px] md:items-center">
+      <div
+        className={`max-h-[90vh] w-full overflow-y-auto ${maxWidthClass} rounded-2xl border border-slate-200 bg-white p-6 shadow-xl`}
+      >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl leading-tight text-slate-900">{title}</h2>

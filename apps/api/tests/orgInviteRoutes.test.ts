@@ -69,6 +69,14 @@ const prismaMock = vi.hoisted(() => {
         store.orgs.push(org);
         return org;
       }),
+      findUnique: vi.fn(async ({ where, select }) => {
+        const org = store.orgs.find((entry) => entry.id === where?.id) ?? null;
+        if (!org) return null;
+        if (select?.ownerUserId) {
+          return { ownerUserId: org.ownerUserId };
+        }
+        return org;
+      }),
     },
     orgMembership: {
       findFirst: vi.fn(async ({ where, include }) => {

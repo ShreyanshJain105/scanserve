@@ -36,12 +36,42 @@ services:
       retries: 10
       start_period: 5s
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: scan2serve-clickhouse
+    ports:
+      - "8123:8123"
+      - "9002:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/ping >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: scan2serve-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
   api:
     image: node:20-alpine
     container_name: scan2serve-api
     working_dir: /app
     env_file:
-      - ./apps/api/.env.local
+      - ./apps/api/.env
     volumes:
       - ./:/app
       - api-node-modules:/app/node_modules
@@ -53,6 +83,9 @@ services:
       CLIENT_URL: http://localhost:3000
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_URL: http://localhost:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: scan2serve
+      REDIS_URL: redis://redis:6379
     command: >
       sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api db:push && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api dev"
     ports:
@@ -61,6 +94,10 @@ services:
       db:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:4000/healthz >/dev/null 2>&1 || exit 1"]
@@ -74,7 +111,7 @@ services:
     container_name: scan2serve-web
     working_dir: /app
     env_file:
-      - ./apps/web/.env.local
+      - ./apps/web/.env
     volumes:
       - ./:/app
       - web-node-modules:/app/node_modules
@@ -120,6 +157,8 @@ services:
 volumes:
   db-data:
   minio-data:
+  clickhouse-data:
+  redis-data:
   api-node-modules:
   web-node-modules:
   web-next-cache:

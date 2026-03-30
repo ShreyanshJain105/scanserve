@@ -2,6 +2,10 @@ import Razorpay from "razorpay";
 
 let razorpayClient: Razorpay | null = null;
 
+export const isRazorpayConfigured = () => {
+  return Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+};
+
 export const getRazorpay = () => {
   if (razorpayClient) return razorpayClient;
   const keyId = process.env.RAZORPAY_KEY_ID;

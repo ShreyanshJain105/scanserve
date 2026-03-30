@@ -15,8 +15,8 @@ pnpm lint   # run Next.js ESLint
 
 ## Route Groups
 - `src/app/(auth)/` — login, register pages (no auth required)
-- `src/app/(public)/` — public menu `/menu/[slug]`, order status `/order/[id]`
-- `src/app/dashboard/` — business owner pages (requires business role)
+- `src/app/(public)/` — public menu `/menu/[slug]`, customer orders hub `/orders`
+- `src/app/dashboard/` — business owner pages (requires business role), including `/dashboard/orders`
 - `src/app/admin/` — admin pages (requires admin role)
 
 ## Conventions
@@ -301,7 +301,7 @@ pnpm lint   # run Next.js ESLint
 
 ## Updates 2026-03-24
 - Public menu cart now captures customer details, creates orders via `/api/public/orders`, and initiates Stripe checkout (`Order & pay` button).
-- Added `/order/[id]` status page in public flow with order totals and item breakdown.
+- Added `/orders` customer hub in public flow with order list + detail selection.
 - Updated public-menu and order-page tests; web suite re-run and passing.
 
 ## Updates 2026-03-24
@@ -330,7 +330,7 @@ pnpm lint   # run Next.js ESLint
 - Removed duplicate notification scope tag since the selector buttons already indicate scope.
 
 ## Updates 2026-03-24
-- Public menu checkout now uses Razorpay: loads checkout script, creates Razorpay order via API, verifies payment, then redirects to `/order/[id]`.
+- Public menu checkout now uses Razorpay: loads checkout script, creates Razorpay order via API, verifies payment, then redirects to `/orders?orderId=...`.
 
 ## Updates 2026-03-27
 - Added a secondary navigation bar below the header with links to Home, Explore, and Dashboard.
@@ -360,3 +360,83 @@ pnpm lint   # run Next.js ESLint
 - Manage-access modal now labels org members as owner/member (no org role text) and respects business-role-only assignment/removal rules.
 - Updated dashboard/org/onboarding/org-create tests to mock `isOwner` in org membership responses (apps/web/tests/*).
 - Tables QR download now includes CSRF token for POST downloads, fixing INVALID_CSRF errors on bulk ZIP download (apps/web/src/app/dashboard/tables/page.tsx, apps/web/src/lib/api.ts).
+- Implemented Layer 8 order management UI at `src/app/dashboard/orders/page.tsx` with status filters, polling, order detail modal, and status transitions; added "View orders" entry point in dashboard overview.
+- Added orders dashboard tests (`apps/web/tests/orders-page.test.tsx`).
+
+## Updates 2026-03-29
+- Fixed `tests/orders-page.test.tsx` mock to include `usePathname` for `AppHeader` hook usage.
+- Re-ran `pnpm --filter @scan2serve/web test`; all tests pass with existing `act(...)` warnings in header/menu tests.
+- Documented `/dashboard/orders` under dashboard route group for current Layer 8 UI.
+
+## Updates 2026-03-29
+- Orders dashboard now uses a single list with color-hued cards and a right-side filter/sort pane instead of status tabs (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-29
+- Added cash/razorpay payment method selection in public menu checkout and surfaced paid/unpaid tags plus mark-paid action for cash orders in the orders dashboard (`apps/web/src/components/public/public-menu-client.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Orders list cards now use a non-button container with keyboard handling to avoid nested button hydration errors (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Orders list tags now sit in a single horizontal row at top-right and no longer overlap content (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Added date filter (today/yesterday/all) and status-based sort option on the orders dashboard (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Orders dashboard now sends `date` + `tzOffset` to the API and relies on server-side date filtering (apps/web/src/app/dashboard/orders/page.tsx).
+
+## Updates 2026-03-30
+- Public menu checkout now requires customer login and supports phone/email QR auth; QR login/register forms accept phone and redirect unauthenticated users to `/qr/login` before placing orders (`apps/web/src/components/public/public-menu-client.tsx`, `apps/web/src/app/qr/login/page.tsx`, `apps/web/src/app/qr/register/page.tsx`).
+- Orders hub now relies on authenticated customer access to fetch `/api/public/orders` and `/api/public/orders/:id`.
+- Added `/orders` customer hub with list + selected-order detail and removed `/order/[id]` route.
+- Checkout now redirects to `/orders?orderId=...` after cash orders and Razorpay verification.
+- Added `View orders` link inside customer profile dropdowns in the navbar (`apps/web/src/components/layout/app-header.tsx`).
+- Orders hub now emphasizes current orders with larger cards and collapses history into a smaller toggled list (`apps/web/src/components/public/customer-orders-hub.tsx`).
+- Fixed orders hub test assertions and re-ran web tests (`pnpm --filter @scan2serve/web test`, 17 files, 55 tests passed; act warnings remain).
+
+## Updates 2026-03-30
+- Simplified QR customer login/register forms to a single "Email or phone" input and infer the identifier type before submitting (`apps/web/src/app/qr/login/page.tsx`, `apps/web/src/app/qr/register/page.tsx`).
+
+## Updates 2026-03-30
+- Polished orders dashboard UI with summary stats, refresh control, and loading skeletons (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Added test-env guard to skip notification fetches and reduce act warnings in header tests (`apps/web/src/components/layout/app-header.tsx`).
+
+## Updates 2026-03-30
+- Added status-actor accountability display in orders detail modal (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Switched status-actor display to a horizontal flow timeline in the orders detail modal (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Updated orders activity timeline to highlight the active arrow and show actors on the arrow between statuses (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Switched the order activity timeline to a vertical workflow layout for better responsiveness (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Moved order activity workflow into a side pane inside the order detail modal (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Moved order activity workflow into a dedicated side pane with a mobile collapsible toggle (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Added configurable modal width and widened the orders detail modal layout (`apps/web/src/components/ui/modal-dialog.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Made modal dialogs scrollable and mobile-safe by constraining height and aligning to top on small screens (`apps/web/src/components/ui/modal-dialog.tsx`).
+
+## Updates 2026-03-30
+- Updated workflow timeline to show completed/current/upcoming states and place actor labels on connectors between steps (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Simplified workflow timeline UI to a minimal vertical list with connector actor labels inside the order detail modal (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Adjusted workflow connector labels to use the next step actor and removed "handled by" prefix (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Updated orders summary metrics to exclude cancelled orders and count revenue from paid orders only (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-03-30
+- Removed placeholder analytics cards from dashboard orders and overview pages pending analytics endpoints (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/src/app/dashboard/page.tsx`).

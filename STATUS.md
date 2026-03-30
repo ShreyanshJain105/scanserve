@@ -9,23 +9,66 @@
 
 ## Last Session
 
-**Date:** 2026-03-29
+**Date:** 2026-03-30
 **What was done:**
-- Implemented ADR-038 roleless org membership: removed org roles from schema, added migration, and updated API org-permission checks to use org owner + business roles only.
-- Updated business-access management to require owner/manager on the selected business (manager can only add/remove staff) and org membership responses to include `isOwner`.
-- Updated shared types and dashboard UI/guards to use roleless org membership; org invites now rely on org owner or any business owner/manager.
-- Adjusted API/web tests for new membership shape (`isOwner`) and roleless org membership.
-- Fixed INVALID_CSRF on QR ZIP download by attaching CSRF token to binary download POSTs in tables dashboard.
+- Implemented ADR-036 Task 2: native partitioning for `orders` + `order_items` by `created_at` with composite primary keys.
+- Added `order_created_at` to `order_items` and updated order creation/updates to use composite keys.
+- Added partition maintenance worker to create/drop monthly partitions and wired it into API boot.
+- Added partition maintenance env knobs and migration to convert existing orders to partitioned tables.
+- Updated ADR-036 documentation to reflect composite keys and partitioning details.
+- Installed new dependencies locally and re-ran API tests (all 16 files, 99 tests passed; expected warnings for missing AI keys/outbox mocks).
+- Polished Layer 8 orders dashboard UI with summary stats, refresh control, and loading skeletons.
+- Added a test-env guard to skip header notification fetches to reduce act warnings during web tests.
+- Added `status_actors` accountability tracking on orders and displayed per-phase actors in the order detail UI.
+- Added local setup/run shell scripts for running the stack outside containers.
+- Switched order status-actor UI to a horizontal flow timeline in the orders detail view.
+- Highlighted the active status arrow and moved actor labels onto the connector between statuses.
+- Switched order status activity to a vertical workflow timeline for better responsiveness.
+- Moved the order activity workflow into a side pane within the order detail modal.
+- Added a mobile collapsible toggle and side-pane layout for the order workflow.
+- Widened the order detail modal and made modal width configurable to prevent awkward side-pane overlap.
+- Made modal dialogs scrollable and aligned them to the top on mobile to prevent overflow.
+- Updated the workflow timeline to show completed/current/upcoming states with actor labels on connectors.
+- Simplified the workflow timeline to a minimal vertical list with connector actor labels.
+- Updated connector labels to use the next step actor and removed the "handled by" prefix.
+- Removed placeholder analytics cards from dashboard orders and overview pages (analytics endpoints pending).
+- Updated orders summary metrics to exclude cancelled orders and count revenue from paid orders only.
+- Marked ADR-043 implementation task checklist as complete.
+- Reordered post ADR-036 TODOs by priority in `STATUS.md`.
 
 **What's NOT done yet:**
 - Live Razorpay checkout + signature verification with real keys not run (blocked: Razorpay test mode account not created yet).
-- Layer 8 dashboard UI (order list/detail/status transitions + polling) not implemented yet (ADR-036 paused).
+- Layer 8 dashboard UI still needs refinement/UX polish + potential cleanup of React `act(...)` warnings in tests.
 - Admin UI clarity improvements (admin panel UX) deferred per user request.
-- API/web test suites not re-run after ADR-038 + CSRF download changes.
+ - Tests not re-run after ADR-039 implementation.
+ - Tests not re-run after ADR-040 implementation.
+ - Tests not re-run after ORDER_NOT_PAID guard change.
+ - Tests not re-run after ADR-042 implementation.
+- Tests not re-run after ADR-043 implementation.
+- Tests not re-run after ADR-036 Task 1 (outbox + ClickHouse) changes.
+- Tests not re-run after ADR-036 Redis Streams queue changes.
+- Tests not re-run after Layer 8 UI polish changes.
+- Tests not re-run after status-actor accountability changes.
+- Tests not re-run after status-actor flow timeline UI changes.
+- Tests not re-run after status-actor arrow highlight updates.
+- Tests not re-run after switching to a vertical workflow timeline.
+- Tests not re-run after moving the workflow into a side pane.
+- Tests not re-run after adding mobile workflow toggle + side-pane layout.
+- Tests not re-run after modal width/layout adjustments.
+- Tests not re-run after modal mobile overflow fix.
+- Tests not re-run after workflow timeline state/actor connector update.
+- Tests not re-run after workflow timeline simplification.
+- Tests not re-run after workflow connector label adjustment.
+- Tests not re-run after removing placeholder analytics cards.
+- Tests not re-run after order summary metric adjustment.
+- Tests not re-run after adding local setup/run scripts.
+- TODO (post ADR-036/Layer 8): add analytics endpoints (e.g., `/api/analytics/orders`) and wire dashboard UI metrics from server-side analytics.
+- TODO (post ADR-036/Layer 8): enforce private networking (VPC/internal network) so DB/Redis/ClickHouse are not publicly exposed; only web edge is public.
+- TODO (post ADR-036/Layer 8): add Grafana-based resource + service dashboard (likely via compose with Prometheus/exporters).
 
 **Next step:**
-1. Run `pnpm --filter @scan2serve/api test` and `pnpm --filter @scan2serve/web test`.
-2. Continue Layer 8 dashboard UI once tests are green.
+1. Re-run API tests after partitioning changes and confirm migration in a real DB.
+2. Continue any remaining Layer 8 polish (UI + test cleanup).
 
 **Build progress:**
 ```
@@ -911,6 +954,14 @@ Layer 11: Polish & Deploy
 ### 2026-03-29 — Session 157: Tables download CSRF fix
 - Exported CSRF helpers for client use and attached `x-csrf-token` to binary download POSTs in the tables dashboard, fixing INVALID_CSRF on QR ZIP downloads.
 
+### 2026-03-29 — Session 158: API tests + migration attempt
+- Fixed org-invite test mocks for new org-owner notification lookup and re-ran `pnpm --filter @scan2serve/api test` (passing).
+- `pnpm --filter @scan2serve/api db:migrate` failed due to missing `DATABASE_URL` env.
+
+### 2026-03-29 — Session 159: Layer 8 orders UI start
+- Unpaused ADR-036 and added order management page with status filtering, polling, detail modal, and status transitions.
+- Added dashboard entry point for orders and a new web test for the orders page.
+
 ---
 
 ## Decisions Log
@@ -952,6 +1003,10 @@ Layer 11: Polish & Deploy
 | ADR-036 | Layer 8 order management + retention + warehouse feed — Accepted | Define order status flow, dashboard scope, 6-month retention/partitioning, and event queue → ClickHouse warehouse | 2026-03-27 |
 | ADR-037 | RBAC scope + org/business invites — Accepted | Add org model, scoped roles, invite accept/decline, and membership-gated business access | 2026-03-27 |
 | ADR-038 | Roleless org membership (business roles only) — Accepted | Remove org roles; org ownership tracked on org; permissions derive from business roles | 2026-03-29 |
+| ADR-039 | Cash payments + payment-gated order creation — Accepted | Require payment method at order creation, block Razorpay when unconfigured, and show paid/unpaid state with cash mark-paid action | 2026-03-29 |
+| ADR-040 | Server-side order date filtering — Accepted | Move date filtering to DB queries using browser timezone and `updatedAt` window | 2026-03-30 |
+| ADR-042 | Separate customer accounts + require login before orders — Accepted | Allow same-email business/customer accounts, enforce customer login, and restrict order access to owner | 2026-03-30 |
+| ADR-043 | Customer orders hub page — Accepted | Add `/orders` hub with paginated customer orders list API and remove `/order/:id` deep links | 2026-03-30 |
 
 ---
 
@@ -965,3 +1020,153 @@ pnpm dev:web              # start frontend only
 pnpm --filter @scan2serve/api db:migrate   # run Prisma migrations
 pnpm --filter @scan2serve/api db:seed      # seed admin user
 ```
+
+### 2026-03-29 — Session 160: Web test fix
+- Fixed orders page test mock to include `usePathname` and re-ran web tests.
+- Web test suite now passes; React `act(...)` warnings still reported in header/menu tests.
+
+### 2026-03-29 — Session 161: CLAUDE sync
+- Synced root/API/web CLAUDE docs to reflect roleless org membership endpoints and the `/dashboard/orders` route.
+
+### 2026-03-29 — Session 162: Orders UI refresh
+- Reworked orders dashboard to a single list with hue-based status cards and a right-side filter/sort panel.
+
+### 2026-03-29 — Session 163: ADR-039 drafted
+- Drafted ADR-039 for cash payments + payment-gated order creation and payment-status tags.
+
+### 2026-03-29 — Session 164: Cash payments + payment tags
+- Accepted ADR-039 and implemented cash payment method + payment-gated order creation in public order flow.
+- Added `payment_method` + `unpaid` payment status in Prisma and order APIs, plus mark-paid endpoint for cash orders.
+- Updated public menu checkout and orders dashboard UI to show payment tags and allow marking cash orders paid.
+
+### 2026-03-30 — Session 165: Orders hydration fix
+- Replaced order card button with a div + keyboard handling to avoid nested button hydration errors.
+
+### 2026-03-30 — Session 166: Order tag layout
+- Repositioned order status/payment tags into a single horizontal row to avoid overlapping card content.
+
+### 2026-03-30 — Session 167: Orders date filter + status sort
+- Added today/yesterday date filter and status-based sort option on orders dashboard.
+
+### 2026-03-30 — Session 168: ADR-040 drafted
+- Drafted ADR-040 for server-side order date filtering (timezone + date basis pending).
+
+### 2026-03-30 — Session 169: Server-side order date filter
+- Implemented server-side order date filtering using browser timezone and `updatedAt` window; orders page now passes `date` + `tzOffset`.
+
+### 2026-03-30 — Session 170: Order completion guard
+- Added ORDER_NOT_PAID guard to block completing orders until payment is paid.
+
+### 2026-03-30 — Session 171: ADR-041 drafted
+- Drafted ADR-041 for requiring customer login before order placement.
+
+### 2026-03-30 — Session 172: ADR-042 drafted
+- Drafted ADR-042 for separating customer accounts and requiring login before order placement.
+
+### 2026-03-30 — Session 173: Customer account separation
+- Added customer user model + refresh tokens, required customer login before orders, and enforced order ownership for `/order/:id`.
+
+### 2026-03-30 — Session 174: QR auth single identifier field
+- Simplified QR customer login/register forms to a single email-or-phone input with identifier inference before submit.
+
+### 2026-03-30 — Session 175: Customer orders hub ADR draft
+- Drafted ADR-043 proposing a customer orders hub page and customer-scoped orders list API; awaiting answers.
+
+### 2026-03-30 — Session 176: ADR-043 verification
+- Accepted ADR-043 and aligned decisions: `/orders` hub, remove `/order/:id`, 10-item pagination, and active-order default selection rule.
+- Added ADR-043 implementation task checklist for redirects, route removal, API, tests, and doc updates.
+
+### 2026-03-30 — Session 177: ADR-043 implementation
+- Added `/orders` customer hub UI with list + detail selection and removed `/order/[id]`.
+- Added `GET /api/public/orders` list endpoint with cursor pagination and updated shared order list types.
+- Updated redirects, tests, and docs to reflect `/orders` hub.
+
+### 2026-03-30 — Session 178: Orders link in navbar
+- Added a `View orders` link inside the customer profile dropdown in the navbar.
+
+### 2026-03-30 — Session 179: Orders hub sizing
+- Enlarged current-order cards and collapsed history orders into a smaller toggled list.
+
+### 2026-03-30 — Session 180: Public routes test fix
+- Added `prisma.order.findFirst` to public route test mocks to unblock customer order pagination tests.
+
+### 2026-03-30 — Session 181: API tests run
+- Ran `pnpm --filter @scan2serve/api test` (16 files, 99 tests passed; warnings for missing AI keys).
+
+### 2026-03-30 — Session 182: Web tests run
+- Updated orders hub test assertions and re-ran `pnpm --filter @scan2serve/web test` (17 files, 55 tests passed; act warnings remain).
+
+### 2026-03-30 — Session 183: ADR-036 Task 1 foundation
+- Added `OrderEventOutbox` schema + migration to persist order events for warehouse ingestion.
+- Implemented outbox worker to ship events to ClickHouse with retry/backoff and database/table auto-creation.
+- Enqueued order events into outbox from order create/payment/status flows and started worker in API bootstrap.
+- Added ClickHouse service and env wiring to `docker-compose.yml`.
+- Documented ClickHouse/outbox env settings in `apps/api/.env.example`.
+
+### 2026-03-30 — Session 184: Redis Streams queue for warehouse feed
+- Updated ADR-036 to route order events through outbox → Redis Streams → ClickHouse.
+- Added Redis Streams publisher + consumer workers and wired the consumer into API bootstrap.
+- Added Redis service/env wiring in `docker-compose.yml` and queue env settings in `apps/api/.env.example`.
+- Resolved compose port collision by mapping ClickHouse native port to host `9002`.
+
+### 2026-03-30 — Session 185: ADR-036 partitioning + retention
+- Added composite primary keys for partitioned `orders` and `order_items` and introduced `order_created_at` on order items.
+- Added migration to convert existing order tables into native monthly partitions.
+- Implemented partition maintenance worker to create/drop monthly partitions and wired it into API bootstrap.
+- Updated ADR-036 and env configs to document partitioning/retention settings.
+
+### 2026-03-30 — Session 186: API tests after partitioning
+- Installed local deps and re-ran `pnpm --filter @scan2serve/api test` (16 files, 99 tests passed; expected warnings for missing AI keys/outbox mocks).
+
+### 2026-03-30 — Session 187: Layer 8 UI polish
+- Enhanced orders dashboard with summary metrics, refresh control, and loading skeletons.
+- Added test-env guard to skip notification fetches in header to reduce act warnings in web tests.
+
+### 2026-03-30 — Session 188: Order status accountability
+- Added `status_actors` JSONB field on orders with migration and status-actor updates on order status transitions.
+- Surfaced status-actor accountability in the orders detail UI.
+
+### 2026-03-30 — Session 190: Status actor flow UI
+- Replaced per-status actor list with a horizontal flow timeline in the orders detail modal.
+
+### 2026-03-30 — Session 191: Status actor arrow highlight
+- Highlighted the active pending→confirmed arrow and moved actor labels to the connectors between statuses.
+
+### 2026-03-30 — Session 192: Vertical workflow timeline
+- Reworked order status activity to a vertical workflow timeline for responsive layouts.
+
+### 2026-03-30 — Session 193: Workflow side pane
+- Moved the order activity workflow into a side pane inside the order detail modal.
+
+### 2026-03-30 — Session 194: Mobile workflow toggle
+- Added a mobile collapsible toggle for the workflow and refactored the activity timeline into a reusable component.
+
+### 2026-03-30 — Session 195: Order modal layout
+- Widened the orders detail modal and made modal width configurable to support side-pane layouts.
+
+### 2026-03-30 — Session 196: Modal mobile overflow fix
+- Constrained modal height and enabled scrolling to avoid mobile overflow.
+
+### 2026-03-30 — Session 197: Workflow connector actors
+- Updated workflow timeline to show completed/current/upcoming states and display actor labels on connectors between steps.
+
+### 2026-03-30 — Session 198: Workflow UI simplification
+- Simplified the workflow timeline to a minimal vertical list with actor labels on connectors.
+
+### 2026-03-30 — Session 199: Workflow connector labels
+- Adjusted connector labels to use the next step actor and removed the "handled by" prefix.
+
+### 2026-03-30 — Session 201: Remove placeholder analytics
+- Removed placeholder analytics cards from dashboard orders and overview pages pending analytics endpoints.
+
+### 2026-03-30 — Session 200: Order summary metrics
+- Excluded cancelled orders from summary metrics and limited revenue to paid orders.
+
+### 2026-03-30 — Session 189: Local dev scripts
+- Added `scripts/setup-local.sh` and `scripts/run-local.sh` for local (non-container) setup and service startup.
+
+### 2026-03-30 — Session 202: ADR-043 checklist complete
+- Marked ADR-043 implementation task checklist as completed in `docs/adr/ADR-043-customer-orders-hub.md`.
+
+### 2026-03-30 — Session 203: Reordered post-ADR TODOs
+- Reordered the post ADR-036 TODO list in `STATUS.md` so analytics endpoints are listed first, followed by private networking and Grafana.

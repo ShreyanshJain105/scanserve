@@ -85,3 +85,35 @@ Project documentation for architecture decisions, process notes, and operational
 ## Updates 2026-03-29
 - Drafted `docs/adr/ADR-038-org-membership-roleless.md` proposing roleless org membership and business-role-only permissions.
 - ADR-038 accepted and implemented: org memberships are roleless, org invites authorized by org owner or any business owner/manager, and business access management is scoped to selected-business roles only.
+- Unpaused ADR-036 (Layer 8 order management) and began order management UI implementation in web.
+
+## Updates 2026-03-29
+- ADR-039 accepted: added cash payments, payment-gated order creation, and UI payment-status tags.
+
+## Updates 2026-03-30
+- ADR-040 accepted: orders date filtering moves to server-side queries using browser timezone.
+
+## Updates 2026-03-30
+- Drafted ADR-041 to require customer login before order placement (QR-scoped auth).
+- ADR-042 accepted: separate customer accounts and require login before order placement.
+
+## Updates 2026-03-30
+- Drafted ADR-042 for separating customer accounts and requiring login before order placement.
+
+## Updates 2026-03-30
+- Drafted ADR-043 to introduce a customer orders hub page (list + selected order detail) and an authenticated customer orders list API.
+- ADR-043 accepted: customer orders hub at `/orders`, remove `/order/:id`, and add customer orders list API with 10-item pagination and active-order default selection.
+- ADR-043 now includes an implementation task checklist covering redirects, route removal, API, tests, and doc updates.
+- ADR-043 implementation underway: `/orders` hub and customer orders list API are now in place; docs updated to remove `/order/[id]` references.
+
+## Updates 2026-03-30
+- Marked ADR-043 implementation tasks as completed (`docs/adr/ADR-043-customer-orders-hub.md`).
+
+## Updates 2026-03-30
+- Updated ADR-036 to specify outbox → Redis Streams → ClickHouse for the warehouse feed pipeline.
+
+## Updates 2026-03-30
+- Updated ADR-036 to document composite primary keys and partitioning for `orders` + `order_items`.
+
+## Updates 2026-03-30
+- Updated ADR-036 with status-actor accountability addendum (statusActors JSON field + UI visibility).

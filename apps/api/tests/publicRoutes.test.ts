@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { createHmac } from "crypto";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { signAccessToken } from "../src/services/authService";
 
 const TestDecimal = vi.hoisted(
   () =>
@@ -57,6 +58,7 @@ const store = vi.hoisted(() => ({
   menuItems: [] as any[],
   orders: [] as any[],
   orderItems: [] as any[],
+  customerUsers: [] as any[],
 }));
 
 const prismaMock = vi.hoisted(() => ({
@@ -81,6 +83,24 @@ const prismaMock = vi.hoisted(() => ({
         return store.businesses.find((b) => b.id === where.id) || null;
       }
       return null;
+    }),
+  },
+  customerUser: {
+    findUnique: vi.fn(async ({ where: { id } }) =>
+      store.customerUsers.find((user) => user.id === id) || null
+    ),
+    findFirst: vi.fn(async ({ where }) => {
+      const candidates = store.customerUsers.filter((user) => {
+        if (where?.OR?.length) {
+          return where.OR.some((condition: any) => {
+            if (condition.email) return user.email === condition.email;
+            if (condition.phone) return user.phone === condition.phone;
+            return false;
+          });
+        }
+        return false;
+      });
+      return candidates[0] || null;
     }),
   },
   table: {
@@ -124,9 +144,25 @@ const prismaMock = vi.hoisted(() => ({
       store.orders.push(record);
       return record;
     }),
-    findUnique: vi.fn(async ({ where: { id }, include }) => {
-      const order = store.orders.find((entry) => entry.id === id);
+    findFirst: vi.fn(async ({ where, include, select }) => {
+      let order = store.orders.find((entry) => entry.id === where?.id);
+      if (where?.customerUserId) {
+        order = store.orders.find(
+          (entry) => entry.id === where.id && entry.customerUserId === where.customerUserId
+        );
+      }
       if (!order) return null;
+      if (select) {
+        const selected: any = {};
+        if (select.id) selected.id = order.id;
+        if (select.updatedAt) selected.updatedAt = order.updatedAt;
+        if (select.createdAt) selected.createdAt = order.createdAt;
+        if (select.paymentStatus) selected.paymentStatus = order.paymentStatus;
+        if (select.razorpayOrderId) selected.razorpayOrderId = order.razorpayOrderId;
+        if (select.paymentMethod) selected.paymentMethod = order.paymentMethod;
+        if (select.customerUserId) selected.customerUserId = order.customerUserId;
+        return selected;
+      }
       const items = store.orderItems.filter((item) => item.orderId === order.id);
       const business = store.businesses.find((b) => b.id === order.businessId) || null;
       if (include?.items && include?.business) {
@@ -140,8 +176,64 @@ const prismaMock = vi.hoisted(() => ({
       }
       return order;
     }),
-    update: vi.fn(async ({ where: { id }, data }) => {
-      const order = store.orders.find((entry) => entry.id === id);
+    findMany: vi.fn(async ({ where, orderBy, take, include }) => {
+      let results = store.orders.filter((entry) => {
+        if (where?.customerUserId && entry.customerUserId !== where.customerUserId) {
+          return false;
+        }
+        if (where?.OR?.length) {
+          return where.OR.some((condition: any) => {
+            if (condition.updatedAt?.lt) {
+              return entry.updatedAt < condition.updatedAt.lt;
+            }
+            if (condition.updatedAt && condition.id?.lt) {
+              const target =
+                condition.updatedAt instanceof Date
+                  ? condition.updatedAt.getTime()
+                  : condition.updatedAt.equals?.getTime?.() ?? condition.updatedAt.equals;
+              return entry.updatedAt.getTime() === target && entry.id < condition.id.lt;
+            }
+            if (condition.updatedAt?.equals && condition.id?.lt) {
+              return (
+                entry.updatedAt.getTime() === condition.updatedAt.equals.getTime?.() &&
+                entry.id < condition.id.lt
+              );
+            }
+            return false;
+          });
+        }
+        return true;
+      });
+
+      if (orderBy?.length) {
+        results = results.sort((a, b) => {
+          for (const rule of orderBy) {
+            if (rule.updatedAt) {
+              const diff = b.updatedAt.getTime() - a.updatedAt.getTime();
+              if (diff !== 0) return diff;
+            }
+            if (rule.id) {
+              if (a.id === b.id) continue;
+              return b.id.localeCompare(a.id);
+            }
+          }
+          return 0;
+        });
+      }
+
+      const limited = typeof take === "number" ? results.slice(0, take) : results;
+
+      if (include?.business) {
+        return limited.map((order) => ({
+          ...order,
+          business: store.businesses.find((b) => b.id === order.businessId) || null,
+        }));
+      }
+      return limited;
+    }),
+    update: vi.fn(async ({ where, data }) => {
+      const targetId = where?.id_createdAt?.id ?? where?.id;
+      const order = store.orders.find((entry) => entry.id === targetId);
       if (!order) return null;
       Object.assign(order, data, { updatedAt: new Date() });
       return order;
@@ -170,7 +262,23 @@ vi.mock("../src/services/razorpay", () => ({
       create: razorpayCreateMock,
     },
   }),
+  isRazorpayConfigured: () =>
+    Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
 }));
+
+const parseCookies = (cookieHeader?: string) => {
+  if (!cookieHeader) return {};
+  return cookieHeader.split(";").reduce((acc, part) => {
+    const [k, v] = part.trim().split("=");
+    if (k) acc[k] = decodeURIComponent(v || "");
+    return acc;
+  }, {} as Record<string, string>);
+};
+
+const customerCookie = (id: string, email: string) => {
+  const token = signAccessToken({ id, email, role: "customer" });
+  return `qr_customer_access=${encodeURIComponent(token)}`;
+};
 
 type SupportedMethod = "get" | "post";
 
@@ -228,14 +336,17 @@ const runMenu = async (path: string, params?: Record<string, string>, query?: Re
   return res;
 };
 
-const runOrderCreate = async (body: Record<string, unknown>) => {
+const runOrderCreate = async (body: Record<string, unknown>, cookies?: string) => {
   const { req, res } = createMocks({
     method: "POST",
     url: "/orders",
+    headers: cookies ? { cookie: cookies } : undefined,
     eventEmitter: EventEmitter,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).body = body;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).cookies = parseCookies(cookies);
   const handler = getRouteHandler("post", "/orders");
   handler(req, res, (err: unknown) => {
     if (err) throw err;
@@ -244,14 +355,36 @@ const runOrderCreate = async (body: Record<string, unknown>) => {
   return res;
 };
 
-const runOrderCheckout = async (orderId: string) => {
+const runOrderList = async (query?: Record<string, string>, cookies?: string) => {
+  const { req, res } = createMocks({
+    method: "GET",
+    url: "/orders",
+    headers: cookies ? { cookie: cookies } : undefined,
+    eventEmitter: EventEmitter,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).query = query ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).cookies = parseCookies(cookies);
+  const handler = getRouteHandler("get", "/orders");
+  handler(req, res, (err: unknown) => {
+    if (err) throw err;
+  });
+  await waitForResponseEnd(res);
+  return res;
+};
+
+const runOrderCheckout = async (orderId: string, cookies?: string) => {
   const { req, res } = createMocks({
     method: "POST",
     url: `/orders/${orderId}/checkout`,
+    headers: cookies ? { cookie: cookies } : undefined,
     eventEmitter: EventEmitter,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).params = { id: orderId };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).cookies = parseCookies(cookies);
   const handler = getRouteHandler("post", "/orders/:id/checkout");
   handler(req, res, (err: unknown) => {
     if (err) throw err;
@@ -260,16 +393,23 @@ const runOrderCheckout = async (orderId: string) => {
   return res;
 };
 
-const runOrderVerify = async (orderId: string, body: Record<string, unknown>) => {
+const runOrderVerify = async (
+  orderId: string,
+  body: Record<string, unknown>,
+  cookies?: string
+) => {
   const { req, res } = createMocks({
     method: "POST",
     url: `/orders/${orderId}/verify-payment`,
+    headers: cookies ? { cookie: cookies } : undefined,
     eventEmitter: EventEmitter,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).params = { id: orderId };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).body = body;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (req as any).cookies = parseCookies(cookies);
   const handler = getRouteHandler("post", "/orders/:id/verify-payment");
   handler(req, res, (err: unknown) => {
     if (err) throw err;
@@ -288,6 +428,7 @@ describe("public routes", () => {
     store.menuItems.length = 0;
     store.orders.length = 0;
     store.orderItems.length = 0;
+    store.customerUsers.length = 0;
     razorpayCreateMock.mockReset();
   });
 
@@ -383,6 +524,16 @@ describe("public routes", () => {
   });
 
   it("creates orders using server-side prices", async () => {
+    process.env.RAZORPAY_KEY_ID = "rzp_test_123";
+    process.env.RAZORPAY_KEY_SECRET = "rzp_test_secret";
+    store.customerUsers.push({
+      id: "cust_1",
+      email: "cust@example.com",
+      phone: null,
+      passwordHash: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     store.businesses.push({
       id: "b1",
       slug: "cafe-aurora",
@@ -406,23 +557,185 @@ describe("public routes", () => {
       price: new Prisma.Decimal("3.25"),
     });
 
-    const res = await runOrderCreate({
-      businessId: "b1",
-      tableId: "t1",
-      customerName: "Asha",
-      items: [
-        { menuItemId: "m1", quantity: 2 },
-        { menuItemId: "m2", quantity: 1 },
-      ],
-    });
+    const res = await runOrderCreate(
+      {
+        businessId: "b1",
+        tableId: "t1",
+        customerName: "Asha",
+        paymentMethod: "razorpay",
+        items: [
+          { menuItemId: "m1", quantity: 2 },
+          { menuItemId: "m2", quantity: 1 },
+        ],
+      },
+      customerCookie("cust_1", "cust@example.com")
+    );
 
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData().data.amount).toBe("14.25");
     expect(store.orderItems).toHaveLength(2);
   });
 
+  it("lists customer orders newest-first with pagination", async () => {
+    store.businesses.push(
+      { id: "b1", slug: "alpha", name: "Alpha", currencyCode: "USD" },
+      { id: "b2", slug: "bravo", name: "Bravo", currencyCode: "INR" }
+    );
+    store.customerUsers.push({ id: "cust-1", email: "cust@example.com" });
+    store.orders.push(
+      {
+        id: "order-1",
+        businessId: "b1",
+        tableId: "t1",
+        status: "confirmed",
+        totalAmount: new Prisma.Decimal("10.00"),
+        paymentStatus: "paid",
+        paymentMethod: "cash",
+        customerUserId: "cust-1",
+        createdAt: new Date("2026-03-29T10:00:00Z"),
+        updatedAt: new Date("2026-03-29T10:00:00Z"),
+      },
+      {
+        id: "order-2",
+        businessId: "b2",
+        tableId: "t2",
+        status: "pending",
+        totalAmount: new Prisma.Decimal("20.00"),
+        paymentStatus: "pending",
+        paymentMethod: "razorpay",
+        customerUserId: "cust-1",
+        createdAt: new Date("2026-03-30T10:00:00Z"),
+        updatedAt: new Date("2026-03-30T10:00:00Z"),
+      },
+      {
+        id: "order-3",
+        businessId: "b1",
+        tableId: "t3",
+        status: "completed",
+        totalAmount: new Prisma.Decimal("30.00"),
+        paymentStatus: "paid",
+        paymentMethod: "cash",
+        customerUserId: "cust-2",
+        createdAt: new Date("2026-03-30T12:00:00Z"),
+        updatedAt: new Date("2026-03-30T12:00:00Z"),
+      }
+    );
+
+    const res = await runOrderList({ limit: "1" }, customerCookie("cust-1", "cust@example.com"));
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().status).toBe(1);
+    expect(res._getJSONData().data.orders).toHaveLength(1);
+    expect(res._getJSONData().data.orders[0].id).toBe("order-2");
+    expect(res._getJSONData().data.orders[0].business.name).toBe("Bravo");
+    expect(res._getJSONData().data.nextCursor).toBe("order-2");
+
+    const resPage2 = await runOrderList(
+      { limit: "2", cursor: res._getJSONData().data.nextCursor },
+      customerCookie("cust-1", "cust@example.com")
+    );
+    expect(resPage2._getJSONData().data.orders).toHaveLength(1);
+    expect(resPage2._getJSONData().data.orders[0].id).toBe("order-1");
+    expect(resPage2._getJSONData().data.nextCursor).toBeNull();
+  });
+
+  it("creates cash orders even without Razorpay config", async () => {
+    delete process.env.RAZORPAY_KEY_ID;
+    delete process.env.RAZORPAY_KEY_SECRET;
+    store.customerUsers.push({
+      id: "cust_1",
+      email: "cust@example.com",
+      phone: null,
+      passwordHash: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    store.businesses.push({
+      id: "b1",
+      slug: "cafe-aurora",
+      name: "Cafe Aurora",
+      currencyCode: "USD",
+      status: "approved",
+      archivedAt: null,
+      blocked: false,
+    });
+    store.tables.push({ id: "t1", businessId: "b1", tableNumber: 1, isActive: true });
+    store.menuItems.push({
+      id: "m1",
+      businessId: "b1",
+      isAvailable: true,
+      price: new Prisma.Decimal("5.50"),
+    });
+
+    const res = await runOrderCreate(
+      {
+        businessId: "b1",
+        tableId: "t1",
+        customerName: "Asha",
+        paymentMethod: "cash",
+        items: [{ menuItemId: "m1", quantity: 1 }],
+      },
+      customerCookie("cust_1", "cust@example.com")
+    );
+
+    expect(res._getStatusCode()).toBe(200);
+    expect(res._getJSONData().data.paymentStatus).toBe("unpaid");
+    expect(store.orders[0].paymentMethod).toBe("cash");
+  });
+
+  it("blocks Razorpay orders when Razorpay is not configured", async () => {
+    delete process.env.RAZORPAY_KEY_ID;
+    delete process.env.RAZORPAY_KEY_SECRET;
+    store.customerUsers.push({
+      id: "cust_1",
+      email: "cust@example.com",
+      phone: null,
+      passwordHash: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    store.businesses.push({
+      id: "b1",
+      slug: "cafe-aurora",
+      name: "Cafe Aurora",
+      currencyCode: "USD",
+      status: "approved",
+      archivedAt: null,
+      blocked: false,
+    });
+    store.tables.push({ id: "t1", businessId: "b1", tableNumber: 1, isActive: true });
+    store.menuItems.push({
+      id: "m1",
+      businessId: "b1",
+      isAvailable: true,
+      price: new Prisma.Decimal("5.50"),
+    });
+
+    const res = await runOrderCreate(
+      {
+        businessId: "b1",
+        tableId: "t1",
+        customerName: "Asha",
+        paymentMethod: "razorpay",
+        items: [{ menuItemId: "m1", quantity: 1 }],
+      },
+      customerCookie("cust_1", "cust@example.com")
+    );
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(res._getJSONData().error.code).toBe("RAZORPAY_NOT_CONFIGURED");
+  });
+
   it("creates a Razorpay order for checkout", async () => {
     process.env.RAZORPAY_KEY_ID = "rzp_test_123";
+    process.env.RAZORPAY_KEY_SECRET = "rzp_test_secret";
+    store.customerUsers.push({
+      id: "cust_1",
+      email: "cust@example.com",
+      phone: null,
+      passwordHash: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     store.businesses.push({
       id: "b1",
       slug: "cafe-aurora",
@@ -438,16 +751,18 @@ describe("public routes", () => {
       tableId: "t1",
       totalAmount: new Prisma.Decimal("12.50"),
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       status: "pending",
       customerName: "Asha",
       customerPhone: null,
+      customerUserId: "cust_1",
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
     razorpayCreateMock.mockResolvedValueOnce({ id: "order_rzp_1" });
 
-    const res = await runOrderCheckout("order-1");
+    const res = await runOrderCheckout("order-1", customerCookie("cust_1", "cust@example.com"));
     expect(res._getStatusCode()).toBe(200);
     const data = res._getJSONData().data;
     expect(data.razorpayOrderId).toBe("order_rzp_1");
@@ -458,16 +773,26 @@ describe("public routes", () => {
 
   it("verifies Razorpay payment signatures and confirms order", async () => {
     process.env.RAZORPAY_KEY_SECRET = "secret_test";
+    store.customerUsers.push({
+      id: "cust_1",
+      email: "cust@example.com",
+      phone: null,
+      passwordHash: "x",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     store.orders.push({
       id: "order-2",
       businessId: "b1",
       tableId: "t1",
       totalAmount: new Prisma.Decimal("9.00"),
       paymentStatus: "pending",
+      paymentMethod: "razorpay",
       status: "pending",
       razorpayOrderId: "order_rzp_2",
       customerName: "Asha",
       customerPhone: null,
+      customerUserId: "cust_1",
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -475,11 +800,15 @@ describe("public routes", () => {
     const payload = "order_rzp_2|pay_123";
     const signature = createHmac("sha256", "secret_test").update(payload).digest("hex");
 
-    const res = await runOrderVerify("order-2", {
-      razorpay_order_id: "order_rzp_2",
-      razorpay_payment_id: "pay_123",
-      razorpay_signature: signature,
-    });
+    const res = await runOrderVerify(
+      "order-2",
+      {
+        razorpay_order_id: "order_rzp_2",
+        razorpay_payment_id: "pay_123",
+        razorpay_signature: signature,
+      },
+      customerCookie("cust_1", "cust@example.com")
+    );
 
     expect(res._getStatusCode()).toBe(200);
     expect(store.orders[0].paymentStatus).toBe("paid");

@@ -111,7 +111,8 @@ scan2serve/
 
 ## Database Schema
 
-- `users` — id, email, password_hash, role (customer|business|admin), created_at, updated_at
+- `users` — id, email, password_hash, role (business|admin), created_at, updated_at
+- `customer_users` — id, email?, phone?, password_hash, created_at, updated_at
 - `businesses` — id, user_id (FK), name, slug, currency_code, description, logo_url, address, phone, status (pending|approved|rejected|archived), archived_at, archived_previous_status, created_at, updated_at
 - `business_rejections` — rejection history for businesses (reason + created_at)
 - `categories` — id, business_id (FK), name, sort_order
@@ -119,9 +120,10 @@ scan2serve/
 - `tables` — id, business_id (FK), table_number (int, unique per business), label (optional), is_active, created_at
 - `qr_codes` — id, business_id (FK), table_id (FK), unique_code, qr_image_url, created_at
 - `qr_code_rotations` — tracks QR token regeneration with optional grace expiry
-- `orders` — id, business_id (FK), table_id (FK), status (pending|confirmed|preparing|ready|completed|cancelled), total_amount, stripe_payment_id, customer_name, customer_phone, created_at
-- `order_items` — id, order_id (FK), menu_item_id (FK), quantity, unit_price, special_instructions
-- `refresh_tokens` — hashed refresh token records with expiry/revocation state
+- `orders` — id, business_id (FK), table_id (FK), customer_user_id (FK), status (pending|confirmed|preparing|ready|completed|cancelled), total_amount, payment_status, payment_method, razorpay_order_id, razorpay_payment_id, customer_name, customer_phone, created_at (partition key; composite PK with id)
+- `order_items` — id, order_id (FK), order_created_at (partition/FK key), menu_item_id (FK), quantity, unit_price, special_instructions
+- `refresh_tokens` — hashed refresh token records for business/admin
+- `customer_refresh_tokens` — hashed refresh token records for customers
 - `deleted_asset_cleanups` — retryable queue for deferred S3 object deletions
 - `archived_business_deletion_audits` — immutable audit records for retention-triggered archived business deletions
 
@@ -158,17 +160,21 @@ Current API implementation (selected, high-signal routes):
 ### Org + Memberships
 - `POST /api/business/org` — create org (owner membership)
 - `GET /api/business/org/membership` — current user org membership (or null)
+- `GET /api/business/org/members` — list org members (roleless, includes `isOwner`)
 - `GET /api/business/org/invites/check`
 - `POST /api/business/org/invites`
 - `POST /api/business/org/invites/:id/accept`
 - `POST /api/business/org/invites/:id/decline`
 - `POST /api/business/org/leave`
 - `POST /api/business/memberships` — assign business membership (owner/manager)
+- `GET /api/business/memberships` — list business memberships for a business
+- `DELETE /api/business/memberships` — revoke business membership (owner/manager)
 
 ### Order Management (Business)
-- `GET /api/business/orders` — status filter + cursor pagination
+- `GET /api/business/orders` — status/date filter + cursor pagination (`date=today|yesterday|all`, `tzOffset` minutes)
 - `GET /api/business/orders/:id` — order detail
 - `PATCH /api/business/orders/:id/status` — status transition
+- `PATCH /api/business/orders/:id/mark-paid` — mark cash orders as paid
 
 ### AI
 - `GET /api/ai/menu/item-suggestions`
@@ -176,6 +182,11 @@ Current API implementation (selected, high-signal routes):
 
 ### QR / Public
 - `GET /api/public/qr/:qrToken` — resolve QR token to business/table context
+- `GET /api/public/orders` — list customer orders (cursor pagination)
+- `POST /api/public/orders` — create order (server computes totals)
+- `POST /api/public/orders/:id/checkout` — create Razorpay checkout
+- `POST /api/public/orders/:id/verify-payment` — verify Razorpay payment
+- `GET /api/public/orders/:id` — order detail for customer
 - `GET /api/business/tables` — list tables (pagination/filter) with QR metadata
 - `POST /api/business/tables/bulk` — bulk create tables with QR issuance
 - `PATCH /api/business/tables/:tableId` — update table label/active state
@@ -191,7 +202,6 @@ Current API implementation (selected, high-signal routes):
 
 ### Placeholders / Not fully implemented yet
 - `GET /api/business/menu` currently returns placeholder payload.
-- Orders/payments route namespaces are not mounted yet in `apps/api/src/index.ts`.
 
 ## Feature Dependency Pyramid
 
@@ -268,7 +278,7 @@ Build features in this order. Each layer depends on the layers above it.
   │ • Razorpay signature verification                             │
   │ • Payment flow: cart → Razorpay Checkout → status page        │
   │ • Order confirmation with order number                        │
-  │ • Order status page /order/[id] (polling for updates)         │
+  │ • Customer orders hub /orders (list + selected order detail)  │
   └────────────────────────────────────────────────────────────────┘
 
  ┌──────────────────────────────────────────────────────────────────┐
@@ -336,15 +346,16 @@ Build features in this order. Each layer depends on the layers above it.
 | `/dashboard/org-invite/[inviteId]` | business | Org invite preview + accept/decline |
 | `/dashboard/menu` | business | Menu/category management + image + AI assist |
 | `/dashboard/tables` | business | Tables + QR management |
+| `/dashboard/orders` | business | Order management (polling list + status transitions) |
 | `/admin` | admin | Moderation panel (approve/reject businesses) |
 | `/qr/[qrToken]` | public | QR entry route (resolve + redirect) |
 | `/qr/login` | public | QR-scoped customer login |
 | `/qr/register` | public | QR-scoped customer registration |
 | `/menu/[slug]` | public | Public menu placeholder route |
-| `/order/[id]` | public | Order status page |
+| `/orders` | public | Customer orders hub (list + detail) |
 
 Planned but not yet present in web app routes:
-- `/dashboard/orders`
+- (none for Layer 8 UI; `/dashboard/orders` is now implemented)
 
 ## Key Design Decisions
 
@@ -396,6 +407,10 @@ This section is the high-level source of truth for what is already implemented a
   - QR token regeneration/history plus table-scoped single QR downloads (PNG/SVG).
   - Batch QR ZIP export endpoint for active/selected tables.
   - `/dashboard/tables` UI for table operations and QR download workflows.
+
+- **Layer 8 Order Management**
+  - Business order list/detail/status endpoints with cursor pagination and status transitions.
+  - `/dashboard/orders` UI with polling list, detail modal, and action buttons.
 
 - **AI Assistance (ADR-010 / ADR-011 / ADR-013)**
   - Category/item suggestion endpoints with deterministic fallback behavior.
@@ -567,7 +582,6 @@ This section is the high-level source of truth for what is already implemented a
 - Fixed dashboard hook order regression by moving member-map `useMemo` above early returns.
 - Org-invite preview page now uses `useParams` to read `inviteId` instead of direct params prop access (Promise params warning fix).
 - Dashboard now shows a waiting-for-access message for non-owners with no assigned businesses (instead of showing create-business CTA).
-- Org invites now default org role to `staff` (no role selection at invite); business roles are assigned when granting business access.
 - Updated org-invite web tests to mock `useParams` after switching invite page to hook-based params access.
 - Added business membership removal endpoint and UI controls to revoke access from the manage-business-access modal.
 - Manage-business-access modal now hides removal controls for self and non-owner/manager users (staff get read-only view).
@@ -579,3 +593,45 @@ This section is the high-level source of truth for what is already implemented a
 - Business access management and dashboard permissions now depend on the selected business role only (owner/manager), not org roles; org member summaries now expose `isOwner` instead of role.
 - Added migration `20260329120000_roleless_org_memberships` dropping org role columns and updated shared types/tests accordingly.
 - Fixed dashboard tables QR download CSRF failures by exporting CSRF helpers and attaching `x-csrf-token` to binary download POSTs (apps/web/src/lib/api.ts, apps/web/src/app/dashboard/tables/page.tsx).
+- API test fix: mocked `prisma.org.findUnique` in org invite tests to align with roleless org invite notifications (apps/api/tests/orgInviteRoutes.test.ts).
+- Layer 8 UI started: added orders management page with polling list, detail modal, and status transitions plus dashboard entry point (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Added web tests for orders dashboard (`apps/web/tests/orders-page.test.tsx`).
+- Synced root CLAUDE endpoints/routes to roleless org membership and `/dashboard/orders`; removed outdated placeholders.
+- ADR-039 accepted: orders now require `paymentMethod`, cash orders default to `paymentStatus="unpaid"`, Razorpay orders are blocked when not configured, and business can mark cash orders paid.
+
+## Updates 2026-03-30
+- ADR-042 accepted: customer accounts are separated into `customer_users`, orders require customer login, and order status access is restricted to the owning customer.
+- QR customer auth UI now uses a single "Email or phone" field for login/registration, inferring identifier type before submit (`apps/web/src/app/qr/login/page.tsx`, `apps/web/src/app/qr/register/page.tsx`).
+- Drafted ADR-043 for a customer orders hub page (list + selected order detail) with a customer-scoped orders list API.
+- ADR-043 accepted: `/orders` hub replaces `/order/:id`, customer orders list API is paginated at 10 items, and default selection prefers most recently updated active orders.
+- ADR-043 now includes an implementation task checklist (redirect updates, `/order/[id]` removal, API + tests, and doc updates).
+- Implemented `/orders` customer hub UI, removed `/order/[id]`, and updated checkout redirects to `/orders?orderId=...`.
+- Added `GET /api/public/orders` with cursor pagination and shared customer orders list types.
+- Added `View orders` link in customer profile dropdown in the web navbar (`apps/web/src/components/layout/app-header.tsx`).
+- Orders hub now renders larger current-order cards with a collapsed/smaller history section (`apps/web/src/components/public/customer-orders-hub.tsx`).
+- Updated public routes test mock to include `prisma.order.findFirst` for customer order pagination (`apps/api/tests/publicRoutes.test.ts`).
+- Ran API test suite: `pnpm --filter @scan2serve/api test` passed (16 files, 99 tests; missing AI key warnings expected).
+- Fixed orders hub test assertions and re-ran web tests: `pnpm --filter @scan2serve/web test` passed (17 files, 55 tests; act warnings remain).
+- Added order events outbox schema + migration and enqueue wiring for ADR-036 warehouse feed (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260330123000_order_event_outbox/migration.sql`, `apps/api/src/services/orderEvents.ts`).
+- Added ClickHouse outbox worker and API boot wiring (`apps/api/src/services/orderEventOutbox.ts`, `apps/api/src/index.ts`), plus compose service + env knobs (`docker-compose.yml`, `apps/api/.env.example`).
+- Updated ADR-036 warehouse feed to outbox → Redis Streams → ClickHouse; added Redis Streams publisher/consumer workers and Redis service/env wiring.
+- Updated docker-compose ClickHouse port mapping to avoid MinIO conflict (host `9002` → container `9000`).
+- Implemented ADR-036 partitioning with composite keys for `orders` + `order_items`, added `order_created_at`, and added a partition maintenance worker for monthly partitions/retention.
+- Re-ran API tests after partitioning changes (16 files, 99 tests passed; warnings for missing AI keys/outbox mocks).
+- Polished orders dashboard UI with summary stats + refresh controls and added a test-env guard for header notifications fetch to reduce act warnings.
+- Added per-phase order status accountability via `statusActors` JSON on orders and surfaced it in the orders detail UI.
+- Added local setup/run shell scripts for non-container dev workflows (`scripts/setup-local.sh`, `scripts/run-local.sh`).
+- Adjusted order status accountability to render as a flow timeline in the orders detail view.
+- Highlighted active order-status arrow and moved actor labels onto the connector between phases in the orders detail timeline.
+- Switched the order activity timeline to a vertical workflow layout for better responsiveness.
+- Moved the order activity workflow into a side pane within the order detail modal.
+- Added a mobile collapsible toggle for the workflow side pane and refactored the activity timeline into a reusable component.
+- Added configurable modal widths and widened the orders detail modal to avoid awkward side-pane overlap.
+- Made modal dialogs scrollable and mobile-safe by constraining height and aligning to top on small screens.
+- Updated order workflow timeline to show completed/current/upcoming states with actor labels on connectors.
+- Simplified the workflow timeline to a minimal vertical list with connector actor labels.
+- Adjusted workflow connector labels to use the next step actor and removed the "handled by" prefix.
+- Removed placeholder analytics cards from dashboard orders and overview pages pending analytics endpoints.
+- Updated orders summary metrics to exclude cancelled orders and count revenue from paid orders only.
+- Marked ADR-043 implementation tasks as completed (`docs/adr/ADR-043-customer-orders-hub.md`).
+- Reordered the post ADR-036 TODOs in `STATUS.md` so analytics endpoints appear first, followed by private networking and Grafana.

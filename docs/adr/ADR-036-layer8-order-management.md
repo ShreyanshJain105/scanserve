@@ -1,6 +1,6 @@
 # ADR-036: Layer 8 Order Management (Business Dashboard)
 
-- Status: Paused
+- Status: Accepted
 - Date: 2026-03-27
 
 ## Context
@@ -27,13 +27,17 @@
    - Older operational-order data is dropped from Postgres after it has been shipped to the warehouse.
 
 4) **Partitioning**
-   - Partition `orders` (and dependent `order_items`) by month for efficient retention.
+   - Partition `orders` and `order_items` by month on `created_at` for efficient retention.
    - Each monthly partition holds all restaurants’ orders for that month.
    - Automated partition creation + drop policy for rolling 6-month retention.
+   - Native partitioning requires composite primary keys:
+     - `orders` primary key becomes `(id, created_at)`
+     - `order_items` uses `(id, order_created_at)` and stores `order_created_at` to preserve FK integrity
 
 5) **Event queue + warehouse**
-   - Every order create/update emits an **order event** into a queue.
-   - Downstream consumer writes to a data warehouse for historical and complex analytics.
+   - Every order create/update emits an **order event** into an outbox table.
+   - Outbox worker publishes those events into a **Redis Streams** queue.
+   - Downstream consumer reads the stream and writes to ClickHouse for historical and complex analytics.
    - Dashboards use:
      - Postgres for realtime/operational queries,
      - Warehouse for historical analytics.
@@ -48,11 +52,21 @@
    - API route tests for list/detail/status validation.
    - Web tests for status transitions + list refresh behavior.
 
+9) **Status Attribution (Addendum)**
+   - Store per-phase attribution on the order record as a JSON blob.
+   - Field: `statusActors` (JSON) with string values per phase.
+   - Keys: `confirmedBy`, `preparingBy`, `readyBy`, `completedBy`, `cancelledBy`.
+   - Value format: human-readable text string (future-friendly, e.g. display name; fallback to email when available).
+   - Update on each status transition to capture the latest actor.
+   - Visible in business order dashboard details (for users with order access).
+
 ## Consequences
 - Enables basic operational flow without introducing WebSockets.
 - Requires careful status validation to avoid invalid transitions.
 - Introduces data lifecycle management (partition creation/drop) and warehouse pipeline operations.
-- Requires clear event schema + idempotency guarantees for queue processing.
+- Composite primary keys are required for partitioned orders; lookups that update orders must use `(id, created_at)`.
+- Adds Redis to infra and introduces outbox + queue processing; requires clear event schema + idempotency guarantees for queue processing.
+- Adds lightweight accountability without a full audit log; future migration to an audit table remains possible.
 
 ## Questions & Answers
 
@@ -66,6 +80,7 @@
 - Q7: What **warehouse target** are you envisioning (e.g., BigQuery/Snowflake/Redshift/ClickHouse), or should we define an abstract sink for now?
 - Q8: What **event schema** do you want (full order snapshot per event vs. diff/patch), and do you need **idempotency keys**?
 - Q9: Should **deletes** in Postgres be hard deletes after 6 months, or do we keep a minimal tombstone?
+- Q10: Should we store per-phase accountability for order status transitions, and where should it be visible?
 
 ### Answers (to be filled by user)
 - A1:
@@ -92,3 +107,4 @@
 - A7: ClickHouse
 - A8: Full snapshot events. Warehouse uses `eventId` for dedupe and upserts by `orderId` only if `eventCreatedAt` is newer than the stored warehouse `eventCreatedAt`.
 - A9: Hard delete from Postgres after 6 months.
+- A10: Track per-phase attribution on orders using a JSON `statusActors` field with string values; show it on order dashboard details.

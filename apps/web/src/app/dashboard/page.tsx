@@ -254,6 +254,10 @@ export default function DashboardPage() {
   const canManageMenuAndTables =
     selectedBusinessRole === "owner" || selectedBusinessRole === "manager";
   const canManageBusiness = selectedBusinessRole === "owner";
+  const canViewOrders =
+    selectedBusinessRole === "owner" ||
+    selectedBusinessRole === "manager" ||
+    selectedBusinessRole === "staff";
   const canInvite =
     isOrgOwner ||
     businesses.some((business) => {
@@ -292,6 +296,14 @@ export default function DashboardPage() {
 
   const guardOrgInvite = (message: string) => {
     if (!canInvite) {
+      showToast({ variant: "error", message });
+      return false;
+    }
+    return true;
+  };
+
+  const guardOrderAccess = (message: string) => {
+    if (!canViewOrders) {
       showToast({ variant: "error", message });
       return false;
     }
@@ -692,6 +704,18 @@ export default function DashboardPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Active business overview</h2>
             <div className="flex items-center gap-2">
+              {canViewOrders && (
+                <button
+                  onClick={() => {
+                    if (!guardOrderAccess("Only assigned team members can view orders.")) return;
+                    if (!guardBusinessActive()) return;
+                    router.push("/dashboard/orders");
+                  }}
+                  className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700"
+                >
+                  View orders
+                </button>
+              )}
               {selectedBusiness?.status === "archived" && canManageBusiness ? (
                 <button
                   onClick={runRestore}
@@ -714,38 +738,9 @@ export default function DashboardPage() {
           </div>
 
           <div className={isBlocked ? "pointer-events-none blur-[2px]" : ""}>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div
-                className={`rounded-lg border p-4 ${
-                  selectedBusiness?.status === "archived"
-                    ? "border-red-200 bg-red-100/60"
-                    : ""
-                }`}
-              >
-                <p className="text-sm text-gray-500">Today orders</p>
-                <p className="mt-2 text-2xl font-semibold">0</p>
-              </div>
-              <div
-                className={`rounded-lg border p-4 ${
-                  selectedBusiness?.status === "archived"
-                    ? "border-red-200 bg-red-100/60"
-                    : ""
-                }`}
-              >
-                <p className="text-sm text-gray-500">Pending orders</p>
-                <p className="mt-2 text-2xl font-semibold">0</p>
-              </div>
-              <div
-                className={`rounded-lg border p-4 ${
-                  selectedBusiness?.status === "archived"
-                    ? "border-red-200 bg-red-100/60"
-                    : ""
-                }`}
-              >
-                <p className="text-sm text-gray-500">Revenue</p>
-                <p className="mt-2 text-2xl font-semibold">$0.00</p>
-              </div>
-            </div>
+            <p className="text-sm text-gray-500">
+              Analytics summaries will appear once dedicated analytics endpoints are available.
+            </p>
           </div>
 
           {isBlocked && (

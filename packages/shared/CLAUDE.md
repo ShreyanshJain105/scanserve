@@ -42,3 +42,10 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 ## Updates 2026-03-29
 - Added `BusinessProfile.businessRole` plus `OrgMemberSummary` and `BusinessMemberSummary` types to support RBAC assignment UI.
 - Removed `OrgRole` and org role fields from shared types; org membership and org member summaries now expose `isOwner` instead of role to support roleless org membership.
+
+## Updates 2026-03-29
+- Added `paymentMethod` and `unpaid` payment status to shared order types to support cash orders.
+
+## Updates 2026-03-30
+- Auth request types now allow phone identifiers for customer login/register (`LoginRequest`, `RegisterRequest`).
+- Added customer orders hub response types (`CustomerOrderSummary`, `CustomerOrdersListResponse`).
