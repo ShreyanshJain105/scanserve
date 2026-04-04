@@ -11,16 +11,16 @@
 
 **Date:** 2026-04-04
 **What was done:**
-- Added `cache: "no-store"` for GET requests in `apiFetch` to avoid stale polling responses.
-- Added focus/visibility refresh triggers on the orders dashboard so polling updates when the tab regains focus.
-- Updated `apps/web/CLAUDE.md` and root `CLAUDE.md` with the new polling/cache notes.
+- Confirmed orders dashboard polling is working in a live check (per user).
+- Accepted ADR-044 and implemented order dashboard toast + sound notifications for new orders while the page is visible.
+- Added bundled notification tone at `apps/web/public/sounds/order-notification.wav`.
+- Updated docs/root/web CLAUDE notes for ADR-044 and implementation context.
 
 **What's NOT done yet:**
 - Layer 8 polish, analytics endpoints, infra hardening remain (Razorpay intentionally skipped for now).
 
 **Next step:**
-1. Verify orders dashboard now updates automatically without manual refresh in a live session.
-2. Choose the next bucket: Layer 8 polish, analytics endpoints, or infra hardening.
+1. Decide the next bucket after notifications: Layer 8 polish, analytics endpoints, or infra hardening.
 
 **Build progress:**
 ```
@@ -936,6 +936,10 @@ Layer 11: Polish & Deploy
 
 ---
 
+### 2026-04-04 — Session 162: ADR-044 draft (order notifications)
+- Drafted ADR-044 for order dashboard toast + sound notifications and captured open questions for triggering, mute behavior, and sound asset choice.
+- Noted live confirmation that orders dashboard polling is working.
+
 ## Decisions Log
 
 | # | Decision | Why | Date |
@@ -979,6 +983,7 @@ Layer 11: Polish & Deploy
 | ADR-040 | Server-side order date filtering — Accepted | Move date filtering to DB queries using browser timezone and `updatedAt` window | 2026-03-30 |
 | ADR-042 | Separate customer accounts + require login before orders — Accepted | Allow same-email business/customer accounts, enforce customer login, and restrict order access to owner | 2026-03-30 |
 | ADR-043 | Customer orders hub page — Accepted | Add `/orders` hub with paginated customer orders list API and remove `/order/:id` deep links | 2026-03-30 |
+| ADR-044 | Order dashboard notifications (toast + sound) — Accepted | Notify operators of new orders with toast + sound while dashboard is open | 2026-04-04 |
 
 ---
 
@@ -1146,3 +1151,7 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 ### 2026-04-04 — Session 161: Orders polling freshness
 - Set client GET requests to use `cache: "no-store"` in `apiFetch` to prevent stale polling responses.
 - Added focus/visibility refresh trigger for orders dashboard polling so new orders appear without manual refresh.
+
+### 2026-04-04 — Session 163: Order notifications (toast + sound)
+- Accepted ADR-044 and implemented new-order toast + sound notifications on the orders dashboard.
+- Added bundled notification tone at `apps/web/public/sounds/order-notification.wav`.

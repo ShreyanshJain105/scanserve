@@ -450,3 +450,4 @@ pnpm lint   # run Next.js ESLint
 - Updated web compose command to run `next dev` from `/app/apps/web`; web healthcheck now returns 200 with manifests present.
 - Set `apiFetch` GET requests to use `cache: "no-store"` to avoid stale order lists when polling (`apps/web/src/lib/api.ts`).
 - Added focus/visibility refresh trigger for the orders dashboard polling so new orders appear without manual refresh (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Orders dashboard now triggers a toast + sound when a new order arrives while the page is visible, using a bundled tone (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/public/sounds/order-notification.wav`).

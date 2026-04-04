@@ -117,3 +117,9 @@ Project documentation for architecture decisions, process notes, and operational
 
 ## Updates 2026-03-30
 - Updated ADR-036 with status-actor accountability addendum (statusActors JSON field + UI visibility).
+
+## Updates 2026-04-04
+- ADR-044 accepted: order dashboard notifications will use toasts + a bundled sound tone.
+
+## Updates 2026-04-04
+- Drafted ADR-044 for order dashboard notifications using toast + sound (`docs/adr/ADR-044-order-notifications-toast-sound.md`).

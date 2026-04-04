@@ -640,6 +640,8 @@ This section is the high-level source of truth for what is already implemented a
 - Attempted web test triage; `pnpm`/`node` are unavailable in this environment so tests could not be executed.
 - Next step is to get failing web test output or install the toolchain to run `pnpm --filter @scan2serve/web test`.
 - Updated `AppHeader` tests to force `NODE_ENV=production` in notification-fetch cases so the test-env guard no longer blocks mocked notification calls (`apps/web/tests/app-header.test.tsx`).
+- Accepted ADR-044 and added order dashboard new-order toast + sound notification logic with bundled sound asset (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/public/sounds/order-notification.wav`).
+- Drafted ADR-044 for order dashboard notifications using toast + sound (`docs/adr/ADR-044-order-notifications-toast-sound.md`).
 - Docker compose hardening: added per-app `node_modules` volumes for `apps/web` and `apps/api` (and tests) to avoid stale host `node_modules` interfering with container installs (`docker-compose.yml`).
 - Added partition guard to skip monthly partition maintenance when the base `orders` tables are not partitioned, preventing repeated `42P17` failures on fresh DBs (`apps/api/src/services/orderPartitionMaintenance.ts`).
 - Updated docker compose API boot to run `pnpm --filter @scan2serve/api db:migrate` instead of `db:push` so raw SQL migrations (including partitioning) apply on fresh DBs (`docker-compose.yml`).

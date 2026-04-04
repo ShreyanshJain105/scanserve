@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth-context";
 import { apiFetch } from "../../../lib/api";
@@ -190,6 +190,10 @@ export default function DashboardOrdersPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailOrder, setDetailOrder] = useState<OrderDetail | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const latestSignatureRef = useRef<string | null>(null);
+  const notificationsPrimedRef = useRef(false);
+  const hasInteractedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const selectedBusinessRole =
     selectedBusiness?.businessRole ?? (selectedBusiness?.userId === user?.id ? "owner" : null);
@@ -235,7 +239,7 @@ export default function DashboardOrdersPage() {
     status.charAt(0).toUpperCase() + status.slice(1);
 
   const loadOrders = async ({ reset }: { reset: boolean }) => {
-    if (!headers) return;
+    if (!headers) return null;
     const params = new URLSearchParams();
     if (dateFilter !== "all") params.set("date", dateFilter);
     params.set("tzOffset", String(-new Date().getTimezoneOffset()));
@@ -250,6 +254,7 @@ export default function DashboardOrdersPage() {
     setOrders((current) => (reset ? data.orders : [...current, ...data.orders]));
     setNextCursor(data.nextCursor);
     setHasMore(Boolean(data.hasMore));
+    return data;
   };
 
   const refreshOrders = async (opts?: { silent?: boolean }) => {
@@ -258,7 +263,44 @@ export default function DashboardOrdersPage() {
       if (orders.length === 0) setInitialLoading(true);
     }
     try {
-      await loadOrders({ reset: true });
+      const data = await loadOrders({ reset: true });
+      if (data) {
+        const latest = data.orders.reduce<OrderSummary | null>((current, order) => {
+          if (!current) return order;
+          const currentTime = new Date(current.createdAt).getTime();
+          const nextTime = new Date(order.createdAt).getTime();
+          if (nextTime > currentTime) return order;
+          if (nextTime === currentTime && order.id > current.id) return order;
+          return current;
+        }, null);
+        const latestSignature = latest ? `${latest.createdAt}-${latest.id}` : null;
+        const shouldNotify =
+          notificationsPrimedRef.current &&
+          latestSignature &&
+          latestSignature !== latestSignatureRef.current &&
+          document.visibilityState === "visible";
+        if (latestSignature) {
+          latestSignatureRef.current = latestSignature;
+        }
+        if (!notificationsPrimedRef.current) {
+          notificationsPrimedRef.current = true;
+        }
+        if (shouldNotify) {
+          showToast({
+            title: "New order",
+            message: "A new order just came in.",
+          });
+          if (hasInteractedRef.current) {
+            if (!audioRef.current) {
+              audioRef.current = new Audio("/sounds/order-notification.wav");
+              audioRef.current.preload = "auto";
+              audioRef.current.volume = 0.7;
+            }
+            audioRef.current.currentTime = 0;
+            void audioRef.current.play().catch(() => {});
+          }
+        }
+      }
       setLastUpdated(new Date());
     } catch (error) {
       showToast({
@@ -375,6 +417,23 @@ export default function DashboardOrdersPage() {
   useEffect(() => {
     if (!loading && !user) router.push("/home");
   }, [loading, user, router]);
+
+  useEffect(() => {
+    latestSignatureRef.current = null;
+    notificationsPrimedRef.current = false;
+  }, [headers, dateFilter]);
+
+  useEffect(() => {
+    const markInteraction = () => {
+      hasInteractedRef.current = true;
+    };
+    window.addEventListener("pointerdown", markInteraction, { once: true });
+    window.addEventListener("keydown", markInteraction, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", markInteraction);
+      window.removeEventListener("keydown", markInteraction);
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading && user?.role === "business" && !selectedBusinessRole) {
