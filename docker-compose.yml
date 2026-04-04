@@ -1,7 +1,6 @@
 services:
   minio:
     image: minio/minio:latest
-    container_name: scan2serve-minio
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -20,7 +19,6 @@ services:
 
   db:
     image: postgres:15-alpine
-    container_name: scan2serve-db
     environment:
       POSTGRES_DB: scan2serve
       POSTGRES_USER: scan2serve
@@ -38,12 +36,12 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
-    container_name: scan2serve-clickhouse
     ports:
       - "8123:8123"
       - "9002:9000"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse-users:/etc/clickhouse-server/users.d
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/ping >/dev/null 2>&1 || exit 1"]
       interval: 10s
@@ -53,7 +51,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: scan2serve-redis
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
@@ -68,7 +65,6 @@ services:
 
   api:
     image: node:20-alpine
-    container_name: scan2serve-api
     working_dir: /app
     env_file:
       - ./apps/api/.env
@@ -90,7 +86,7 @@ services:
       CLICKHOUSE_DATABASE: scan2serve
       REDIS_URL: redis://redis:6379
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api db:migrate && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api dev"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api db:migrate:deploy && pnpm --filter @scan2serve/api db:generate && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api clickhouse:users && pnpm --filter @scan2serve/api clickhouse:bootstrap && pnpm --filter @scan2serve/api dev"
     ports:
       - "4000:4000"
     depends_on:
@@ -111,7 +107,6 @@ services:
 
   web:
     image: node:20-alpine
-    container_name: scan2serve-web
     working_dir: /app
     env_file:
       - ./apps/web/.env
@@ -143,7 +138,7 @@ services:
 
   tests:
     image: node:20-alpine
-    container_name: scan2serve-tests
+    profiles: ["tests"]
     working_dir: /app
     volumes:
       - ./:/app

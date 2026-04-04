@@ -113,7 +113,7 @@ scan2serve/
 
 - `users` — id, email, password_hash, role (business|admin), created_at, updated_at
 - `customer_users` — id, email?, phone?, password_hash, created_at, updated_at
-- `businesses` — id, user_id (FK), name, slug, currency_code, description, logo_url, address, phone, status (pending|approved|rejected|archived), archived_at, archived_previous_status, created_at, updated_at
+- `businesses` — id, user_id (FK), name, slug, currency_code, country_code, timezone, description, logo_url, address, phone, status (pending|approved|rejected|archived), archived_at, archived_previous_status, created_at, updated_at
 - `business_rejections` — rejection history for businesses (reason + created_at)
 - `categories` — id, business_id (FK), name, sort_order
 - `menu_items` — id, category_id (FK), business_id (FK), name, description, price, image_path, is_available, dietary_tags[], sort_order
@@ -659,3 +659,19 @@ This section is the high-level source of truth for what is already implemented a
 - Rebuilt compose; web healthcheck now returns 200 and all services show healthy in `docker compose ps`.
 - Set client `apiFetch` GET requests to use `cache: "no-store"` to prevent stale polling responses (`apps/web/src/lib/api.ts`).
 - Added focus/visibility refresh trigger for orders dashboard polling so new orders appear without manual refresh (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Added business `countryCode` + `timezone` fields and onboarding inputs for analytics windowing; default timezone is country-driven with browser fallback (`apps/api/prisma/schema.prisma`, `apps/web/src/app/dashboard/onboarding/page.tsx`).
+- Added dashboard analytics overview endpoint (Postgres + ClickHouse with Redis caching) and UI cards on dashboard/orders pages (`apps/api/src/routes/analytics.ts`, `apps/api/src/services/analytics.ts`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
+- Fixed onboarding country/timezone selects to use explicit label bindings for accessibility + tests (`apps/web/src/app/dashboard/onboarding/page.tsx`).
+- Added ClickHouse bootstrap script to create `scan2serve` database + `order_events` table (`apps/api/scripts/clickhouse-bootstrap.ts`).
+- Wired ClickHouse bootstrap into compose API startup so ClickHouse is seeded before the API serves analytics (`docker-compose.yml`).
+- Added optional ClickHouse credential split for bootstrap/ingest/query to support read-only analytics users (`apps/api/.env.example`, `apps/api/src/services/analytics.ts`, `apps/api/src/services/orderEventQueueConsumer.ts`, `apps/api/scripts/clickhouse-bootstrap.ts`).
+- Added ClickHouse admin Docker user file and bootstrap script for ingest/query users; wired into compose startup (`clickhouse-users/admin.xml`, `apps/api/scripts/clickhouse-users-bootstrap.ts`, `docker-compose.yml`).
+
+## Updates 2026-04-05
+- Added `db:migrate:deploy` script for non-interactive Prisma migrations in containers (`apps/api/package.json`).
+- Switched compose API startup to use `db:migrate:deploy` to avoid `prisma migrate dev` hanging in container startup (`docker-compose.yml`).
+- Added `db:generate` before `db:seed` in compose startup so Prisma client is available in containers (`docker-compose.yml`).
+- Moved the `tests` compose service behind a `tests` profile so it does not run on default `docker compose up` (`docker-compose.yml`).
+- Added `scripts/test-compose.sh` to run the `tests` profile explicitly and updated `scripts/dev-compose.sh`/README to clarify tests are separate (`scripts/dev-compose.sh`, `scripts/test-compose.sh`, `README.md`).
+- Updated `scripts/test-compose.sh` to run tests under a dedicated compose project name to avoid missing-network conflicts (`scripts/test-compose.sh`, `README.md`).
+- Removed hardcoded `container_name` entries in compose to avoid cross-project name collisions (notably when running tests profile) (`docker-compose.yml`).

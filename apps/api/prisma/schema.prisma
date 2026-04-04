@@ -67,6 +67,8 @@ model Business {
   name        String
   slug        String         @unique
   currencyCode String        @default("USD") @map("currency_code")
+  countryCode String?        @map("country_code")
+  timezone    String         @default("UTC") @map("timezone")
   description String?
   logoUrl     String?        @map("logo_url")
   address     String

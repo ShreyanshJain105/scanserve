@@ -165,7 +165,13 @@ ADMIN_SEED_PASSWORD=changeme
 ### 3. Start with Docker Compose (recommended)
 
 ```bash
-docker-compose up --build
+docker compose up --build
+```
+
+Or use the helper script:
+
+```bash
+./scripts/dev-compose.sh
 ```
 
 This starts PostgreSQL, MinIO (local S3), the API, and the web app — all with healthchecks.
@@ -188,6 +194,14 @@ pnpm dev          # starts both web and api in parallel
 pnpm dev:web      # frontend only
 pnpm dev:api      # backend only
 ```
+
+### 6. Run tests in Docker
+
+```bash
+./scripts/test-compose.sh
+```
+
+The script runs tests under a separate Compose project to avoid network conflicts.
 
 ---
 

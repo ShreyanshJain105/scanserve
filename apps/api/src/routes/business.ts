@@ -112,6 +112,8 @@ const uploadBusinessLogoMiddleware: express.RequestHandler = (req, res, next) =>
 const profileCreateSchema = z.object({
   name: z.string().min(2),
   currencyCode: z.string().trim().regex(/^[A-Za-z]{3}$/),
+  countryCode: z.string().trim().min(2).max(2),
+  timezone: z.string().trim().min(3).max(64),
   description: z.string().max(2000).optional().nullable(),
   address: z.string().min(5),
   phone: z.string().min(6).max(32),
@@ -121,6 +123,8 @@ const profileUpdateSchema = z.object({
   businessId: z.string().optional(),
   name: z.string().min(2).optional(),
   currencyCode: z.string().trim().regex(/^[A-Za-z]{3}$/).optional(),
+  countryCode: z.string().trim().min(2).max(2).optional(),
+  timezone: z.string().trim().min(3).max(64).optional(),
   description: z.string().max(2000).optional().nullable(),
   address: z.string().min(5).optional(),
   phone: z.string().min(6).max(32).optional(),
@@ -290,6 +294,8 @@ type RawBusiness = {
   name: string;
   slug: string;
   currencyCode: string;
+  countryCode: string | null;
+  timezone: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -308,6 +314,8 @@ type SerializedBusiness = {
   name: string;
   slug: string;
   currencyCode: string;
+  countryCode: string | null;
+  timezone: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -328,6 +336,8 @@ const serializeBusiness = (business: RawBusiness): SerializedBusiness => {
     name: business.name,
     slug: business.slug,
     currencyCode: business.currencyCode,
+    countryCode: business.countryCode ?? null,
+    timezone: business.timezone,
     description: business.description,
     logoUrl: business.logoUrl,
     address: business.address,
@@ -889,6 +899,8 @@ router.post(
           name: parsed.data.name,
           slug,
           currencyCode: normalizeCurrencyCode(parsed.data.currencyCode),
+          countryCode: parsed.data.countryCode.toUpperCase(),
+          timezone: parsed.data.timezone,
           description: parsed.data.description ?? null,
           logoUrl: null,
           address: parsed.data.address,
@@ -1597,6 +1609,10 @@ router.patch(
       ...(parsed.data.currencyCode !== undefined
         ? { currencyCode: normalizeCurrencyCode(parsed.data.currencyCode) }
         : {}),
+      ...(parsed.data.countryCode !== undefined
+        ? { countryCode: parsed.data.countryCode.toUpperCase() }
+        : {}),
+      ...(parsed.data.timezone !== undefined ? { timezone: parsed.data.timezone } : {}),
       ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
       ...(parsed.data.address !== undefined ? { address: parsed.data.address } : {}),
       ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}),

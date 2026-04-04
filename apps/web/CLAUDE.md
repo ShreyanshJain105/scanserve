@@ -451,3 +451,8 @@ pnpm lint   # run Next.js ESLint
 - Set `apiFetch` GET requests to use `cache: "no-store"` to avoid stale order lists when polling (`apps/web/src/lib/api.ts`).
 - Added focus/visibility refresh trigger for the orders dashboard polling so new orders appear without manual refresh (`apps/web/src/app/dashboard/orders/page.tsx`).
 - Orders dashboard now triggers a toast + sound when a new order arrives while the page is visible, using a bundled tone (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/public/sounds/order-notification.wav`).
+
+## Updates 2026-04-04
+- Added country + timezone fields to business onboarding with country-driven timezone defaults (`apps/web/src/app/dashboard/onboarding/page.tsx`).
+- Added dashboard analytics overview component (per-window cards, partial-load safe) and mounted on dashboard + orders pages (`apps/web/src/components/dashboard/analytics-overview.tsx`, `apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).
+- Fixed onboarding country/timezone selects to be label-accessible via `htmlFor`/`id` to stabilize tests (`apps/web/src/app/dashboard/onboarding/page.tsx`).

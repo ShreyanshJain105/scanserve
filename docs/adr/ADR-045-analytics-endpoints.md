@@ -1,42 +1,69 @@
-# ADR-045: Business Analytics Endpoints
+# ADR-045: Business Analytics Endpoints (Dashboard-Scoped, Dual-Source)
 
 **Date:** 2026-04-04
-**Status:** Proposed
+**Status:** Accepted
 
 ## Context
-The dashboard currently lacks analytics data; placeholder analytics cards have been removed pending real endpoints. We need a minimal, reliable analytics API for business users that supports the dashboard summary metrics and future charts. This must be consistent with existing order retention/partitioning (6-month Postgres retention, order partitions) and avoid heavy warehouse dependencies for MVP.
+The dashboard currently lacks analytics data; placeholder analytics cards have been removed pending real endpoints. We need analytics APIs for business users that support dashboard sections and time-series windows. Requirements include: no client-side aggregation, strict window definitions (today vs all other windows excluding today), and a split data source strategy (Postgres for short windows; ClickHouse warehouse for longer windows). We also want Redis-backed caching for all non-today windows and a non-blocking UI that can render with partial data.
 
 ## Decision (Proposed)
-Introduce a small set of business-scoped analytics endpoints backed by Postgres to power dashboard summary cards and a basic trends chart. The endpoints will be read-only, require business-role access, and accept a date range window in the business’s local timezone. Aggregations will include order counts and revenue derived from paid orders only (matching current dashboard summary semantics).
+Adopt **dashboard-scoped analytics endpoints** (one endpoint per dashboard section) and support a **fixed set of windows** per section:
+`today`, `yesterday`, `currentWeek`, `lastWeek`, `lastMonth`, `lastQuarter`, `lastYear`.
 
-Initial endpoints (proposed):
-- `GET /api/business/analytics/summary` — aggregate metrics for a time window (e.g., total orders, paid revenue, cancelled count, average order value, unpaid cash count).
-- `GET /api/business/analytics/trends` — time-series buckets (daily or hourly) for orders and revenue within a window.
-- (Optional) `GET /api/business/analytics/top-items` — top-selling items (by quantity) within a window.
+Data sourcing rules:
+- **Postgres** serves `today`, `yesterday`, and `currentWeek`.
+- **ClickHouse** serves `lastWeek`, `lastMonth`, `lastQuarter`, and `lastYear`.
+- All windows **except `today`** must exclude the current day from their search space.
+- No analytics aggregation in JS; all computations are performed in SQL/warehouse queries.
 
-Key rules (proposed):
-- Use server-side windowing with `startDate`, `endDate`, and `tzOffset` (minutes) so queries align with the business’s local day boundaries.
-- Revenue uses paid orders only; cancelled orders are excluded from counts/revenue unless explicitly requested.
-- Results are scoped to the selected business (respecting business memberships and RBAC).
-- No warehouse dependency for MVP; queries run on Postgres partitions.
+Endpoints are read-only, require business-role access, and return **fully aggregated** metrics + time series for their section. Each endpoint response includes per-window `source` and `status` so the UI can render partial data if one source fails.
+Requests include a `source` field (and optional `windows`) so the UI can issue **two calls per section**: one for Postgres windows and one for warehouse windows.
+
+Caching:
+- Redis-backed caching for all windows **except `today`**.
+- Cache keys must include `businessId`, `timezone`, window, and section.
+
+Timezone:
+- Business profiles will store a `timezone` field chosen at onboarding.
+- Onboarding will add a timezone dropdown driven by country selection (country → timezone mapping).
+
+Proposed section endpoints:
+- `GET /api/business/analytics/overview` — high-level metrics and time series for orders + revenue.
+- `GET /api/business/analytics/orders` — order volume, status breakdowns, and order trends.
+- `GET /api/business/analytics/revenue` — paid revenue + AOV trends.
+- `GET /api/business/analytics/customers` — customer order counts and repeat rate (if available), otherwise placeholder for future.
+
+Response shape (conceptual):
+```
+{
+  section: "overview",
+  timezone: "Asia/Kolkata",
+  windows: {
+    today: { source: "postgres", status: "ok", series: [...], summary: {...} },
+    lastMonth: { source: "clickhouse", status: "error", error: "...", series: [], summary: {...?} }
+  }
+}
+```
 
 ## Consequences
-- Adds new query surfaces and shared types for analytics responses.
-- Requires careful query performance and indices for partitioned orders.
-- Establishes a contract for future dashboard charts and a clear upgrade path to warehouse-backed analytics later.
+- Adds new dashboard-scoped analytics endpoints + shared response types.
+- Requires Redis integration for analytics caching.
+- Requires ClickHouse query layer for long windows and Postgres query layer for short windows.
+- Adds onboarding timezone selection and a `timezone` field on Business (schema + migration).
+- Enables partial UI rendering with per-window status and source metadata.
 
 ## Questions & Answers
 
 ### Questions for User
-- Q1: Which summary metrics are required for MVP? (e.g., total orders, paid revenue, avg order value, cancelled count, unpaid cash count, active orders)
-- Q2: What default date window should the dashboard use? (e.g., today, last 7 days, last 30 days)
-- Q3: Do you want trend buckets daily only, or should we support hourly for “today” views?
-- Q4: Should analytics include only `completed` orders, or all non-cancelled statuses? (Current UI summary excludes cancelled and counts paid revenue only.)
-- Q5: Do you want a “top items” endpoint in this MVP, or defer it?
+- Q1: Confirm dashboard-scoped endpoints (one endpoint per dashboard section) as the route strategy.
+- Q2: Confirm timezone onboarding: add `country` + `timezone` selection to business onboarding; store `timezone` on Business for analytics windowing.
+- Q3: Confirm Redis caching: use Redis for all non-today windows, with cache keys scoped by `businessId`, `timezone`, `section`, and `window`.
+- Q4: Confirm ClickHouse as the warehouse for long windows (lastWeek/lastMonth/lastQuarter/lastYear).
+- Q5: Should each dashboard endpoint **merge Postgres + ClickHouse in one response** (returning partial data if one source fails), or should we keep **two endpoints** per section (one for Postgres windows, one for warehouse windows) and let the UI merge?
 
 ### Answers (to be filled by user)
-- A1:
-- A2:
-- A3:
-- A4:
-- A5:
+- A1: Per dashboard.
+- A2: Add timezone selection in onboarding based on country; store timezone on business.
+- A3: Use Redis for caching (non-today windows).
+- A4: ClickHouse is the warehouse target for long windows.
+- A5: Keep one endpoint per dashboard section, but request payload specifies which source windows to fetch; UI will make two requests (Postgres windows + warehouse windows) and merge.

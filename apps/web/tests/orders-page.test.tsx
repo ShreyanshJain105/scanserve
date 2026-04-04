@@ -43,6 +43,8 @@ describe("OrdersPage", () => {
         name: "Cafe",
         slug: "cafe",
         currencyCode: "USD",
+        countryCode: "US",
+        timezone: "America/New_York",
         description: null,
         logoUrl: null,
         address: "A",
@@ -55,10 +57,38 @@ describe("OrdersPage", () => {
       },
     });
 
-    apiFetchMock
-      .mockResolvedValueOnce({
-        orders: [
-          {
+    apiFetchMock.mockImplementation((url: string) => {
+      if (url === "/api/business/analytics/overview") {
+        return Promise.resolve({ section: "overview", timezone: "UTC", windows: {} });
+      }
+      if (url.startsWith("/api/business/orders?")) {
+        return Promise.resolve({
+          orders: [
+            {
+              id: "order_1",
+              businessId: "b1",
+              tableId: "t1",
+              status: "pending",
+              totalAmount: "12.00",
+              paymentStatus: "pending",
+              paymentMethod: "razorpay",
+              razorpayOrderId: null,
+              razorpayPaymentId: null,
+              customerName: "Asha",
+              customerPhone: null,
+              createdAt: "",
+              updatedAt: "",
+              table: { id: "t1", tableNumber: 1, label: null },
+            },
+          ],
+          nextCursor: null,
+          hasMore: false,
+          businessId: "b1",
+        });
+      }
+      if (url === "/api/business/orders/order_1") {
+        return Promise.resolve({
+          order: {
             id: "order_1",
             businessId: "b1",
             tableId: "t1",
@@ -73,58 +103,41 @@ describe("OrdersPage", () => {
             createdAt: "",
             updatedAt: "",
             table: { id: "t1", tableNumber: 1, label: null },
+            items: [
+              {
+                id: "i1",
+                menuItemId: "m1",
+                name: "Tea",
+                quantity: 1,
+                unitPrice: "12.00",
+                specialInstructions: null,
+              },
+            ],
           },
-        ],
-        nextCursor: null,
-        hasMore: false,
-        businessId: "b1",
-      })
-      .mockResolvedValueOnce({
-        order: {
-          id: "order_1",
-          businessId: "b1",
-          tableId: "t1",
-          status: "pending",
-          totalAmount: "12.00",
-          paymentStatus: "pending",
-          paymentMethod: "razorpay",
-          razorpayOrderId: null,
-          razorpayPaymentId: null,
-          customerName: "Asha",
-          customerPhone: null,
-          createdAt: "",
-          updatedAt: "",
-          table: { id: "t1", tableNumber: 1, label: null },
-          items: [
-            {
-              id: "i1",
-              menuItemId: "m1",
-              name: "Tea",
-              quantity: 1,
-              unitPrice: "12.00",
-              specialInstructions: null,
-            },
-          ],
-        },
-      })
-      .mockResolvedValueOnce({
-        order: {
-          id: "order_1",
-          businessId: "b1",
-          tableId: "t1",
-          status: "confirmed",
-          totalAmount: "12.00",
-          paymentStatus: "pending",
-          paymentMethod: "razorpay",
-          razorpayOrderId: null,
-          razorpayPaymentId: null,
-          customerName: "Asha",
-          customerPhone: null,
-          createdAt: "",
-          updatedAt: "",
-          table: { id: "t1", tableNumber: 1, label: null },
-        },
-      });
+        });
+      }
+      if (url === "/api/business/orders/order_1/status") {
+        return Promise.resolve({
+          order: {
+            id: "order_1",
+            businessId: "b1",
+            tableId: "t1",
+            status: "confirmed",
+            totalAmount: "12.00",
+            paymentStatus: "pending",
+            paymentMethod: "razorpay",
+            razorpayOrderId: null,
+            razorpayPaymentId: null,
+            customerName: "Asha",
+            customerPhone: null,
+            createdAt: "",
+            updatedAt: "",
+            table: { id: "t1", tableNumber: 1, label: null },
+          },
+        });
+      }
+      return Promise.resolve({});
+    });
 
     render(<OrdersPage />);
 

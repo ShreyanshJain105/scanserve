@@ -8,6 +8,7 @@ import businessRoutes from "./routes/business";
 import adminRoutes from "./routes/admin";
 import publicRoutes from "./routes/public";
 import aiRoutes from "./routes/ai";
+import analyticsRoutes from "./routes/analytics";
 import { requireCsrf } from "./middleware/csrf";
 import { logger } from "./utils/logger";
 import { startDeletedAssetCleanupWorker } from "./services/deletedAssetCleanup";
@@ -104,6 +105,7 @@ app.get("/healthz", (_req, res) => {
 // ─── Routes (to be added per feature) ───────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/business", businessRoutes);
+app.use("/api/business/analytics", analyticsRoutes);
 // app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/public", publicRoutes);

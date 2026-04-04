@@ -7,6 +7,7 @@ import { apiFetch } from "../../../lib/api";
 import { showToast } from "../../../lib/toast";
 import { AppHeader } from "../../../components/layout/app-header";
 import { BodyBackButton } from "../../../components/layout/body-back-button";
+import { AnalyticsOverview } from "../../../components/dashboard/analytics-overview";
 import { ModalDialog } from "../../../components/ui/modal-dialog";
 import type { OrderStatus } from "@scan2serve/shared";
 
@@ -543,9 +544,9 @@ export default function DashboardOrdersPage() {
               {busy ? "Refreshing..." : "Refresh"}
             </button>
           </div>
-          <p className="mt-4 text-sm text-slate-500">
-            Analytics cards will appear once the dedicated analytics endpoints are available.
-          </p>
+          <div className="mt-4">
+            <AnalyticsOverview />
+          </div>
         </header>
 
         <section className="grid gap-6 lg:grid-cols-[260px_1fr]">

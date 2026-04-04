@@ -9,18 +9,16 @@
 
 ## Last Session
 
-**Date:** 2026-04-04
+**Date:** 2026-04-05
 **What was done:**
-- Confirmed orders dashboard polling is working in a live check (per user).
-- Accepted ADR-044 and implemented order dashboard toast + sound notifications for new orders while the page is visible.
-- Added bundled notification tone at `apps/web/public/sounds/order-notification.wav`.
-- Updated docs/root/web CLAUDE notes for ADR-044 and implementation context.
+- Removed hardcoded compose container names to prevent name collisions across projects (fixes tests profile conflicts).
+- Kept tests profile + script flow intact.
 
 **What's NOT done yet:**
-- Layer 8 polish, analytics endpoints, infra hardening remain (Razorpay intentionally skipped for now).
+- Re-run `./scripts/test-compose.sh` to confirm the container-name conflict is resolved.
 
 **Next step:**
-1. Decide the next bucket after notifications: Layer 8 polish, analytics endpoints, or infra hardening.
+1. Run `./scripts/test-compose.sh` and confirm tests start cleanly.
 
 **Build progress:**
 ```
@@ -940,6 +938,13 @@ Layer 11: Polish & Deploy
 - Drafted ADR-044 for order dashboard toast + sound notifications and captured open questions for triggering, mute behavior, and sound asset choice.
 - Noted live confirmation that orders dashboard polling is working.
 
+### 2026-04-04 — Session 163: Analytics endpoints (ADR-045)
+- Accepted ADR-045 for dashboard-scoped analytics endpoints with Postgres (today/yesterday/current week) + ClickHouse (last week/month/quarter/year).
+- Added business `countryCode` + `timezone` fields (schema + migration) and onboarding UI selection for country/timezone.
+- Added Redis client helper + analytics cache wrapper for non-today windows.
+- Implemented `/api/business/analytics/overview` with source-specific requests and per-window cache.
+- Added analytics overview UI cards to dashboard + orders pages with partial-load tolerance.
+
 ## Decisions Log
 
 | # | Decision | Why | Date |
@@ -984,6 +989,7 @@ Layer 11: Polish & Deploy
 | ADR-042 | Separate customer accounts + require login before orders — Accepted | Allow same-email business/customer accounts, enforce customer login, and restrict order access to owner | 2026-03-30 |
 | ADR-043 | Customer orders hub page — Accepted | Add `/orders` hub with paginated customer orders list API and remove `/order/:id` deep links | 2026-03-30 |
 | ADR-044 | Order dashboard notifications (toast + sound) — Accepted | Notify operators of new orders with toast + sound while dashboard is open | 2026-04-04 |
+| ADR-045 | Business analytics endpoints (dashboard-scoped) — Accepted | Add Postgres + ClickHouse analytics endpoints with Redis caching and business timezone | 2026-04-04 |
 
 ---
 
@@ -1155,3 +1161,18 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 ### 2026-04-04 — Session 163: Order notifications (toast + sound)
 - Accepted ADR-044 and implemented new-order toast + sound notifications on the orders dashboard.
 - Added bundled notification tone at `apps/web/public/sounds/order-notification.wav`.
+
+### 2026-04-05 — Session 164: Compose migrate deploy
+- Added non-interactive Prisma migration script, switched compose API startup to use it, and ensured Prisma client generation before seeding in containers.
+
+### 2026-04-05 — Session 165: Compose tests profile
+- Moved the `tests` compose service behind a `tests` profile so it does not run during default `docker compose up`.
+
+### 2026-04-05 — Session 166: Compose tests script
+- Added `scripts/test-compose.sh` and moved tests behind a `tests` profile so default compose no longer runs tests; updated README/dev script notes.
+
+### 2026-04-05 — Session 167: Tests compose network fix
+- Updated the tests compose script to use a dedicated project name and clean up stale networks before running.
+
+### 2026-04-05 — Session 168: Compose container name cleanup
+- Removed hardcoded container names in compose to avoid cross-project conflicts when running tests profile.

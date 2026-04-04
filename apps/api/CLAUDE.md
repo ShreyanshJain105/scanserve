@@ -284,3 +284,19 @@ pnpm db:studio    # open Prisma Studio GUI
 - Updated partitioning migration `20260330170000_order_partitions` to use `TIMESTAMP(3)` for partition key columns so Prisma does not generate follow-up type-alter migrations; removed the auto-generated `20260404125859` migration that was only attempting forbidden partition-key type changes.
 - Re-ran compose with fresh volumes: `db:migrate` applied cleanly and the partition maintenance worker successfully created monthly `orders` and `order_items` partitions; API booted without partition errors.
 - Re-ran compose after enforcing pnpm store dir; API tests still pass (16 files / 99 tests).
+
+## Updates 2026-04-04
+- Added business `countryCode` + `timezone` fields (schema + migration) and wired into business profile create/update + serialization (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260404190000_business_timezone_country/migration.sql`, `apps/api/src/routes/business.ts`, `apps/api/src/routes/admin.ts`).
+- Added Redis client helper and analytics cache wrapper for non-today windows (`apps/api/src/services/redisClient.ts`, `apps/api/src/services/analyticsCache.ts`).
+- Added analytics service + dashboard-scoped overview endpoint with Postgres + ClickHouse query paths and windowed aggregation (`apps/api/src/services/analytics.ts`, `apps/api/src/routes/analytics.ts`, `apps/api/src/services/clickhouseClient.ts`, `apps/api/src/index.ts`).
+- Added ClickHouse bootstrap script to create database + `order_events` table (`apps/api/scripts/clickhouse-bootstrap.ts`, `apps/api/package.json`).
+- Wired ClickHouse bootstrap to run during compose API startup before dev server (`docker-compose.yml`).
+- Added optional ClickHouse bootstrap/ingest/query credentials so read-only analytics users won’t block writes (`apps/api/.env.example`, `apps/api/src/services/analytics.ts`, `apps/api/src/services/orderEventQueueConsumer.ts`, `apps/api/scripts/clickhouse-bootstrap.ts`).
+- Added ClickHouse admin user file for Docker and a bootstrap script to create ingest/query users (`clickhouse-users/admin.xml`, `apps/api/scripts/clickhouse-users-bootstrap.ts`, `docker-compose.yml`).
+
+## Updates 2026-04-05
+- Added `db:migrate:deploy` script to avoid interactive `prisma migrate dev` in containers (`apps/api/package.json`).
+- Switched compose API startup to use `db:migrate:deploy` for non-interactive health in containers (`docker-compose.yml`).
+- Added `db:generate` before `db:seed` in compose startup to ensure Prisma client is generated in containers (`docker-compose.yml`).
+- Moved the `tests` compose service behind a `tests` profile so it no longer runs on default `docker compose up` (`docker-compose.yml`).
+- Removed hardcoded `container_name` entries in compose to prevent name collisions across compose projects (`docker-compose.yml`).

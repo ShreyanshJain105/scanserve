@@ -44,7 +44,15 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: null });
+    apiFetchMock.mockImplementation((url: string) => {
+      if (url === "/api/business/analytics/overview") {
+        return Promise.resolve({ section: "overview", timezone: "UTC", windows: {} });
+      }
+      if (url === "/api/business/org/membership") {
+        return Promise.resolve({ membership: null });
+      }
+      return Promise.resolve({});
+    });
 
     render(<DashboardPage />);
 
@@ -65,7 +73,15 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
+    apiFetchMock.mockImplementation((url: string) => {
+      if (url === "/api/business/analytics/overview") {
+        return Promise.resolve({ section: "overview", timezone: "UTC", windows: {} });
+      }
+      if (url === "/api/business/org/membership") {
+        return Promise.resolve({ membership: { id: "m1", orgId: "o1", isOwner: true } });
+      }
+      return Promise.resolve({});
+    });
 
     render(<DashboardPage />);
 
@@ -108,6 +124,8 @@ describe("DashboardPage", () => {
           name: "My Cafe",
           slug: "my-cafe",
           currencyCode: "USD",
+          countryCode: "US",
+          timezone: "America/New_York",
           description: null,
           logoUrl: null,
           address: "A",
@@ -124,6 +142,8 @@ describe("DashboardPage", () => {
         name: "My Cafe",
         slug: "my-cafe",
         currencyCode: "USD",
+        countryCode: "US",
+        timezone: "America/New_York",
         description: null,
         logoUrl: null,
         address: "A",
@@ -138,7 +158,15 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
+    apiFetchMock.mockImplementation((url: string) => {
+      if (url === "/api/business/analytics/overview") {
+        return Promise.resolve({ section: "overview", timezone: "UTC", windows: {} });
+      }
+      if (url === "/api/business/org/membership") {
+        return Promise.resolve({ membership: { id: "m1", orgId: "o1", isOwner: true } });
+      }
+      return Promise.resolve({});
+    });
 
     render(<DashboardPage />);
 
@@ -162,6 +190,8 @@ describe("DashboardPage", () => {
           name: "My Cafe",
           slug: "my-cafe",
           currencyCode: "USD",
+          countryCode: "US",
+          timezone: "America/New_York",
           description: null,
           logoUrl: null,
           address: "A",
@@ -178,6 +208,8 @@ describe("DashboardPage", () => {
         name: "My Cafe",
         slug: "my-cafe",
         currencyCode: "USD",
+        countryCode: "US",
+        timezone: "America/New_York",
         description: null,
         logoUrl: null,
         address: "A",
@@ -192,7 +224,15 @@ describe("DashboardPage", () => {
       archiveBusinessProfile: vi.fn(),
       restoreBusinessProfile: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: { id: "m1", orgId: "o1", isOwner: true } });
+    apiFetchMock.mockImplementation((url: string) => {
+      if (url === "/api/business/analytics/overview") {
+        return Promise.resolve({ section: "overview", timezone: "UTC", windows: {} });
+      }
+      if (url === "/api/business/org/membership") {
+        return Promise.resolve({ membership: { id: "m1", orgId: "o1", isOwner: true } });
+      }
+      return Promise.resolve({});
+    });
 
     render(<DashboardPage />);
     await waitFor(() => {
@@ -214,6 +254,8 @@ describe("DashboardPage", () => {
           name: "Active Cafe",
           slug: "active-cafe",
           currencyCode: "USD",
+          countryCode: "US",
+          timezone: "America/New_York",
           description: null,
           logoUrl: "http://localhost/logo.png",
           address: "A",
@@ -230,6 +272,8 @@ describe("DashboardPage", () => {
           name: "Old Cafe",
           slug: "old-cafe",
           currencyCode: "USD",
+          countryCode: "US",
+          timezone: "America/New_York",
           description: null,
           logoUrl: null,
           address: "A",
@@ -247,6 +291,8 @@ describe("DashboardPage", () => {
         name: "Active Cafe",
         slug: "active-cafe",
         currencyCode: "USD",
+        countryCode: "US",
+        timezone: "America/New_York",
         description: null,
         logoUrl: "http://localhost/logo.png",
         address: "A",

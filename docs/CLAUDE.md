@@ -123,3 +123,6 @@ Project documentation for architecture decisions, process notes, and operational
 
 ## Updates 2026-04-04
 - Drafted ADR-044 for order dashboard notifications using toast + sound (`docs/adr/ADR-044-order-notifications-toast-sound.md`).
+
+## Updates 2026-04-04
+- ADR-045 accepted: dashboard-scoped analytics endpoints with Postgres (today/yesterday/current week) + ClickHouse (last week/month/quarter/year), Redis caching for non-today, and timezone stored on business profiles (`docs/adr/ADR-045-analytics-endpoints.md`).

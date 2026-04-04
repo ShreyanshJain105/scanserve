@@ -11,8 +11,10 @@ const consumerName =
   `${process.env.HOSTNAME || "consumer"}-${process.pid}`;
 
 const clickhouseUrl = process.env.CLICKHOUSE_URL || "http://localhost:8123";
-const clickhouseUser = process.env.CLICKHOUSE_USER || "default";
-const clickhousePassword = process.env.CLICKHOUSE_PASSWORD || "";
+const clickhouseUser =
+  process.env.CLICKHOUSE_INGEST_USER || process.env.CLICKHOUSE_USER || "default";
+const clickhousePassword =
+  process.env.CLICKHOUSE_INGEST_PASSWORD || process.env.CLICKHOUSE_PASSWORD || "";
 const clickhouseDatabase = process.env.CLICKHOUSE_DATABASE || "scan2serve";
 
 let consumerTimer: NodeJS.Timeout | null = null;

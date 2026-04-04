@@ -77,6 +77,8 @@ export interface BusinessProfile {
   name: string;
   slug: string;
   currencyCode: string;
+  countryCode?: string | null;
+  timezone: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -89,6 +91,53 @@ export interface BusinessProfile {
   rejections?: BusinessRejection[];
   businessRole?: BusinessRole | null;
 }
+
+// ─── Analytics ───────────────────────────────────────────────
+
+export type AnalyticsWindow =
+  | "today"
+  | "yesterday"
+  | "currentWeek"
+  | "lastWeek"
+  | "lastMonth"
+  | "lastQuarter"
+  | "lastYear";
+
+export type AnalyticsSource = "postgres" | "warehouse";
+
+export type AnalyticsWindowSummary = {
+  orderCount: number;
+  cancelledCount: number;
+  paidOrderCount: number;
+  unpaidCashCount: number;
+  paidRevenue: string;
+  avgPaidOrderValue: string;
+};
+
+export type AnalyticsSeriesPoint = {
+  bucketStart: string;
+  orderCount: number;
+  paidRevenue: string;
+};
+
+export type AnalyticsWindowResult = {
+  window: AnalyticsWindow;
+  source: AnalyticsSource;
+  status: "ok" | "error";
+  summary: AnalyticsWindowSummary;
+  series: AnalyticsSeriesPoint[];
+  error?: string;
+};
+
+export type AnalyticsSectionResponse = {
+  section: "overview" | "orders" | "revenue" | "customers";
+  timezone: string;
+  windows: Partial<Record<AnalyticsWindow, AnalyticsWindowResult>>;
+};
+
+export type AnalyticsSectionRequest = {
+  source: AnalyticsSource;
+};
 
 export interface Org {
   id: string;

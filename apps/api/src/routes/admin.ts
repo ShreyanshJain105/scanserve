@@ -30,6 +30,8 @@ type RawBusiness = {
   name: string;
   slug: string;
   currencyCode: string;
+  countryCode: string | null;
+  timezone: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -48,6 +50,8 @@ const serializeBusiness = (business: RawBusiness) => ({
   name: business.name,
   slug: business.slug,
   currencyCode: business.currencyCode,
+  countryCode: business.countryCode ?? null,
+  timezone: business.timezone,
   description: business.description,
   logoUrl: business.logoUrl,
   address: business.address,

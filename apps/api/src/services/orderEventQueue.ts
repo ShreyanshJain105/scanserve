@@ -1,12 +1,8 @@
-import { createClient, RedisClientType } from "redis";
-import { logger } from "../utils/logger";
+import type { RedisClientType } from "redis";
+import { getRedisClient } from "./redisClient";
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 const orderEventStream = process.env.ORDER_EVENT_STREAM || "order_events";
 const orderEventStreamMaxLen = Number(process.env.ORDER_EVENT_STREAM_MAXLEN || 0);
-
-let redisClient: RedisClientType | null = null;
-let redisConnecting: Promise<RedisClientType> | null = null;
 
 export type OrderEventQueueEvent = {
   eventId: string;
@@ -20,29 +16,7 @@ export type OrderEventQueueEvent = {
 export const getOrderEventStreamName = () => orderEventStream;
 export const getOrderEventStreamMaxLen = () => orderEventStreamMaxLen;
 
-export const getOrderEventRedisClient = async () => {
-  if (redisClient?.isOpen) return redisClient;
-  if (redisConnecting) return redisConnecting;
-
-  redisClient = createClient({ url: redisUrl });
-  redisClient.on("error", (error) => {
-    logger.warn("redis.client.error", {
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-  });
-
-  redisConnecting = redisClient
-    .connect()
-    .then(() => {
-      logger.info("redis.client.connected", { url: redisUrl });
-      return redisClient as RedisClientType;
-    })
-    .finally(() => {
-      redisConnecting = null;
-    });
-
-  return redisConnecting;
-};
+export const getOrderEventRedisClient = async (): Promise<RedisClientType> => getRedisClient();
 
 const buildXAddArgs = (event: OrderEventQueueEvent) => {
   const payload = JSON.stringify(event.payload ?? {});

@@ -75,6 +75,13 @@ describe("BusinessOnboardingPage", () => {
     expect(screen.queryByRole("option", { name: "INR" })).toBeNull();
     expect(screen.getByLabelText("Currency code")).toHaveValue("INR");
 
+    fireEvent.change(screen.getByLabelText("Country"), {
+      target: { value: "IN" },
+    });
+    fireEvent.change(screen.getByLabelText("Business timezone"), {
+      target: { value: "Asia/Kolkata" },
+    });
+
     fireEvent.change(await screen.findByPlaceholderText("Street, area, city"), {
       target: { value: "12 Main St" },
     });
@@ -84,10 +91,12 @@ describe("BusinessOnboardingPage", () => {
     fireEvent.click(screen.getByText("Create profile"));
 
     await waitFor(() => {
-      expect(createBusinessProfileMock).toHaveBeenCalledWith(
+        expect(createBusinessProfileMock).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "Green Leaf Cafe",
           currencyCode: "INR",
+          countryCode: "IN",
+          timezone: "Asia/Kolkata",
         })
       );
     });
@@ -114,6 +123,12 @@ describe("BusinessOnboardingPage", () => {
 
     fireEvent.change(await screen.findByPlaceholderText("Example: Green Leaf Cafe"), {
       target: { value: "Logo Cafe" },
+    });
+    fireEvent.change(screen.getByLabelText("Country"), {
+      target: { value: "US" },
+    });
+    fireEvent.change(screen.getByLabelText("Business timezone"), {
+      target: { value: "America/New_York" },
     });
     fireEvent.change(await screen.findByPlaceholderText("Street, area, city"), {
       target: { value: "12 Main St" },
@@ -148,6 +163,8 @@ describe("BusinessOnboardingPage", () => {
           name: "Locked Cafe",
           slug: "locked-cafe",
           currencyCode: "USD",
+          countryCode: "US",
+          timezone: "America/New_York",
           description: "desc",
           logoUrl: null,
           address: "Addr",
@@ -185,7 +202,12 @@ describe("BusinessOnboardingPage", () => {
       updateBusinessProfile: vi.fn(),
       refreshBusinessProfiles: vi.fn(),
     });
-    apiFetchMock.mockResolvedValueOnce({ membership: null });
+    apiFetchMock.mockImplementation((url: string) => {
+      if (url === "/api/business/org/membership") {
+        return Promise.resolve({ membership: null });
+      }
+      return Promise.resolve({});
+    });
 
     render(<BusinessOnboardingPage />);
 

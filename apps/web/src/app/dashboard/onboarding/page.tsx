@@ -12,6 +12,8 @@ import { BodyBackButton } from "../../../components/layout/body-back-button";
 type FormState = {
   name: string;
   currencyCode: string;
+  countryCode: string;
+  timezone: string;
   description: string;
   address: string;
   phone: string;
@@ -20,6 +22,8 @@ type FormState = {
 const emptyForm: FormState = {
   name: "",
   currencyCode: "USD",
+  countryCode: "",
+  timezone: "",
   description: "",
   address: "",
   phone: "",
@@ -52,6 +56,42 @@ const CURRENCY_OPTIONS = [
   "TRY",
   "ZAR",
 ];
+
+const COUNTRY_TIMEZONE_OPTIONS = [
+  { code: "IN", name: "India", timezones: ["Asia/Kolkata"] },
+  {
+    code: "US",
+    name: "United States",
+    timezones: [
+      "America/New_York",
+      "America/Chicago",
+      "America/Denver",
+      "America/Los_Angeles",
+      "America/Anchorage",
+      "Pacific/Honolulu",
+    ],
+  },
+  { code: "GB", name: "United Kingdom", timezones: ["Europe/London"] },
+  { code: "AE", name: "United Arab Emirates", timezones: ["Asia/Dubai"] },
+  { code: "AU", name: "Australia", timezones: ["Australia/Sydney", "Australia/Perth"] },
+  { code: "CA", name: "Canada", timezones: ["America/Toronto", "America/Vancouver"] },
+  { code: "DE", name: "Germany", timezones: ["Europe/Berlin"] },
+  { code: "SG", name: "Singapore", timezones: ["Asia/Singapore"] },
+  { code: "ZA", name: "South Africa", timezones: ["Africa/Johannesburg"] },
+  { code: "BR", name: "Brazil", timezones: ["America/Sao_Paulo"] },
+];
+
+const resolveBrowserTimezone = () => {
+  if (typeof Intl === "undefined") return "UTC";
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+};
+
+const resolveDefaultCountry = (timezone: string) => {
+  const match = COUNTRY_TIMEZONE_OPTIONS.find((entry) =>
+    entry.timezones.includes(timezone)
+  );
+  return match?.code ?? "US";
+};
 
 const normalizeCurrencyCode = (value: string) =>
   value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
@@ -112,6 +152,15 @@ function BusinessOnboardingPageContent() {
 
     return CURRENCY_OPTIONS.filter((code) => code.includes(normalizedQuery));
   }, [currencyQuery]);
+  const selectedCountry = useMemo(
+    () => COUNTRY_TIMEZONE_OPTIONS.find((entry) => entry.code === form.countryCode) ?? null,
+    [form.countryCode]
+  );
+  const timezoneOptions = useMemo(() => {
+    if (selectedCountry) return selectedCountry.timezones;
+    if (form.timezone) return [form.timezone];
+    return [resolveBrowserTimezone()];
+  }, [form.timezone, selectedCountry]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -160,13 +209,24 @@ function BusinessOnboardingPageContent() {
 
   useEffect(() => {
     if (!existing) {
-      setForm(emptyForm);
+      const browserTimezone = resolveBrowserTimezone();
+      const countryCode = resolveDefaultCountry(browserTimezone);
+      const defaultTimezone =
+        COUNTRY_TIMEZONE_OPTIONS.find((entry) => entry.code === countryCode)?.timezones[0] ??
+        browserTimezone;
+      setForm({
+        ...emptyForm,
+        countryCode,
+        timezone: defaultTimezone,
+      });
       return;
     }
 
     setForm({
       name: existing.name,
       currencyCode: existing.currencyCode,
+      countryCode: existing.countryCode ?? "",
+      timezone: existing.timezone ?? "UTC",
       description: existing.description ?? "",
       address: existing.address,
       phone: existing.phone,
@@ -243,6 +303,8 @@ function BusinessOnboardingPageContent() {
       const payload = {
         name: form.name,
         currencyCode: form.currencyCode,
+        countryCode: form.countryCode,
+        timezone: form.timezone,
         description: form.description || null,
         address: form.address,
         phone: form.phone,
@@ -400,10 +462,66 @@ function BusinessOnboardingPageContent() {
                 </div>
               ) : null}
             </div>
-              <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500">
               Type to search. Currency changes only when you select an option.
             </span>
           </div>
+
+          <label className="grid gap-1 text-sm" htmlFor="business-country">
+            <span>Country</span>
+            <select
+              id="business-country"
+              aria-label="Country"
+              value={form.countryCode}
+              onChange={(event) => {
+                const code = event.target.value;
+                const match =
+                  COUNTRY_TIMEZONE_OPTIONS.find((entry) => entry.code === code) ?? null;
+                setForm((current) => ({
+                  ...current,
+                  countryCode: code,
+                  timezone: match?.timezones[0] ?? current.timezone,
+                }));
+              }}
+              className="rounded-md border px-3 py-2"
+              required
+            >
+              <option value="" disabled>
+                Select country
+              </option>
+              {COUNTRY_TIMEZONE_OPTIONS.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500">
+              Used to default the business timezone for analytics windows.
+            </span>
+          </label>
+
+          <label className="grid gap-1 text-sm" htmlFor="business-timezone">
+            <span>Business timezone</span>
+            <select
+              id="business-timezone"
+              aria-label="Business timezone"
+              value={form.timezone}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, timezone: event.target.value }))
+              }
+              className="rounded-md border px-3 py-2"
+              required
+            >
+              {timezoneOptions.map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500">
+              Analytics windows align to this timezone.
+            </span>
+          </label>
 
           <label className="grid gap-1 text-sm">
             <span>Business address</span>

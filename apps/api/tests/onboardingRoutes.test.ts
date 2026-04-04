@@ -45,6 +45,8 @@ type BusinessRecord = {
   name: string;
   slug: string;
   currencyCode: string;
+  countryCode: string | null;
+  timezone: string;
   description: string | null;
   logoUrl: string | null;
   address: string;
@@ -154,6 +156,8 @@ vi.mock("../src/prisma", () => ({
           name: data.name,
           slug: data.slug,
           currencyCode: data.currencyCode ?? "USD",
+          countryCode: data.countryCode ?? null,
+          timezone: data.timezone ?? "UTC",
           description: data.description ?? null,
           logoUrl: data.logoUrl ?? null,
           address: data.address,
@@ -476,6 +480,8 @@ describe("Layer 3 onboarding routes", () => {
       body: {
         name: "Cedar Cafe",
         currencyCode: "usd",
+        countryCode: "US",
+        timezone: "America/New_York",
         description: "Coffee and snacks",
         address: "12 Market Street",
         phone: "+1-202-000-0000",
@@ -521,6 +527,8 @@ describe("Layer 3 onboarding routes", () => {
       body: {
         name: "City Cafe",
         currencyCode: "INR",
+        countryCode: "IN",
+        timezone: "Asia/Kolkata",
         address: "12 Main Street",
         phone: "+91-111-111-1111",
       },
@@ -533,6 +541,8 @@ describe("Layer 3 onboarding routes", () => {
       body: {
         name: "City Cafe",
         currencyCode: "INR",
+        countryCode: "IN",
+        timezone: "Asia/Kolkata",
         address: "44 Main Street",
         phone: "+91-222-222-2222",
       },
@@ -557,6 +567,8 @@ describe("Layer 3 onboarding routes", () => {
       body: {
         name: "Logo Cafe",
         currencyCode: "USD",
+        countryCode: "US",
+        timezone: "America/New_York",
         address: "88 Street",
         phone: "+1-303-000-0000",
       },
@@ -593,6 +605,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "Pending Bistro",
       slug: "pending-bistro",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "A",
@@ -608,6 +622,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "Approved Bistro",
       slug: "approved-bistro",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "B",
@@ -656,6 +672,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "Gate Bistro",
       slug: "gate-bistro",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "A",
@@ -704,6 +722,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "Archive Cafe",
       slug: "archive-cafe",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "A",
@@ -743,6 +763,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "Old Archive",
       slug: "old-archive",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "A",
@@ -770,6 +792,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "QR Bistro",
       slug: "qr-bistro",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "A",
@@ -824,6 +848,8 @@ describe("Layer 3 onboarding routes", () => {
       name: "QR Hist",
       slug: "qr-hist",
       currencyCode: "USD",
+      countryCode: "US",
+      timezone: "America/New_York",
       description: null,
       logoUrl: null,
       address: "A",

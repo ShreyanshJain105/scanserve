@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { showToast } from "../../lib/toast";
 import { AppHeader } from "../../components/layout/app-header";
 import { BodyBackButton } from "../../components/layout/body-back-button";
+import { AnalyticsOverview } from "../../components/dashboard/analytics-overview";
 import { ModalDialog } from "../../components/ui/modal-dialog";
 import { apiFetch } from "../../lib/api";
 import type { BusinessMemberSummary, OrgMemberSummary } from "@scan2serve/shared";
@@ -740,9 +741,7 @@ export default function DashboardPage() {
           </div>
 
           <div className={isBlocked ? "pointer-events-none blur-[2px]" : ""}>
-            <p className="text-sm text-gray-500">
-              Analytics summaries will appear once dedicated analytics endpoints are available.
-            </p>
+            <AnalyticsOverview />
           </div>
 
           {isBlocked && (

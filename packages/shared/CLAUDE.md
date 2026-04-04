@@ -49,3 +49,7 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 ## Updates 2026-03-30
 - Auth request types now allow phone identifiers for customer login/register (`LoginRequest`, `RegisterRequest`).
 - Added customer orders hub response types (`CustomerOrderSummary`, `CustomerOrdersListResponse`).
+
+## Updates 2026-04-04
+- Added `countryCode` + `timezone` to `BusinessProfile` for analytics windowing.
+- Added shared analytics request/response types (`AnalyticsSectionRequest`, `AnalyticsSectionResponse`, windows/sources/series/summary).

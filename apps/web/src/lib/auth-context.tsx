@@ -13,6 +13,8 @@ import { apiFetch } from "./api";
 type CreateBusinessProfileInput = {
   name: string;
   currencyCode: string;
+  countryCode: string;
+  timezone: string;
   description?: string | null;
   address: string;
   phone: string;
