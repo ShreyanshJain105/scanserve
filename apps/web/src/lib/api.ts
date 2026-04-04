@@ -84,6 +84,7 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   { retryOn401 = true }: { retryOn401?: boolean } = {}
 ): Promise<T> {
+  const method = (options.method || "GET").toUpperCase();
   const needsCsrf = isMutatingMethod(options.method);
   const csrfToken = needsCsrf ? await ensureCsrfToken() : null;
   const isFormDataBody =
@@ -98,10 +99,13 @@ export async function apiFetch<T>(
     (mergedHeaders as Record<string, string>)[CSRF_HEADER_NAME] = csrfToken;
   }
 
+  const cache = options.cache ?? (method === "GET" ? "no-store" : undefined);
+
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: mergedHeaders,
+    cache,
   });
 
   if (response.status === 401 && retryOn401) {

@@ -440,3 +440,13 @@ pnpm lint   # run Next.js ESLint
 
 ## Updates 2026-03-30
 - Removed placeholder analytics cards from dashboard orders and overview pages pending analytics endpoints (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/src/app/dashboard/page.tsx`).
+
+## Updates 2026-04-04
+- Fixed `AppHeader` test expectations by setting `NODE_ENV=production` in notification-fetch test cases so the fetch guard doesn't skip mocked calls (`apps/web/tests/app-header.test.tsx`).
+- Moved the org-owner onboarding redirect in dashboard page into a `useEffect` to avoid router navigation during render (`apps/web/src/app/dashboard/page.tsx`).
+- Moved the org-owner onboarding redirect effect above early returns to keep hook order stable in `DashboardPage` (`apps/web/src/app/dashboard/page.tsx`).
+- Re-ran web test suite via compose after hook-order fix: all 17 files / 55 tests passed.
+- Re-ran compose with pnpm store isolation; web tests still pass (17 files / 55 tests).
+- Updated web compose command to run `next dev` from `/app/apps/web`; web healthcheck now returns 200 with manifests present.
+- Set `apiFetch` GET requests to use `cache: "no-store"` to avoid stale order lists when polling (`apps/web/src/lib/api.ts`).
+- Added focus/visibility refresh trigger for the orders dashboard polling so new orders appear without manual refresh (`apps/web/src/app/dashboard/orders/page.tsx`).

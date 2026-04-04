@@ -2,7 +2,7 @@
 
 BEGIN;
 
-ALTER TABLE order_items ADD COLUMN order_created_at TIMESTAMP;
+ALTER TABLE order_items ADD COLUMN order_created_at TIMESTAMP(3);
 UPDATE order_items oi
 SET order_created_at = o.created_at
 FROM orders o
@@ -26,8 +26,8 @@ CREATE TABLE orders_partitioned (
   payment_method "PaymentMethod" NOT NULL,
   customer_name text NOT NULL,
   customer_phone text,
-  created_at timestamp NOT NULL,
-  updated_at timestamp NOT NULL,
+  created_at timestamp(3) NOT NULL,
+  updated_at timestamp(3) NOT NULL,
   PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
@@ -38,7 +38,7 @@ CREATE INDEX orders_customer_user_idx ON orders_partitioned (customer_user_id);
 CREATE TABLE order_items_partitioned (
   id text NOT NULL,
   order_id text NOT NULL,
-  order_created_at timestamp NOT NULL,
+  order_created_at timestamp(3) NOT NULL,
   menu_item_id text NOT NULL,
   quantity integer NOT NULL,
   unit_price numeric(10,2) NOT NULL,

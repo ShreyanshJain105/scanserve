@@ -1,5 +1,5 @@
 import React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AppHeader } from "../src/components/layout/app-header";
 
@@ -18,9 +18,16 @@ vi.mock("../src/lib/api", () => ({
 }));
 
 describe("AppHeader", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
   beforeEach(() => {
     useAuthMock.mockReset();
     apiFetchMock.mockReset();
+    process.env.NODE_ENV = "test";
+  });
+
+  afterAll(() => {
+    process.env.NODE_ENV = originalNodeEnv;
   });
 
   it("hides dashboard CTA in customer audience mode", () => {
@@ -46,6 +53,7 @@ describe("AppHeader", () => {
   });
 
   it("shows only business login action in default audience mode", async () => {
+    process.env.NODE_ENV = "production";
     useAuthMock.mockReturnValue({
       loading: false,
       user: { id: "u1", email: "biz@example.com", role: "business" },
@@ -75,6 +83,7 @@ describe("AppHeader", () => {
   });
 
   it("fetches admin notifications when admin user is active", async () => {
+    process.env.NODE_ENV = "production";
     useAuthMock.mockReturnValue({
       loading: false,
       user: { id: "a1", email: "admin@example.com", role: "admin" },
@@ -105,6 +114,7 @@ describe("AppHeader", () => {
   });
 
   it("shows org invite link from notification payload", async () => {
+    process.env.NODE_ENV = "production";
     useAuthMock.mockReturnValue({
       loading: false,
       user: { id: "u1", email: "biz@example.com", role: "business" },

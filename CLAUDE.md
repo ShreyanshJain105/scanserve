@@ -635,3 +635,25 @@ This section is the high-level source of truth for what is already implemented a
 - Updated orders summary metrics to exclude cancelled orders and count revenue from paid orders only.
 - Marked ADR-043 implementation tasks as completed (`docs/adr/ADR-043-customer-orders-hub.md`).
 - Reordered the post ADR-036 TODOs in `STATUS.md` so analytics endpoints appear first, followed by private networking and Grafana.
+
+## Updates 2026-04-04
+- Attempted web test triage; `pnpm`/`node` are unavailable in this environment so tests could not be executed.
+- Next step is to get failing web test output or install the toolchain to run `pnpm --filter @scan2serve/web test`.
+- Updated `AppHeader` tests to force `NODE_ENV=production` in notification-fetch cases so the test-env guard no longer blocks mocked notification calls (`apps/web/tests/app-header.test.tsx`).
+- Docker compose hardening: added per-app `node_modules` volumes for `apps/web` and `apps/api` (and tests) to avoid stale host `node_modules` interfering with container installs (`docker-compose.yml`).
+- Added partition guard to skip monthly partition maintenance when the base `orders` tables are not partitioned, preventing repeated `42P17` failures on fresh DBs (`apps/api/src/services/orderPartitionMaintenance.ts`).
+- Updated docker compose API boot to run `pnpm --filter @scan2serve/api db:migrate` instead of `db:push` so raw SQL migrations (including partitioning) apply on fresh DBs (`docker-compose.yml`).
+- Fixed migration `20260404125024` by removing invalid `RENAME CONSTRAINT` clauses inside `ALTER TABLE` statements (syntax error on fresh DBs) so `db:migrate` applies cleanly (`apps/api/prisma/migrations/20260404125024/migration.sql`).
+- Further fixed migration `20260404125024` by removing `ALTER COLUMN ... SET DATA TYPE` for partition key columns, which fails on partitioned tables (`apps/api/prisma/migrations/20260404125024/migration.sql`).
+- Updated partitioning migration to use `TIMESTAMP(3)` for partition key columns and removed the auto-generated migration that only attempted forbidden type changes (`apps/api/prisma/migrations/20260330170000_order_partitions/migration.sql`).
+- Added per-service pnpm store volumes (`PNPM_STORE_PATH=/pnpm-store`) in compose to avoid concurrent install failures across `api`/`tests`/`web` containers (`docker-compose.yml`).
+- Rebuilt compose with fresh volumes: `db:migrate` completed successfully, partitions were created, API and tests booted cleanly (API + web test suites passed).
+- Moved the org-owner onboarding redirect in dashboard page into a `useEffect` to avoid router navigation during render (`apps/web/src/app/dashboard/page.tsx`).
+- Moved the org-owner onboarding redirect effect above early returns to fix hook-order errors in `DashboardPage` (`apps/web/src/app/dashboard/page.tsx`).
+- Re-ran compose tests: API suite (99 tests) and web suite (55 tests) both passed after the dashboard hook-order fix.
+- Pinned pnpm install to `--store-dir /pnpm-store` in compose commands to enforce the isolated store and avoid `ERR_PNPM_Unknown system error -116` during installs (`docker-compose.yml`).
+- Re-ran compose after the pnpm store-dir change; API and web tests pass and the web container no longer logs missing Next files.
+- Adjusted web compose command to `cd /app/apps/web` before running `next dev` so Next writes manifests to the expected `.next` path, fixing missing `middleware-manifest.json`/`routes-manifest.json` errors (`docker-compose.yml`).
+- Rebuilt compose; web healthcheck now returns 200 and all services show healthy in `docker compose ps`.
+- Set client `apiFetch` GET requests to use `cache: "no-store"` to prevent stale polling responses (`apps/web/src/lib/api.ts`).
+- Added focus/visibility refresh trigger for orders dashboard polling so new orders appear without manual refresh (`apps/web/src/app/dashboard/orders/page.tsx`).

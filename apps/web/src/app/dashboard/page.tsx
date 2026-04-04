@@ -154,6 +154,13 @@ export default function DashboardPage() {
     selectBusiness(visibleBusinesses[0].id);
   }, [visibleBusinesses, selectedBusiness, selectBusiness]);
 
+  useEffect(() => {
+    if (businessLoading) return;
+    if (businesses.length !== 0) return;
+    if (!isOrgOwner) return;
+    router.replace("/dashboard/onboarding");
+  }, [businessLoading, businesses.length, isOrgOwner, router]);
+
   if (loading || !orgChecked) {
     return (
       <main className="min-h-screen bg-gray-50">
@@ -180,11 +187,6 @@ export default function DashboardPage() {
   }
 
   if (!hasOrg) {
-    return null;
-  }
-
-  if (!businessLoading && businesses.length === 0 && isOrgOwner) {
-    router.replace("/dashboard/onboarding");
     return null;
   }
 

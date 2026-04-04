@@ -9,66 +9,18 @@
 
 ## Last Session
 
-**Date:** 2026-03-30
+**Date:** 2026-04-04
 **What was done:**
-- Implemented ADR-036 Task 2: native partitioning for `orders` + `order_items` by `created_at` with composite primary keys.
-- Added `order_created_at` to `order_items` and updated order creation/updates to use composite keys.
-- Added partition maintenance worker to create/drop monthly partitions and wired it into API boot.
-- Added partition maintenance env knobs and migration to convert existing orders to partitioned tables.
-- Updated ADR-036 documentation to reflect composite keys and partitioning details.
-- Installed new dependencies locally and re-ran API tests (all 16 files, 99 tests passed; expected warnings for missing AI keys/outbox mocks).
-- Polished Layer 8 orders dashboard UI with summary stats, refresh control, and loading skeletons.
-- Added a test-env guard to skip header notification fetches to reduce act warnings during web tests.
-- Added `status_actors` accountability tracking on orders and displayed per-phase actors in the order detail UI.
-- Added local setup/run shell scripts for running the stack outside containers.
-- Switched order status-actor UI to a horizontal flow timeline in the orders detail view.
-- Highlighted the active status arrow and moved actor labels onto the connector between statuses.
-- Switched order status activity to a vertical workflow timeline for better responsiveness.
-- Moved the order activity workflow into a side pane within the order detail modal.
-- Added a mobile collapsible toggle and side-pane layout for the order workflow.
-- Widened the order detail modal and made modal width configurable to prevent awkward side-pane overlap.
-- Made modal dialogs scrollable and aligned them to the top on mobile to prevent overflow.
-- Updated the workflow timeline to show completed/current/upcoming states with actor labels on connectors.
-- Simplified the workflow timeline to a minimal vertical list with connector actor labels.
-- Updated connector labels to use the next step actor and removed the "handled by" prefix.
-- Removed placeholder analytics cards from dashboard orders and overview pages (analytics endpoints pending).
-- Updated orders summary metrics to exclude cancelled orders and count revenue from paid orders only.
-- Marked ADR-043 implementation task checklist as complete.
-- Reordered post ADR-036 TODOs by priority in `STATUS.md`.
+- Added `cache: "no-store"` for GET requests in `apiFetch` to avoid stale polling responses.
+- Added focus/visibility refresh triggers on the orders dashboard so polling updates when the tab regains focus.
+- Updated `apps/web/CLAUDE.md` and root `CLAUDE.md` with the new polling/cache notes.
 
 **What's NOT done yet:**
-- Live Razorpay checkout + signature verification with real keys not run (blocked: Razorpay test mode account not created yet).
-- Layer 8 dashboard UI still needs refinement/UX polish + potential cleanup of React `act(...)` warnings in tests.
-- Admin UI clarity improvements (admin panel UX) deferred per user request.
- - Tests not re-run after ADR-039 implementation.
- - Tests not re-run after ADR-040 implementation.
- - Tests not re-run after ORDER_NOT_PAID guard change.
- - Tests not re-run after ADR-042 implementation.
-- Tests not re-run after ADR-043 implementation.
-- Tests not re-run after ADR-036 Task 1 (outbox + ClickHouse) changes.
-- Tests not re-run after ADR-036 Redis Streams queue changes.
-- Tests not re-run after Layer 8 UI polish changes.
-- Tests not re-run after status-actor accountability changes.
-- Tests not re-run after status-actor flow timeline UI changes.
-- Tests not re-run after status-actor arrow highlight updates.
-- Tests not re-run after switching to a vertical workflow timeline.
-- Tests not re-run after moving the workflow into a side pane.
-- Tests not re-run after adding mobile workflow toggle + side-pane layout.
-- Tests not re-run after modal width/layout adjustments.
-- Tests not re-run after modal mobile overflow fix.
-- Tests not re-run after workflow timeline state/actor connector update.
-- Tests not re-run after workflow timeline simplification.
-- Tests not re-run after workflow connector label adjustment.
-- Tests not re-run after removing placeholder analytics cards.
-- Tests not re-run after order summary metric adjustment.
-- Tests not re-run after adding local setup/run scripts.
-- TODO (post ADR-036/Layer 8): add analytics endpoints (e.g., `/api/analytics/orders`) and wire dashboard UI metrics from server-side analytics.
-- TODO (post ADR-036/Layer 8): enforce private networking (VPC/internal network) so DB/Redis/ClickHouse are not publicly exposed; only web edge is public.
-- TODO (post ADR-036/Layer 8): add Grafana-based resource + service dashboard (likely via compose with Prometheus/exporters).
+- Layer 8 polish, analytics endpoints, infra hardening remain (Razorpay intentionally skipped for now).
 
 **Next step:**
-1. Re-run API tests after partitioning changes and confirm migration in a real DB.
-2. Continue any remaining Layer 8 polish (UI + test cleanup).
+1. Verify orders dashboard now updates automatically without manual refresh in a live session.
+2. Choose the next bucket: Layer 8 polish, analytics endpoints, or infra hardening.
 
 **Build progress:**
 ```
@@ -962,6 +914,26 @@ Layer 11: Polish & Deploy
 - Unpaused ADR-036 and added order management page with status filtering, polling, detail modal, and status transitions.
 - Added dashboard entry point for orders and a new web test for the orders page.
 
+### 2026-04-04 — Session 160: Web test triage kickoff
+- Attempted to run `pnpm --filter @scan2serve/web test` but Node/pnpm are not available in this environment.
+- Requested failing test output or approval to install toolchain before proceeding.
+- Updated `apps/web/tests/app-header.test.tsx` to set `NODE_ENV=production` in notification-fetch test cases so the test-env guard no longer blocks mocked calls.
+- Hardened docker-compose mounts with per-app `node_modules` volumes to prevent stale host dependencies breaking container installs (`docker-compose.yml`).
+- Added guard to skip partition maintenance when base tables are not partitioned, avoiding `orders` partition errors on fresh DBs (`apps/api/src/services/orderPartitionMaintenance.ts`).
+- Updated docker compose API boot command to run `db:migrate` instead of `db:push`, ensuring raw SQL migrations (partitioning) run in fresh DBs (`docker-compose.yml`).
+- Fixed migration `20260404125024` by removing invalid `RENAME CONSTRAINT` clauses that caused `db:migrate` to fail on fresh DBs (`apps/api/prisma/migrations/20260404125024/migration.sql`).
+- Removed partition-key `ALTER COLUMN ... SET DATA TYPE` clauses from migration `20260404125024` to fix `cannot alter column ... because it is part of the partition key` errors.
+- Updated partitioning migration to create partition-key columns as `TIMESTAMP(3)` and deleted the auto-generated migration that attempted forbidden type changes (`apps/api/prisma/migrations/20260330170000_order_partitions/migration.sql`).
+- Added per-service pnpm store volumes in compose (`PNPM_STORE_PATH=/pnpm-store`) to prevent concurrent install failures across containers.
+- Rebuilt compose from fresh volumes; migrations applied cleanly and both API + web tests passed via the `tests` service.
+- Fixed dashboard org-owner onboarding redirect to run inside a `useEffect`, preventing React router updates during render (`apps/web/src/app/dashboard/page.tsx`).
+- Moved the org-owner onboarding redirect effect above early returns to keep hook order stable in `DashboardPage` (`apps/web/src/app/dashboard/page.tsx`).
+- Re-ran compose tests: API (99 tests) and web (55 tests) passed after the dashboard hook-order fix.
+- Updated compose install commands to force pnpm store dir (`--store-dir /pnpm-store`) to avoid copyfile errors during install.
+- Re-ran compose after the store-dir change; API (99 tests) and web (55 tests) passed without pnpm install failures.
+- Updated web compose command to `cd /app/apps/web` before running `next dev` so `.next` manifests resolve correctly.
+- Rebuilt compose; web healthcheck now returns 200 and all services are healthy.
+
 ---
 
 ## Decisions Log
@@ -1170,3 +1142,7 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 
 ### 2026-03-30 — Session 203: Reordered post-ADR TODOs
 - Reordered the post ADR-036 TODO list in `STATUS.md` so analytics endpoints are listed first, followed by private networking and Grafana.
+
+### 2026-04-04 — Session 161: Orders polling freshness
+- Set client GET requests to use `cache: "no-store"` in `apiFetch` to prevent stale polling responses.
+- Added focus/visibility refresh trigger for orders dashboard polling so new orders appear without manual refresh.

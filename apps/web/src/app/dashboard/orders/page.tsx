@@ -403,6 +403,21 @@ export default function DashboardOrdersPage() {
     return () => window.clearInterval(id);
   }, [blocked, headers, dateFilter]);
 
+  useEffect(() => {
+    if (blocked) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshOrders({ silent: true });
+      }
+    };
+    window.addEventListener("focus", handleVisibility);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleVisibility);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [blocked, headers, dateFilter]);
+
   const filteredOrders = useMemo(() => {
     const selectedStatuses = new Set<OrderStatus>(
       ORDER_STATUSES.filter((status) => statusFilters[status])

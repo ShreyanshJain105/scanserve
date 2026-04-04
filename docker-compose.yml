@@ -75,10 +75,13 @@ services:
     volumes:
       - ./:/app
       - api-node-modules:/app/node_modules
+      - api-app-node-modules:/app/apps/api/node_modules
+      - api-pnpm-store:/pnpm-store
     environment:
       NODE_ENV: development
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
+      PNPM_STORE_PATH: /pnpm-store
       DATABASE_URL: postgresql://scan2serve:scan2serve@db:5432/scan2serve
       CLIENT_URL: http://localhost:3000
       S3_ENDPOINT: http://minio:9000
@@ -87,7 +90,7 @@ services:
       CLICKHOUSE_DATABASE: scan2serve
       REDIS_URL: redis://redis:6379
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api db:push && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api dev"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api db:migrate && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api dev"
     ports:
       - "4000:4000"
     depends_on:
@@ -115,14 +118,17 @@ services:
     volumes:
       - ./:/app
       - web-node-modules:/app/node_modules
+      - web-app-node-modules:/app/apps/web/node_modules
       - web-next-cache:/app/apps/web/.next
+      - web-pnpm-store:/pnpm-store
     environment:
       NODE_ENV: development
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
+      PNPM_STORE_PATH: /pnpm-store
       API_INTERNAL_URL: http://api:4000
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/web exec next dev --hostname 0.0.0.0 --port 3000"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && cd /app/apps/web && pnpm exec next dev --hostname 0.0.0.0 --port 3000"
     ports:
       - "3000:3000"
     depends_on:
@@ -142,12 +148,16 @@ services:
     volumes:
       - ./:/app
       - test-node-modules:/app/node_modules
+      - test-api-node-modules:/app/apps/api/node_modules
+      - test-web-node-modules:/app/apps/web/node_modules
+      - test-pnpm-store:/pnpm-store
     environment:
       NODE_ENV: test
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
+      PNPM_STORE_PATH: /pnpm-store
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @scan2serve/api test && pnpm --filter @scan2serve/web test"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api test && pnpm --filter @scan2serve/web test"
     depends_on:
       db:
         condition: service_healthy
@@ -160,6 +170,13 @@ volumes:
   clickhouse-data:
   redis-data:
   api-node-modules:
+  api-app-node-modules:
+  api-pnpm-store:
   web-node-modules:
+  web-app-node-modules:
+  web-pnpm-store:
   web-next-cache:
   test-node-modules:
+  test-api-node-modules:
+  test-web-node-modules:
+  test-pnpm-store:

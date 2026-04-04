@@ -276,3 +276,11 @@ pnpm db:studio    # open Prisma Studio GUI
 ## Updates 2026-03-30
 - Added `status_actors` JSONB column on orders with migration and included status actors in order snapshots/responses (`apps/api/prisma/migrations/20260330193000_order_status_actors/migration.sql`, `apps/api/src/routes/business.ts`, `apps/api/src/services/orderEvents.ts`).
 - Order status updates now record per-phase actor labels in `statusActors` for accountability.
+
+## Updates 2026-04-04
+- Added partition guard to skip monthly partition maintenance when `orders`/`order_items` tables are not actually partitioned, preventing repeated `42P17` errors (`apps/api/src/services/orderPartitionMaintenance.ts`).
+- Fixed migration `20260404125024` by removing invalid `RENAME CONSTRAINT` clauses inside `ALTER TABLE` statements (Postgres syntax error on fresh DBs) so `db:migrate` can apply cleanly (`apps/api/prisma/migrations/20260404125024/migration.sql`).
+- Further fixed migration `20260404125024` by removing `ALTER COLUMN ... SET DATA TYPE` on partition key columns (`orders.created_at`, `order_items.order_created_at`) which are not allowed in partitioned tables (`apps/api/prisma/migrations/20260404125024/migration.sql`).
+- Updated partitioning migration `20260330170000_order_partitions` to use `TIMESTAMP(3)` for partition key columns so Prisma does not generate follow-up type-alter migrations; removed the auto-generated `20260404125859` migration that was only attempting forbidden partition-key type changes.
+- Re-ran compose with fresh volumes: `db:migrate` applied cleanly and the partition maintenance worker successfully created monthly `orders` and `order_items` partitions; API booted without partition errors.
+- Re-ran compose after enforcing pnpm store dir; API tests still pass (16 files / 99 tests).

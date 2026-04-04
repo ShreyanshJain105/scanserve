@@ -67,7 +67,26 @@ const dropPartition = async (partitionName: string) => {
   logger.info("orders.partition.dropped", { partition: partitionName });
 };
 
+const isTablePartitioned = async (table: string) => {
+  const rows = await prisma.$queryRawUnsafe<Array<{ isPartitioned: boolean }>>(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM pg_partitioned_table pt
+       JOIN pg_class c ON pt.partrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       WHERE n.nspname = 'public' AND c.relname = '${table}'
+     ) AS "isPartitioned"`
+  );
+  return rows[0]?.isPartitioned ?? false;
+};
+
 const ensurePartitionsForTable = async (table: string, column: string, now: Date) => {
+  const partitioned = await isTablePartitioned(table);
+  if (!partitioned) {
+    logger.warn("orders.partition.table_not_partitioned", { table });
+    return;
+  }
+
   const currentMonth = monthStartUtc(now.getUTCFullYear(), now.getUTCMonth());
   const keepFrom = addMonthsUtc(currentMonth, -(retentionMonths - 1));
   const createThrough = addMonthsUtc(currentMonth, futureMonths);
