@@ -76,7 +76,7 @@ type OrderSummary = {
   razorpayPaymentId: string | null;
   customerName: string;
   customerPhone: string | null;
-  statusActors?: Record<string, string> | null;
+  statusActors?: Record<string, { userId: string | null; email: string | null } | string> | null;
   createdAt: string;
   updatedAt: string;
   table: { id: string; tableNumber: number; label: string | null } | null;
@@ -99,6 +99,14 @@ const STATUS_ACTOR_LABELS: Record<string, string> = {
   readyBy: "Ready by",
   completedBy: "Completed by",
   cancelledBy: "Cancelled by",
+};
+
+const resolveActorLabel = (
+  actor?: { userId: string | null; email: string | null } | string | null
+) => {
+  if (!actor) return null;
+  if (typeof actor === "string") return actor;
+  return actor.email ?? actor.userId ?? null;
 };
 
 const STATUS_FLOW_STEPS = [
@@ -133,7 +141,7 @@ const ActivityTimeline = ({ detailOrder }: { detailOrder: OrderDetail }) => {
             nextStep?.actorKey && detailOrder.statusActors
               ? detailOrder.statusActors[nextStep.actorKey] ?? null
               : null;
-          const actorLabel = connectorActor ?? null;
+          const actorLabel = resolveActorLabel(connectorActor);
           return (
             <li key={step.status} className="space-y-2">
               <div className="flex items-center gap-3">
@@ -161,7 +169,10 @@ const ActivityTimeline = ({ detailOrder }: { detailOrder: OrderDetail }) => {
       </ol>
       {showCancelled && (
         <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-          Cancelled {detailOrder.statusActors?.cancelledBy ? `by ${detailOrder.statusActors.cancelledBy}` : ""}
+          Cancelled{" "}
+          {detailOrder.statusActors?.cancelledBy
+            ? `by ${resolveActorLabel(detailOrder.statusActors.cancelledBy) ?? "Unknown"}`
+            : ""}
         </div>
       )}
     </div>
@@ -351,9 +362,9 @@ export default function DashboardOrdersPage() {
         }
       );
       setOrders((current) =>
-        current.map((order) => (order.id === orderId ? { ...order, status: data.order.status } : order))
+        current.map((order) => (order.id === orderId ? { ...order, ...data.order } : order))
       );
-      setDetailOrder((current) => (current ? { ...current, status: data.order.status } : current));
+      setDetailOrder((current) => (current ? { ...current, ...data.order } : current));
       showToast({ variant: "success", message: "Order status updated." });
     } catch (error) {
       showToast({

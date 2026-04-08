@@ -308,3 +308,6 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added internal API key enforcement middleware for non-public routes (`apps/api/src/middleware/internalApiKey.ts`, wired in `apps/api/src/index.ts`).
 - Added `INTERNAL_API_KEY` to API env sample and local env (`apps/api/.env.example`, `apps/api/.env`).
 - Marked `/api/auth/logout` as a public route exempt from internal API key enforcement (`apps/api/src/middleware/internalApiKey.ts`).
+
+## Updates 2026-04-09
+- Status actor persistence now stores `{ userId, email }` objects per status key in `status_actors`, with normalization for legacy string values (`apps/api/src/utils/statusActors.ts`, `apps/api/src/routes/business.ts`, `apps/api/src/services/orderEvents.ts`).

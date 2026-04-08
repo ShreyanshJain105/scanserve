@@ -53,3 +53,6 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 ## Updates 2026-04-04
 - Added `countryCode` + `timezone` to `BusinessProfile` for analytics windowing.
 - Added shared analytics request/response types (`AnalyticsSectionRequest`, `AnalyticsSectionResponse`, windows/sources/series/summary).
+
+## Updates 2026-04-09
+- Added `StatusActorInfo`/`StatusActors` types and attached `statusActors` to `Order` to support per-status `{ userId, email }` actor metadata.

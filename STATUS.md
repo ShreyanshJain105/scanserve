@@ -11,19 +11,17 @@
 
 **Date:** 2026-04-09
 **What was done:**
-- Added internal API key enforcement middleware for non-public API routes and wired it into API bootstrap (`apps/api/src/middleware/internalApiKey.ts`, `apps/api/src/index.ts`).
-- Updated gateway to inject the internal API key via envsubst template (`gateway/nginx.conf.template`, `docker-compose.yml`).
-- Added `INTERNAL_API_KEY` to API env sample and local env (`apps/api/.env.example`, `apps/api/.env`).
-- Routed local traffic through the gateway by default: expose gateway on `:3000` and remove direct `web`/`api` ports; updated `NEXT_PUBLIC_API_URL` to `http://localhost:3000` (`docker-compose.yml`, `apps/web/.env`, `apps/web/.env.example`).
-- Fixed gateway template to use `INTERNAL_API_KEY` env var instead of hardcoded value (`gateway/nginx.conf.template`).
+- Accepted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors`.
+- Added status-actor normalization utility and updated API status update + order snapshot serialization to use the new object shape (`apps/api/src/utils/statusActors.ts`, `apps/api/src/routes/business.ts`, `apps/api/src/services/orderEvents.ts`).
+- Updated orders dashboard timeline to render actor labels from `{ userId, email }` entries with legacy string fallback (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Updated orders status transition handler to merge the full API order payload so actor data refreshes immediately after status changes (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Added shared `StatusActorInfo`/`StatusActors` types and attached `statusActors` to `Order` (`packages/shared/src/types.ts`).
 
 **What's NOT done yet:**
-- Confirm public vs non-public route list is correct (auth/public/health vs business/admin/ai).
-- Verify local dev still works through the gateway (`/healthz`, `/api/auth/*`, and dashboard flows).
+- Run API/web test suites to validate the new statusActors shape and UI refresh behavior.
 
 **Next step:**
-1. Confirm public/non-public route list.
-2. Run compose and verify gateway routing + internal API key behavior.
+1. Run targeted tests (`pnpm --filter @scan2serve/api test`, `pnpm --filter @scan2serve/web test`) and fix any regressions.
 
 **Build progress:**
 ```
@@ -949,6 +947,13 @@ Layer 11: Polish & Deploy
 - Added Redis client helper + analytics cache wrapper for non-today windows.
 - Implemented `/api/business/analytics/overview` with source-specific requests and per-window cache.
 - Added analytics overview UI cards to dashboard + orders pages with partial-load tolerance.
+### 2026-04-09 — Session 178: ADR-047 drafted
+- Drafted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors`.
+### 2026-04-09 — Session 179: Status actor identity
+- Accepted ADR-047 and updated order status actor storage to `{ userId, email }` objects with API/UI/shared type updates.
+### 2026-04-09 — Session 180: Orders status actor UI refresh
+- Fixed status update handler to merge the full order payload so status actor labels update immediately in the dashboard UI.
+
 
 ## Decisions Log
 
@@ -995,6 +1000,8 @@ Layer 11: Polish & Deploy
 | ADR-043 | Customer orders hub page — Accepted | Add `/orders` hub with paginated customer orders list API and remove `/order/:id` deep links | 2026-03-30 |
 | ADR-044 | Order dashboard notifications (toast + sound) — Accepted | Notify operators of new orders with toast + sound while dashboard is open | 2026-04-04 |
 | ADR-045 | Business analytics endpoints (dashboard-scoped) — Accepted | Add Postgres + ClickHouse analytics endpoints with Redis caching and business timezone | 2026-04-04 |
+| ADR-046 | API gateway layer | Front gateway all traffic and require internal API key for non-public API routes | 2026-04-09 |
+| ADR-047 | Order status actors store user identity | Store `{ userId, email }` objects per status key in `status_actors` | 2026-04-09 |
 
 ---
 

@@ -693,3 +693,5 @@ This section is the high-level source of truth for what is already implemented a
 - Gateway routing now uses an envsubst template (`gateway/nginx.conf.template`) for internal API key injection.
 - Routed local web/API traffic through the gateway by default (expose gateway on `:3000`, remove direct `web`/`api` ports, update `NEXT_PUBLIC_API_URL`) (`docker-compose.yml`, `apps/web/.env`, `apps/web/.env.example`).
 - Fixed gateway template to use `INTERNAL_API_KEY` env var instead of hardcoded value (`gateway/nginx.conf.template`).
+- Accepted and implemented ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors` (`docs/adr/ADR-047-order-status-actors-with-user-identity.md`).
+- Fixed orders dashboard status updates to merge the full order payload so actor labels refresh immediately after transitions (`apps/web/src/app/dashboard/orders/page.tsx`).

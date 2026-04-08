@@ -27,6 +27,7 @@ import {
   enqueueDeletedMenuItemImage,
 } from "../services/deletedAssetCleanup";
 import { fetchOrderSnapshot, publishOrderEventBestEffort } from "../services/orderEvents";
+import { normalizeStatusActors, type StatusActorInfo } from "../utils/statusActors";
 
 const notifyAdmins = async (params: {
   businessId: string;
@@ -608,10 +609,7 @@ const serializeOrderSummary = (order: {
   paymentMethod: order.paymentMethod,
   customerName: order.customerName,
   customerPhone: order.customerPhone,
-  statusActors:
-    order.statusActors && typeof order.statusActors === "object" && !Array.isArray(order.statusActors)
-      ? (order.statusActors as Record<string, string>)
-      : null,
+  statusActors: normalizeStatusActors(order.statusActors),
   createdAt: order.createdAt.toISOString(),
   updatedAt: order.updatedAt.toISOString(),
   table: order.table
@@ -685,8 +683,12 @@ const resolveStatusActorKey = (status: OrderStatus) => {
   }
 };
 
-const resolveStatusActorLabel = (req: express.Request) =>
-  req.user?.name ?? req.user?.email ?? "Unknown";
+const resolveStatusActorInfo = (req: express.Request): StatusActorInfo | null => {
+  const userId = req.user?.id ?? null;
+  const email = req.user?.email ?? null;
+  if (!userId && !email) return null;
+  return { userId, email };
+};
 
 const notifyUser = async (params: {
   userId: string;
@@ -3001,17 +3003,14 @@ router.patch(
     }
 
     const actorKey = resolveStatusActorKey(parsed.data.status);
-    const actorLabel = resolveStatusActorLabel(req);
-    const currentActors =
-      existing.statusActors && typeof existing.statusActors === "object" && !Array.isArray(existing.statusActors)
-        ? (existing.statusActors as Record<string, string>)
-        : {};
+    const actorInfo = resolveStatusActorInfo(req);
+    const currentActors = normalizeStatusActors(existing.statusActors) ?? {};
 
     const updated = await prisma.order.update({
       where: { id_createdAt: { id: existing.id, createdAt: existing.createdAt } },
       data: {
         status: parsed.data.status,
-        statusActors: actorKey ? { ...currentActors, [actorKey]: actorLabel } : currentActors,
+        statusActors: actorKey && actorInfo ? { ...currentActors, [actorKey]: actorInfo } : currentActors,
       },
       include: {
         table: { select: { id: true, tableNumber: true, label: true } },

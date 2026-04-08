@@ -458,6 +458,10 @@ pnpm lint   # run Next.js ESLint
 ## Updates 2026-04-09
 - Switched `NEXT_PUBLIC_API_URL` to the gateway port (`http://localhost:3000`) for single-origin routing (`apps/web/.env`, `apps/web/.env.example`).
 
+## Updates 2026-04-09
+- Order workflow timeline now renders status actors from `{ userId, email }` objects (with legacy string fallback) in the orders detail modal (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Status update UI now merges the full API order payload so `statusActors` refreshes immediately after transitions (`apps/web/src/app/dashboard/orders/page.tsx`).
+
 ## Updates 2026-04-04
 - Added country + timezone fields to business onboarding with country-driven timezone defaults (`apps/web/src/app/dashboard/onboarding/page.tsx`).
 - Added dashboard analytics overview component (per-window cards, partial-load safe) and mounted on dashboard + orders pages (`apps/web/src/components/dashboard/analytics-overview.tsx`, `apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).

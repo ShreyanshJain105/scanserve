@@ -263,6 +263,13 @@ export interface QrCode {
 
 // ─── Orders ─────────────────────────────────────────────────
 
+export type StatusActorInfo = {
+  userId: string | null;
+  email: string | null;
+};
+
+export type StatusActors = Record<string, StatusActorInfo>;
+
 export interface Order {
   id: string;
   businessId: string;
@@ -275,6 +282,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   customerName: string;
   customerPhone: string | null;
+  statusActors?: StatusActors | null;
   createdAt: string;
 }
 

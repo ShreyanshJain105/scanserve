@@ -134,3 +134,7 @@ Project documentation for architecture decisions, process notes, and operational
 - Updated ADR-046 to require an internal API key header from the gateway for API requests, never exposed to browsers (`docs/adr/ADR-046-api-gateway-layer.md`).
 - Accepted ADR-046 with gateway-fronts-both + internal API key for non-public routes (`docs/adr/ADR-046-api-gateway-layer.md`).
 - Implemented gateway routing baseline and internal API key enforcement wiring (Nginx gateway + API middleware).
+- Accepted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors` (`docs/adr/ADR-047-order-status-actors-with-user-identity.md`).
+
+## Updates 2026-04-09
+- Drafted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors` (`docs/adr/ADR-047-order-status-actors-with-user-identity.md`).

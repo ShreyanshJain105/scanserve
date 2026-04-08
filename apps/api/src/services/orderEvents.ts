@@ -2,6 +2,7 @@ import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { logger } from "../utils/logger";
+import { normalizeStatusActors, type StatusActorInfo } from "../utils/statusActors";
 import { enqueueOrderEventOutbox } from "./orderEventOutbox";
 
 export type OrderEventType = "order_created" | "order_status_updated" | "order_payment_updated";
@@ -17,7 +18,7 @@ export type OrderSnapshot = {
   paymentStatus: string;
   customerName: string;
   customerPhone: string | null;
-  statusActors: Record<string, string> | null;
+  statusActors: Record<string, StatusActorInfo> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,10 +56,7 @@ export const buildOrderSnapshot = (order: {
   paymentStatus: order.paymentStatus,
   customerName: order.customerName,
   customerPhone: order.customerPhone,
-  statusActors:
-    order.statusActors && typeof order.statusActors === "object" && !Array.isArray(order.statusActors)
-      ? (order.statusActors as Record<string, string>)
-      : null,
+  statusActors: normalizeStatusActors(order.statusActors),
   createdAt: order.createdAt.toISOString(),
   updatedAt: order.updatedAt.toISOString(),
 });
