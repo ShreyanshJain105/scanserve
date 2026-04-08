@@ -9,19 +9,21 @@
 
 ## Last Session
 
-**Date:** 2026-04-08
+**Date:** 2026-04-09
 **What was done:**
-- Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` to fix `clickhouse:users` admin auth failures during compose startup.
-- Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
-- Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).
+- Added internal API key enforcement middleware for non-public API routes and wired it into API bootstrap (`apps/api/src/middleware/internalApiKey.ts`, `apps/api/src/index.ts`).
+- Updated gateway to inject the internal API key via envsubst template (`gateway/nginx.conf.template`, `docker-compose.yml`).
+- Added `INTERNAL_API_KEY` to API env sample and local env (`apps/api/.env.example`, `apps/api/.env`).
+- Routed local traffic through the gateway by default: expose gateway on `:3000` and remove direct `web`/`api` ports; updated `NEXT_PUBLIC_API_URL` to `http://localhost:3000` (`docker-compose.yml`, `apps/web/.env`, `apps/web/.env.example`).
+- Fixed gateway template to use `INTERNAL_API_KEY` env var instead of hardcoded value (`gateway/nginx.conf.template`).
 
 **What's NOT done yet:**
-- Re-run compose (or `pnpm --filter @scan2serve/api clickhouse:users`) to confirm the bootstrap succeeds with the corrected credentials.
-- Verify the 1-minute healthcheck interval still meets operational expectations for API/web readiness.
+- Confirm public vs non-public route list is correct (auth/public/health vs business/admin/ai).
+- Verify local dev still works through the gateway (`/healthz`, `/api/auth/*`, and dashboard flows).
 
 **Next step:**
-1. Re-run `docker compose up` (or `pnpm --filter @scan2serve/api clickhouse:users`) and confirm ClickHouse users bootstrap completes.
-2. Confirm the `/healthz` healthcheck cadence at 1 minute is acceptable for ops workflows.
+1. Confirm public/non-public route list.
+2. Run compose and verify gateway routing + internal API key behavior.
 
 **Build progress:**
 ```
@@ -1185,3 +1187,25 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 ### 2026-04-08 — Session 170: Healthcheck interval update
 - Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
 - Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).
+### 2026-04-08 — Session 171: ADR-046 drafted
+- Drafted ADR-046 for an API gateway layer with open questions on gateway tech, scope, and initial rate limiting (`docs/adr/ADR-046-api-gateway-layer.md`).
+
+### 2026-04-09 — Session 172: ADR-046 internal API key
+- Updated ADR-046 to require an internal API key header from the gateway for API requests, never exposed to browsers (`docs/adr/ADR-046-api-gateway-layer.md`).
+
+### 2026-04-09 — Session 173: ADR-046 accepted
+- Accepted ADR-046 with gateway-fronts-both and internal API key required for non-public routes (`docs/adr/ADR-046-api-gateway-layer.md`).
+
+### 2026-04-09 — Session 174: Gateway routing baseline
+- Added Nginx gateway routing config and compose service (`gateway/nginx.conf`, `docker-compose.yml`).
+- Added `gateway/CLAUDE.md` with gateway conventions and update notes.
+
+### 2026-04-09 — Session 175: Internal API key enforcement
+- Added internal API key middleware for non-public API routes and wired it into API bootstrap (`apps/api/src/middleware/internalApiKey.ts`, `apps/api/src/index.ts`).
+- Updated gateway routing to use envsubst template and inject `X-Internal-Api-Key` (`gateway/nginx.conf.template`, `docker-compose.yml`).
+- Added `INTERNAL_API_KEY` to API env sample and local env (`apps/api/.env.example`, `apps/api/.env`).
+
+### 2026-04-09 — Session 176: Gateway primary entry
+- Exposed the gateway on `:3000` and removed direct `web`/`api` ports; updated `NEXT_PUBLIC_API_URL` to `http://localhost:3000` (`docker-compose.yml`, `apps/web/.env`, `apps/web/.env.example`).
+### 2026-04-09 — Session 177: Gateway internal key fix
+- Replaced hardcoded internal API key in the gateway template with envsubst variable (`gateway/nginx.conf.template`).

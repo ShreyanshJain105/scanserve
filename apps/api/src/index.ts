@@ -16,6 +16,7 @@ import { startArchivedBusinessCleanupWorker } from "./services/archivedBusinessC
 import { startOrderEventOutboxWorker } from "./services/orderEventOutbox";
 import { startOrderEventQueueConsumer } from "./services/orderEventQueueConsumer";
 import { startOrderPartitionMaintenance } from "./services/orderPartitionMaintenance";
+import { requireInternalApiKey } from "./middleware/internalApiKey";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -93,6 +94,7 @@ app.use((req, res, next) => {
 // Parse JSON bodies for all routes.
 app.use(express.json());
 app.use(requireCsrf);
+app.use(requireInternalApiKey);
 
 // ─── Health Check ───────────────────────────────────────────
 app.get("/api/health", (_req, res) => {

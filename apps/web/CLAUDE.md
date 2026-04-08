@@ -30,7 +30,7 @@ pnpm lint   # run Next.js ESLint
 
 ## Environment
 - Copy `.env.example` to `.env.local`
-- `NEXT_PUBLIC_API_URL` points to the Express backend
+- `NEXT_PUBLIC_API_URL` points to the gateway (single origin) in local dev
 
 ## Updates 2026-03-19
 - Added auth context + API client with cookie-based flow and 401 refresh retry.
@@ -454,6 +454,9 @@ pnpm lint   # run Next.js ESLint
 
 ## Updates 2026-04-08
 - Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
+
+## Updates 2026-04-09
+- Switched `NEXT_PUBLIC_API_URL` to the gateway port (`http://localhost:3000`) for single-origin routing (`apps/web/.env`, `apps/web/.env.example`).
 
 ## Updates 2026-04-04
 - Added country + timezone fields to business onboarding with country-driven timezone defaults (`apps/web/src/app/dashboard/onboarding/page.tsx`).

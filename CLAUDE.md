@@ -46,6 +46,9 @@ Next.js Frontend (apps/web/)
         │
         │ REST API calls
         ▼
+Nginx Gateway (gateway/)
+        │
+        ▼
 Express.js Backend (apps/api/)
   ├── Auth (register, login, JWT, role middleware)
   ├── Menu CRUD (categories, items, images)
@@ -680,3 +683,13 @@ This section is the high-level source of truth for what is already implemented a
 - Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` to prevent admin auth failures during `clickhouse:users`.
 - Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
 - Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).
+- Drafted ADR-046 for introducing an API gateway layer as infrastructure (`docs/adr/ADR-046-api-gateway-layer.md`).
+
+## Updates 2026-04-09
+- Updated ADR-046 to require an internal API key header from the gateway for API requests, never exposed to browsers (`docs/adr/ADR-046-api-gateway-layer.md`).
+- Accepted ADR-046 with gateway-fronts-both + internal API key for non-public routes (`docs/adr/ADR-046-api-gateway-layer.md`).
+- Added initial Nginx gateway routing and compose service (`gateway/nginx.conf`, `docker-compose.yml`).
+- Enforced internal API key on non-public API routes and injected header from the gateway (`apps/api/src/middleware/internalApiKey.ts`, `apps/api/src/index.ts`, `gateway/nginx.conf.template`, `docker-compose.yml`).
+- Gateway routing now uses an envsubst template (`gateway/nginx.conf.template`) for internal API key injection.
+- Routed local web/API traffic through the gateway by default (expose gateway on `:3000`, remove direct `web`/`api` ports, update `NEXT_PUBLIC_API_URL`) (`docker-compose.yml`, `apps/web/.env`, `apps/web/.env.example`).
+- Fixed gateway template to use `INTERNAL_API_KEY` env var instead of hardcoded value (`gateway/nginx.conf.template`).

@@ -1,0 +1,32 @@
+upstream scan2serve_api {
+  server api:4000;
+}
+
+upstream scan2serve_web {
+  server web:3000;
+}
+
+server {
+  listen 80;
+
+  location /api/ {
+    proxy_pass http://scan2serve_api;
+    proxy_http_version 1.1;
+    proxy_set_header X-Internal-Api-Key ${INTERNAL_API_KEY};
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection "";
+  }
+
+  location / {
+    proxy_pass http://scan2serve_web;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection "";
+  }
+}

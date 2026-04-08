@@ -303,3 +303,8 @@ pnpm db:studio    # open Prisma Studio GUI
 
 ## Updates 2026-04-08
 - Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` to fix admin auth failures during `clickhouse:users`.
+
+## Updates 2026-04-09
+- Added internal API key enforcement middleware for non-public routes (`apps/api/src/middleware/internalApiKey.ts`, wired in `apps/api/src/index.ts`).
+- Added `INTERNAL_API_KEY` to API env sample and local env (`apps/api/.env.example`, `apps/api/.env`).
+- Marked `/api/auth/logout` as a public route exempt from internal API key enforcement (`apps/api/src/middleware/internalApiKey.ts`).

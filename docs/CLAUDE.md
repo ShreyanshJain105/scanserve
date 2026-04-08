@@ -126,3 +126,11 @@ Project documentation for architecture decisions, process notes, and operational
 
 ## Updates 2026-04-04
 - ADR-045 accepted: dashboard-scoped analytics endpoints with Postgres (today/yesterday/current week) + ClickHouse (last week/month/quarter/year), Redis caching for non-today, and timezone stored on business profiles (`docs/adr/ADR-045-analytics-endpoints.md`).
+
+## Updates 2026-04-08
+- Drafted ADR-046 for introducing an API gateway layer as infrastructure (`docs/adr/ADR-046-api-gateway-layer.md`).
+
+## Updates 2026-04-09
+- Updated ADR-046 to require an internal API key header from the gateway for API requests, never exposed to browsers (`docs/adr/ADR-046-api-gateway-layer.md`).
+- Accepted ADR-046 with gateway-fronts-both + internal API key for non-public routes (`docs/adr/ADR-046-api-gateway-layer.md`).
+- Implemented gateway routing baseline and internal API key enforcement wiring (Nginx gateway + API middleware).
