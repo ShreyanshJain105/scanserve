@@ -675,3 +675,8 @@ This section is the high-level source of truth for what is already implemented a
 - Added `scripts/test-compose.sh` to run the `tests` profile explicitly and updated `scripts/dev-compose.sh`/README to clarify tests are separate (`scripts/dev-compose.sh`, `scripts/test-compose.sh`, `README.md`).
 - Updated `scripts/test-compose.sh` to run tests under a dedicated compose project name to avoid missing-network conflicts (`scripts/test-compose.sh`, `README.md`).
 - Removed hardcoded `container_name` entries in compose to avoid cross-project name collisions (notably when running tests profile) (`docker-compose.yml`).
+
+## Updates 2026-04-08
+- Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` to prevent admin auth failures during `clickhouse:users`.
+- Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).

@@ -9,16 +9,19 @@
 
 ## Last Session
 
-**Date:** 2026-04-05
+**Date:** 2026-04-08
 **What was done:**
-- Removed hardcoded compose container names to prevent name collisions across projects (fixes tests profile conflicts).
-- Kept tests profile + script flow intact.
+- Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` to fix `clickhouse:users` admin auth failures during compose startup.
+- Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).
 
 **What's NOT done yet:**
-- Re-run `./scripts/test-compose.sh` to confirm the container-name conflict is resolved.
+- Re-run compose (or `pnpm --filter @scan2serve/api clickhouse:users`) to confirm the bootstrap succeeds with the corrected credentials.
+- Verify the 1-minute healthcheck interval still meets operational expectations for API/web readiness.
 
 **Next step:**
-1. Run `./scripts/test-compose.sh` and confirm tests start cleanly.
+1. Re-run `docker compose up` (or `pnpm --filter @scan2serve/api clickhouse:users`) and confirm ClickHouse users bootstrap completes.
+2. Confirm the `/healthz` healthcheck cadence at 1 minute is acceptable for ops workflows.
 
 **Build progress:**
 ```
@@ -1176,3 +1179,9 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 
 ### 2026-04-05 — Session 168: Compose container name cleanup
 - Removed hardcoded container names in compose to avoid cross-project conflicts when running tests profile.
+
+### 2026-04-08 — Session 169: ClickHouse bootstrap auth fix
+- Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` so `clickhouse:users` can authenticate as the admin user during compose startup.
+### 2026-04-08 — Session 170: Healthcheck interval update
+- Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).

@@ -452,6 +452,9 @@ pnpm lint   # run Next.js ESLint
 - Added focus/visibility refresh trigger for the orders dashboard polling so new orders appear without manual refresh (`apps/web/src/app/dashboard/orders/page.tsx`).
 - Orders dashboard now triggers a toast + sound when a new order arrives while the page is visible, using a bundled tone (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/public/sounds/order-notification.wav`).
 
+## Updates 2026-04-08
+- Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
+
 ## Updates 2026-04-04
 - Added country + timezone fields to business onboarding with country-driven timezone defaults (`apps/web/src/app/dashboard/onboarding/page.tsx`).
 - Added dashboard analytics overview component (per-window cards, partial-load safe) and mounted on dashboard + orders pages (`apps/web/src/components/dashboard/analytics-overview.tsx`, `apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).

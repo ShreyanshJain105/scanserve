@@ -300,3 +300,6 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added `db:generate` before `db:seed` in compose startup to ensure Prisma client is generated in containers (`docker-compose.yml`).
 - Moved the `tests` compose service behind a `tests` profile so it no longer runs on default `docker compose up` (`docker-compose.yml`).
 - Removed hardcoded `container_name` entries in compose to prevent name collisions across compose projects (`docker-compose.yml`).
+
+## Updates 2026-04-08
+- Aligned ClickHouse bootstrap credentials in `apps/api/.env` with `clickhouse-users/admin.xml` to fix admin auth failures during `clickhouse:users`.

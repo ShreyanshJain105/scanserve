@@ -100,7 +100,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:4000/healthz >/dev/null 2>&1 || exit 1"]
-      interval: 10s
+      interval: 1m
       timeout: 5s
       retries: 10
       start_period: 15s
@@ -131,7 +131,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/healthz >/dev/null 2>&1 || exit 1"]
-      interval: 10s
+      interval: 1m
       timeout: 5s
       retries: 10
       start_period: 20s
