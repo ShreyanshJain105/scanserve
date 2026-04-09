@@ -705,3 +705,10 @@ This section is the high-level source of truth for what is already implemented a
 - Fixed Grafana subpath proxying by preserving `/grafana` in `proxy_pass` and forwarding prefix/host headers to stop redirect loops (`gateway/nginx.conf.template`).
 - ClickHouse order-event consumer now uses `CLICKHOUSE_BOOTSTRAP_*` for schema creation and `CLICKHOUSE_INGEST_*` for inserts to prevent privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
 - Added Grafana dashboard provisioning + Scan2Serve overview dashboard JSON, mounted into Grafana via compose (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, `monitoring/grafana/dashboards/scan2serve-overview.json`, `docker-compose.yml`).
+- Enabled ClickHouse Prometheus metrics endpoint via config in `clickhouse-config/prometheus.xml` and mounted config in compose (`docker-compose.yml`).
+
+## Updates 2026-04-10
+- Added ClickHouse Grafana dashboard template backed by Prometheus-scraped ClickHouse metrics (`monitoring/grafana/dashboards/clickhouse-overview.json`).
+- Added Grafana Live websocket proxy handling under `/grafana/api/live/` to avoid 400s through the gateway (`gateway/nginx.conf.template`).
+- Added minimal Postgres exporter config file and mounted it to silence missing config warnings (`monitoring/postgres_exporter.yml`, `docker-compose.yml`).
+- Added optional pretty log output format for API logs via `LOG_FORMAT=pretty` (`apps/api/src/utils/logger.ts`, `apps/api/.env`, `apps/api/.env.example`).

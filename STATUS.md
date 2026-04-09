@@ -9,22 +9,15 @@
 
 ## Last Session
 
-**Date:** 2026-04-09
+**Date:** 2026-04-10
 **What was done:**
-- Fixed Redis outbox publishing to use Redis v4 `multi.addCommand`, resolving `multi.sendCommand is not a function` runtime errors (`apps/api/src/services/orderEventQueue.ts`).
-- Adjusted Grafana gateway proxy to preserve subpath and forward prefix headers, preventing `/grafana/login` redirect loops (`gateway/nginx.conf.template`).
-- Updated ClickHouse order-event consumer to use bootstrap credentials for schema creation and ingest credentials for inserts, avoiding CREATE DATABASE privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
-- Added Grafana dashboard provisioning with a Scan2Serve API/system overview dashboard JSON (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, `monitoring/grafana/dashboards/scan2serve-overview.json`, `docker-compose.yml`).
+- Added pretty log output option for API logs and set local `.env` to `LOG_FORMAT=pretty` (`apps/api/src/utils/logger.ts`, `apps/api/.env`, `apps/api/.env.example`).
 
 **What's NOT done yet:**
-- Restart the gateway container to confirm the Grafana UI loads via `/grafana/` without redirect loops.
-- Restart the API container to ensure ClickHouse consumer no longer logs `ACCESS_DENIED` on schema creation.
-- Restart Grafana to pick up the provisioned dashboard JSON.
+- Restart the API container to pick up `LOG_FORMAT=pretty`.
 
 **Next step:**
-1. Restart the gateway container and verify `http://localhost:3000/grafana/` loads without redirect loops.
-2. Restart the API container and confirm outbox logs no longer show `multi.sendCommand` errors or ClickHouse `ACCESS_DENIED` failures.
-3. Restart the Grafana container and confirm the "Scan2Serve - API & System Overview" dashboard appears.
+1. Restart `api` and confirm logs are now formatted in a readable key/value line.
 
 **Build progress:**
 ```
@@ -1198,6 +1191,22 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 ### 2026-04-08 — Session 170: Healthcheck interval update
 - Reverted orders dashboard polling interval to 15 seconds (`apps/web/src/app/dashboard/orders/page.tsx`).
 - Set API and web `/healthz` docker-compose healthcheck interval to 1 minute (`docker-compose.yml`).
+
+### 2026-04-09 — Session 181: ClickHouse metrics enabled
+- Added ClickHouse Prometheus config (`clickhouse-config/prometheus.xml`) plus explicit listen host (`clickhouse-config/network.xml`) and mounted config in compose.
+- Restarted ClickHouse and confirmed Prometheus target for ClickHouse is `UP`.
+
+### 2026-04-10 — Session 182: ClickHouse Grafana dashboard template
+- Added ClickHouse metrics dashboard JSON (`monitoring/grafana/dashboards/clickhouse-overview.json`) for Grafana provisioning.
+
+### 2026-04-10 — Session 183: Grafana Live websocket proxy fix
+- Added WebSocket upgrade handling for Grafana Live endpoints under `/grafana/api/live/` in the gateway config.
+
+### 2026-04-10 — Session 184: Postgres exporter config
+- Added `monitoring/postgres_exporter.yml` and mounted it in `docker-compose.yml` to silence missing config warnings.
+
+### 2026-04-10 — Session 185: API pretty log format
+- Added `LOG_FORMAT=pretty` support in the API logger and set it in local env to make logs easier to read.
 ### 2026-04-08 — Session 171: ADR-046 drafted
 - Drafted ADR-046 for an API gateway layer with open questions on gateway tech, scope, and initial rate limiting (`docs/adr/ADR-046-api-gateway-layer.md`).
 

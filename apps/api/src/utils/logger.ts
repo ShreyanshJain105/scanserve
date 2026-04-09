@@ -13,12 +13,15 @@ class Logger {
   private static instance: Logger;
   private readonly minLevel: number;
   private readonly useColor: boolean;
+  private readonly format: "json" | "pretty";
 
   private constructor() {
     const envLevel = (process.env.LOG_LEVEL || "info").toLowerCase() as LogLevel;
     this.minLevel = LOG_LEVELS[envLevel] ?? LOG_LEVELS.info;
     const colorFlag = process.env.LOG_COLOR;
     this.useColor = colorFlag !== "false";
+    const formatFlag = (process.env.LOG_FORMAT || "json").toLowerCase();
+    this.format = formatFlag === "pretty" ? "pretty" : "json";
   }
 
   static getInstance() {
@@ -54,7 +57,7 @@ class Logger {
       ...this.normalizeContext(context),
     };
 
-    const line = JSON.stringify(payload);
+    const line = this.format === "pretty" ? this.prettyFormat(payload) : JSON.stringify(payload);
     const output = this.useColor ? this.colorize(level, line) : line;
     if (level === "error") {
       console.error(output);
@@ -81,6 +84,32 @@ class Logger {
       normalized[key] = value;
     }
     return normalized;
+  }
+
+  private prettyFormat(payload: Record<string, unknown>) {
+    const { ts, level, msg, ...rest } = payload as {
+      ts: string;
+      level: string;
+      msg: string;
+    };
+    const parts: string[] = [`[${ts}]`, level.toUpperCase(), msg];
+    const entries = Object.entries(rest)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .sort(([a], [b]) => a.localeCompare(b));
+    for (const [key, value] of entries) {
+      parts.push(`${key}=${this.stringifyValue(value)}`);
+    }
+    return parts.join(" ");
+  }
+
+  private stringifyValue(value: unknown) {
+    if (typeof value === "string") {
+      return /\s/.test(value) ? JSON.stringify(value) : value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    return JSON.stringify(value);
   }
 
   private colorize(level: LogLevel, line: string) {

@@ -188,6 +188,9 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added business membership removal endpoint (`DELETE /api/business/memberships`) with owner/manager role constraints and test coverage.
 - Synced API CLAUDE notes to reflect roleless org membership and org-owner-only attribution model.
 
+## Updates 2026-04-10
+- Added optional pretty log output format controlled by `LOG_FORMAT=pretty` for more readable API logs (`src/utils/logger.ts`, `.env`, `.env.example`).
+
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.
 - API test suite re-run and passing.

@@ -42,6 +42,7 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./clickhouse-users:/etc/clickhouse-server/users.d
+      - ./clickhouse-config:/etc/clickhouse-server/config.d
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/ping >/dev/null 2>&1 || exit 1"]
       interval: 10s
@@ -188,8 +189,12 @@ services:
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
+    command:
+      - "--config.file=/postgres_exporter.yml"
     environment:
       DATA_SOURCE_NAME: postgresql://scan2serve:scan2serve@db:5432/scan2serve?sslmode=disable
+    volumes:
+      - ./monitoring/postgres_exporter.yml:/postgres_exporter.yml:ro
     depends_on:
       db:
         condition: service_healthy

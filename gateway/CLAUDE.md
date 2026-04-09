@@ -14,3 +14,6 @@ Nginx-based gateway that fronts web + API services. It provides a single entry p
 
 ## Updates 2026-04-09
 - Preserved Grafana subpath in proxying and added forwarded prefix/host headers to prevent `/grafana/login` redirect loops (`gateway/nginx.conf.template`).
+
+## Updates 2026-04-10
+- Added Grafana Live websocket proxy handling under `/grafana/api/live/` with upgrade headers to avoid 400s (`gateway/nginx.conf.template`).
