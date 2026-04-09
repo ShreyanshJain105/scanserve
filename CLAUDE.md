@@ -695,3 +695,9 @@ This section is the high-level source of truth for what is already implemented a
 - Fixed gateway template to use `INTERNAL_API_KEY` env var instead of hardcoded value (`gateway/nginx.conf.template`).
 - Accepted and implemented ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors` (`docs/adr/ADR-047-order-status-actors-with-user-identity.md`).
 - Fixed orders dashboard status updates to merge the full order payload so actor labels refresh immediately after transitions (`apps/web/src/app/dashboard/orders/page.tsx`).
+- Reported: API + web test suites pass after ADR-047 changes (`pnpm --filter @scan2serve/api test`, `pnpm --filter @scan2serve/web test`).
+- Dropped private networking from the post-ADR-036 TODO list; Grafana + Prometheus remain for later.
+- Drafted ADR-048 to introduce Prometheus metrics collection and Grafana monitoring (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).
+- Accepted ADR-048 and wired Prometheus + Grafana services (with API metrics endpoint, Postgres exporter, ClickHouse metrics, and `/grafana/` gateway routing) (`docker-compose.yml`, `monitoring/`, `apps/api/src/metrics.ts`, `gateway/nginx.conf.template`).
+- Adjusted internal API key enforcement to accept `Authorization: Bearer` tokens for Prometheus scraping (`apps/api/src/middleware/internalApiKey.ts`, `monitoring/prometheus.yml`).
+- Made compose runtime image configurable via `PNPM_NODE_IMAGE` (defaults to `node:20-alpine`) and restored Corepack with a persistent `COREPACK_HOME` cache (`docker-compose.yml`).

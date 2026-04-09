@@ -17,6 +17,7 @@ import { startOrderEventOutboxWorker } from "./services/orderEventOutbox";
 import { startOrderEventQueueConsumer } from "./services/orderEventQueueConsumer";
 import { startOrderPartitionMaintenance } from "./services/orderPartitionMaintenance";
 import { requireInternalApiKey } from "./middleware/internalApiKey";
+import { metricsMiddleware, metricsRegistry } from "./metrics";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -35,6 +36,7 @@ app.use(
 );
 
 app.use(cookieParser());
+app.use(metricsMiddleware);
 app.use((req, res, next) => {
   const startedAt = process.hrtime.bigint();
   const requestIdHeader = req.header("x-request-id");
@@ -102,6 +104,10 @@ app.get("/api/health", (_req, res) => {
 });
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok" });
+});
+app.get("/metrics", async (_req, res) => {
+  res.setHeader("Content-Type", metricsRegistry.contentType);
+  res.end(await metricsRegistry.metrics());
 });
 
 // ─── Routes (to be added per feature) ───────────────────────

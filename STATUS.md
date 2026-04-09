@@ -11,17 +11,19 @@
 
 **Date:** 2026-04-09
 **What was done:**
-- Accepted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors`.
-- Added status-actor normalization utility and updated API status update + order snapshot serialization to use the new object shape (`apps/api/src/utils/statusActors.ts`, `apps/api/src/routes/business.ts`, `apps/api/src/services/orderEvents.ts`).
-- Updated orders dashboard timeline to render actor labels from `{ userId, email }` entries with legacy string fallback (`apps/web/src/app/dashboard/orders/page.tsx`).
-- Updated orders status transition handler to merge the full API order payload so actor data refreshes immediately after status changes (`apps/web/src/app/dashboard/orders/page.tsx`).
-- Added shared `StatusActorInfo`/`StatusActors` types and attached `statusActors` to `Order` (`packages/shared/src/types.ts`).
+- Accepted ADR-048 and captured monitoring scope: API metrics endpoint with internal API key, Prometheus scraping API + Postgres exporter + ClickHouse metrics, and Grafana exposed via the gateway (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).
+- Added API metrics middleware and `/metrics` endpoint using `prom-client` defaults plus HTTP duration/count metrics (`apps/api/src/metrics.ts`, `apps/api/src/index.ts`, `apps/api/package.json`).
+- Added Prometheus config and Grafana provisioning scaffolding (`monitoring/prometheus.yml`, `monitoring/grafana/provisioning/datasources/prometheus.yml`).
+- Added compose services for Prometheus, Grafana, and Postgres exporter (`docker-compose.yml`).
+- Added gateway route for Grafana at `/grafana/` (`gateway/nginx.conf.template`).
+- Fixed Prometheus scrape auth by allowing `Authorization: Bearer` internal API key (`apps/api/src/middleware/internalApiKey.ts`, `monitoring/prometheus.yml`).
+- Made compose runtime image configurable via `PNPM_NODE_IMAGE` (defaults to `node:20-alpine`) and restored Corepack with `COREPACK_HOME` cache (`docker-compose.yml`).
 
 **What's NOT done yet:**
-- Run API/web test suites to validate the new statusActors shape and UI refresh behavior.
+- Re-run compose stack to validate Prometheus scrape + Grafana UI access.
 
 **Next step:**
-1. Run targeted tests (`pnpm --filter @scan2serve/api test`, `pnpm --filter @scan2serve/web test`) and fix any regressions.
+1. Start the stack and verify `http://localhost:3000/grafana/` loads and Prometheus targets are up.
 
 **Build progress:**
 ```
@@ -1002,6 +1004,7 @@ Layer 11: Polish & Deploy
 | ADR-045 | Business analytics endpoints (dashboard-scoped) — Accepted | Add Postgres + ClickHouse analytics endpoints with Redis caching and business timezone | 2026-04-04 |
 | ADR-046 | API gateway layer | Front gateway all traffic and require internal API key for non-public API routes | 2026-04-09 |
 | ADR-047 | Order status actors store user identity | Store `{ userId, email }` objects per status key in `status_actors` | 2026-04-09 |
+| ADR-048 | Prometheus metrics + Grafana monitoring — Accepted | Introduce monitoring stack and metrics endpoint scope | 2026-04-09 |
 
 ---
 
@@ -1216,3 +1219,22 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 - Exposed the gateway on `:3000` and removed direct `web`/`api` ports; updated `NEXT_PUBLIC_API_URL` to `http://localhost:3000` (`docker-compose.yml`, `apps/web/.env`, `apps/web/.env.example`).
 ### 2026-04-09 — Session 177: Gateway internal key fix
 - Replaced hardcoded internal API key in the gateway template with envsubst variable (`gateway/nginx.conf.template`).
+
+### 2026-04-09 — Session 178: ADR-047 verification
+- Confirmed API and web test suites pass after ADR-047 status-actor changes (per user report).
+
+### 2026-04-09 — Session 179: Post-ADR-036 TODO update
+- Dropped private networking from the post-ADR-036 TODO list; Grafana + Prometheus remain for later.
+
+### 2026-04-09 — Session 180: ADR-048 drafted
+- Drafted ADR-048 for Prometheus metrics collection and Grafana monitoring.
+
+### 2026-04-09 — Session 181: Prometheus + Grafana implementation
+- Accepted ADR-048 and implemented Prometheus + Grafana services with Postgres exporter and ClickHouse metrics scraping.
+- Added API `/metrics` endpoint with `prom-client` and gateway `/grafana/` routing.
+
+### 2026-04-09 — Session 182: Prometheus auth fix
+- Adjusted Prometheus scrape config to use `Authorization: Bearer` and accepted by internal API key middleware.
+
+### 2026-04-09 — Session 183: Compose image override
+- Added `PNPM_NODE_IMAGE` override (defaults to `node:20-alpine`) and persisted Corepack cache via `COREPACK_HOME` to reduce repeated downloads.

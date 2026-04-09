@@ -43,8 +43,15 @@ export const requireInternalApiKey = (
     });
   }
 
-  const providedKey = req.header("x-internal-api-key");
-  if (!providedKey || providedKey.trim() !== expectedKey) {
+  const providedKey = req.header("x-internal-api-key")?.trim();
+  const authHeader = req.header("authorization")?.trim();
+  const bearerPrefix = "Bearer ";
+  const bearerKey =
+    authHeader && authHeader.startsWith(bearerPrefix)
+      ? authHeader.slice(bearerPrefix.length).trim()
+      : null;
+  const matches = providedKey === expectedKey || bearerKey === expectedKey;
+  if (!matches) {
     return res.status(401).json({
       status: 0,
       error: { message: "INTERNAL_API_KEY_REQUIRED" },

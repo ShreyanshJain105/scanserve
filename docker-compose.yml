@@ -64,7 +64,7 @@ services:
       start_period: 5s
 
   api:
-    image: node:20-alpine
+    image: ${PNPM_NODE_IMAGE:-node:20-alpine}
     working_dir: /app
     env_file:
       - ./apps/api/.env
@@ -78,6 +78,7 @@ services:
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
       PNPM_STORE_PATH: /pnpm-store
+      COREPACK_HOME: /pnpm-store/corepack
       DATABASE_URL: postgresql://scan2serve:scan2serve@db:5432/scan2serve
       CLIENT_URL: http://localhost:3000
       S3_ENDPOINT: http://minio:9000
@@ -104,7 +105,7 @@ services:
       start_period: 15s
 
   web:
-    image: node:20-alpine
+    image: ${PNPM_NODE_IMAGE:-node:20-alpine}
     working_dir: /app
     env_file:
       - ./apps/web/.env
@@ -119,6 +120,7 @@ services:
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
       PNPM_STORE_PATH: /pnpm-store
+      COREPACK_HOME: /pnpm-store/corepack
       API_INTERNAL_URL: http://api:4000
     command: >
       sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && cd /app/apps/web && pnpm exec next dev --hostname 0.0.0.0 --port 3000"
@@ -152,8 +154,47 @@ services:
       retries: 10
       start_period: 10s
 
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    depends_on:
+      api:
+        condition: service_healthy
+      postgres-exporter:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SERVER_DOMAIN: localhost:3000
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    environment:
+      DATA_SOURCE_NAME: postgresql://scan2serve:scan2serve@db:5432/scan2serve?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
   tests:
-    image: node:20-alpine
+    image: ${PNPM_NODE_IMAGE:-node:20-alpine}
     profiles: ["tests"]
     working_dir: /app
     volumes:
@@ -167,6 +208,7 @@ services:
       CI: "true"
       PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
       PNPM_STORE_PATH: /pnpm-store
+      COREPACK_HOME: /pnpm-store/corepack
     command: >
       sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api test && pnpm --filter @scan2serve/web test"
     depends_on:
@@ -191,3 +233,5 @@ volumes:
   test-api-node-modules:
   test-web-node-modules:
   test-pnpm-store:
+  prometheus-data:
+  grafana-data:

@@ -138,3 +138,5 @@ Project documentation for architecture decisions, process notes, and operational
 
 ## Updates 2026-04-09
 - Drafted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors` (`docs/adr/ADR-047-order-status-actors-with-user-identity.md`).
+- Drafted ADR-048 to introduce Prometheus metrics collection and Grafana monitoring (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).
+- Accepted ADR-048 and captured monitoring scope (API metrics + Postgres exporter + ClickHouse metrics; Grafana exposed via gateway) (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).

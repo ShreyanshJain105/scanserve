@@ -10,3 +10,4 @@ Nginx-based gateway that fronts web + API services. It provides a single entry p
 ## Updates 2026-04-09
 - Added initial Nginx routing config and compose service for the gateway (`gateway/nginx.conf.template`, `docker-compose.yml`).
 - Fixed internal API key injection to use envsubst variable instead of a hardcoded value (`gateway/nginx.conf.template`).
+- Added Grafana reverse proxy route at `/grafana/` for monitoring UI access (`gateway/nginx.conf.template`).

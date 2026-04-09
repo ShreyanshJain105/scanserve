@@ -199,6 +199,10 @@ pnpm db:studio    # open Prisma Studio GUI
 - Admin endpoints added: list/approve/reject update requests and block/unblock businesses.
 - Prisma schema updated (new enum/table). API test suite passes.
 
+## Updates 2026-04-09
+- Added Prometheus metrics endpoint at `/metrics` with `prom-client` defaults plus HTTP request duration and count metrics (`src/metrics.ts`, `src/index.ts`).
+- Internal API key middleware now accepts `Authorization: Bearer <key>` for Prometheus scraping (`src/middleware/internalApiKey.ts`).
+
 ## Updates 2026-03-24
 - Added business notifications table and owner-facing `GET /api/business/notifications` (last 50) including business name/type/message/payload.
 - Admin approve/reject/block/unblock actions now emit notifications to the business owner.
