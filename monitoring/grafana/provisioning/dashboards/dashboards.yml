@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Scan2Serve
+    orgId: 1
+    folder: Scan2Serve
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards

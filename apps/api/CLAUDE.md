@@ -315,3 +315,9 @@ pnpm db:studio    # open Prisma Studio GUI
 
 ## Updates 2026-04-09
 - Status actor persistence now stores `{ userId, email }` objects per status key in `status_actors`, with normalization for legacy string values (`apps/api/src/utils/statusActors.ts`, `apps/api/src/routes/business.ts`, `apps/api/src/services/orderEvents.ts`).
+
+## Updates 2026-04-09
+- Fixed Redis outbox publishing pipeline to use `multi.addCommand` for stream writes (`apps/api/src/services/orderEventQueue.ts`).
+
+## Updates 2026-04-09
+- ClickHouse queue consumer now uses `CLICKHOUSE_BOOTSTRAP_*` for schema creation and `CLICKHOUSE_INGEST_*` for inserts to avoid CREATE DATABASE privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).

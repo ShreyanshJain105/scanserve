@@ -50,7 +50,7 @@ export const publishOrderEventsToQueue = async (events: OrderEventQueueEvent[]) 
   const multi = client.multi();
 
   for (const event of events) {
-    multi.sendCommand(buildXAddArgs(event));
+    multi.addCommand(buildXAddArgs(event));
   }
 
   await multi.exec();

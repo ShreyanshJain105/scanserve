@@ -11,19 +11,20 @@
 
 **Date:** 2026-04-09
 **What was done:**
-- Accepted ADR-048 and captured monitoring scope: API metrics endpoint with internal API key, Prometheus scraping API + Postgres exporter + ClickHouse metrics, and Grafana exposed via the gateway (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).
-- Added API metrics middleware and `/metrics` endpoint using `prom-client` defaults plus HTTP duration/count metrics (`apps/api/src/metrics.ts`, `apps/api/src/index.ts`, `apps/api/package.json`).
-- Added Prometheus config and Grafana provisioning scaffolding (`monitoring/prometheus.yml`, `monitoring/grafana/provisioning/datasources/prometheus.yml`).
-- Added compose services for Prometheus, Grafana, and Postgres exporter (`docker-compose.yml`).
-- Added gateway route for Grafana at `/grafana/` (`gateway/nginx.conf.template`).
-- Fixed Prometheus scrape auth by allowing `Authorization: Bearer` internal API key (`apps/api/src/middleware/internalApiKey.ts`, `monitoring/prometheus.yml`).
-- Made compose runtime image configurable via `PNPM_NODE_IMAGE` (defaults to `node:20-alpine`) and restored Corepack with `COREPACK_HOME` cache (`docker-compose.yml`).
+- Fixed Redis outbox publishing to use Redis v4 `multi.addCommand`, resolving `multi.sendCommand is not a function` runtime errors (`apps/api/src/services/orderEventQueue.ts`).
+- Adjusted Grafana gateway proxy to preserve subpath and forward prefix headers, preventing `/grafana/login` redirect loops (`gateway/nginx.conf.template`).
+- Updated ClickHouse order-event consumer to use bootstrap credentials for schema creation and ingest credentials for inserts, avoiding CREATE DATABASE privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
+- Added Grafana dashboard provisioning with a Scan2Serve API/system overview dashboard JSON (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, `monitoring/grafana/dashboards/scan2serve-overview.json`, `docker-compose.yml`).
 
 **What's NOT done yet:**
-- Re-run compose stack to validate Prometheus scrape + Grafana UI access.
+- Restart the gateway container to confirm the Grafana UI loads via `/grafana/` without redirect loops.
+- Restart the API container to ensure ClickHouse consumer no longer logs `ACCESS_DENIED` on schema creation.
+- Restart Grafana to pick up the provisioned dashboard JSON.
 
 **Next step:**
-1. Start the stack and verify `http://localhost:3000/grafana/` loads and Prometheus targets are up.
+1. Restart the gateway container and verify `http://localhost:3000/grafana/` loads without redirect loops.
+2. Restart the API container and confirm outbox logs no longer show `multi.sendCommand` errors or ClickHouse `ACCESS_DENIED` failures.
+3. Restart the Grafana container and confirm the "Scan2Serve - API & System Overview" dashboard appears.
 
 **Build progress:**
 ```
@@ -1238,3 +1239,15 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 
 ### 2026-04-09 — Session 183: Compose image override
 - Added `PNPM_NODE_IMAGE` override (defaults to `node:20-alpine`) and persisted Corepack cache via `COREPACK_HOME` to reduce repeated downloads.
+
+### 2026-04-09 — Session: Redis outbox pipeline fix
+- Replaced `multi.sendCommand` with `multi.addCommand` in the Redis outbox publisher to match Redis v4 APIs and stop outbox flush failures (`apps/api/src/services/orderEventQueue.ts`).
+
+### 2026-04-09 — Session: Grafana subpath proxy fix
+- Preserved `/grafana` in gateway `proxy_pass` and forwarded prefix/host headers to stop Grafana login redirect loops (`gateway/nginx.conf.template`).
+
+### 2026-04-09 — Session: ClickHouse consumer bootstrap auth
+- Route ClickHouse schema creation through `CLICKHOUSE_BOOTSTRAP_*` while keeping inserts on `CLICKHOUSE_INGEST_*` to avoid database-creation privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
+
+### 2026-04-09 — Session: Grafana dashboard provisioning
+- Added Grafana dashboard provider and a Scan2Serve overview dashboard JSON, mounted into the Grafana container for auto-provisioning (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, `monitoring/grafana/dashboards/scan2serve-overview.json`, `docker-compose.yml`).

@@ -701,3 +701,7 @@ This section is the high-level source of truth for what is already implemented a
 - Accepted ADR-048 and wired Prometheus + Grafana services (with API metrics endpoint, Postgres exporter, ClickHouse metrics, and `/grafana/` gateway routing) (`docker-compose.yml`, `monitoring/`, `apps/api/src/metrics.ts`, `gateway/nginx.conf.template`).
 - Adjusted internal API key enforcement to accept `Authorization: Bearer` tokens for Prometheus scraping (`apps/api/src/middleware/internalApiKey.ts`, `monitoring/prometheus.yml`).
 - Made compose runtime image configurable via `PNPM_NODE_IMAGE` (defaults to `node:20-alpine`) and restored Corepack with a persistent `COREPACK_HOME` cache (`docker-compose.yml`).
+- Fixed Redis outbox publishing to use `multi.addCommand` for Redis v4 pipelines, avoiding `sendCommand` runtime errors (`apps/api/src/services/orderEventQueue.ts`).
+- Fixed Grafana subpath proxying by preserving `/grafana` in `proxy_pass` and forwarding prefix/host headers to stop redirect loops (`gateway/nginx.conf.template`).
+- ClickHouse order-event consumer now uses `CLICKHOUSE_BOOTSTRAP_*` for schema creation and `CLICKHOUSE_INGEST_*` for inserts to prevent privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
+- Added Grafana dashboard provisioning + Scan2Serve overview dashboard JSON, mounted into Grafana via compose (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, `monitoring/grafana/dashboards/scan2serve-overview.json`, `docker-compose.yml`).

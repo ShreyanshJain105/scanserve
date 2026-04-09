@@ -15,6 +15,10 @@ const clickhouseUser =
   process.env.CLICKHOUSE_INGEST_USER || process.env.CLICKHOUSE_USER || "default";
 const clickhousePassword =
   process.env.CLICKHOUSE_INGEST_PASSWORD || process.env.CLICKHOUSE_PASSWORD || "";
+const clickhouseBootstrapUser =
+  process.env.CLICKHOUSE_BOOTSTRAP_USER || process.env.CLICKHOUSE_USER || "default";
+const clickhouseBootstrapPassword =
+  process.env.CLICKHOUSE_BOOTSTRAP_PASSWORD || process.env.CLICKHOUSE_PASSWORD || "";
 const clickhouseDatabase = process.env.CLICKHOUSE_DATABASE || "scan2serve";
 
 let consumerTimer: NodeJS.Timeout | null = null;
@@ -27,18 +31,21 @@ const orderEventStream = getOrderEventStreamName();
 const formatClickhouseDate = (date: Date) =>
   date.toISOString().replace("T", " ").replace("Z", "");
 
-const buildAuthHeader = () => {
-  if (!clickhouseUser && !clickhousePassword) return undefined;
-  const token = Buffer.from(`${clickhouseUser}:${clickhousePassword}`).toString("base64");
+const buildAuthHeader = (user: string, password: string) => {
+  if (!user && !password) return undefined;
+  const token = Buffer.from(`${user}:${password}`).toString("base64");
   return `Basic ${token}`;
 };
 
-const runClickhouseQuery = async (query: string) => {
+const runClickhouseQuery = async (
+  query: string,
+  auth?: { user: string; password: string }
+) => {
   const headers: Record<string, string> = {
     "Content-Type": "text/plain",
   };
-  const auth = buildAuthHeader();
-  if (auth) headers.Authorization = auth;
+  const authHeader = auth ? buildAuthHeader(auth.user, auth.password) : undefined;
+  if (authHeader) headers.Authorization = authHeader;
 
   const response = await fetch(clickhouseUrl, {
     method: "POST",
@@ -54,7 +61,10 @@ const runClickhouseQuery = async (query: string) => {
 
 const ensureClickhouseSchema = async () => {
   if (clickhouseReady) return;
-  await runClickhouseQuery(`CREATE DATABASE IF NOT EXISTS ${clickhouseDatabase}`);
+  await runClickhouseQuery(`CREATE DATABASE IF NOT EXISTS ${clickhouseDatabase}`, {
+    user: clickhouseBootstrapUser,
+    password: clickhouseBootstrapPassword,
+  });
   await runClickhouseQuery(`
     CREATE TABLE IF NOT EXISTS ${clickhouseDatabase}.order_events (
       event_id String,
@@ -66,7 +76,10 @@ const ensureClickhouseSchema = async () => {
       ingested_at DateTime DEFAULT now()
     ) ENGINE = ReplacingMergeTree
     ORDER BY (order_id, event_id)
-  `);
+  `, {
+    user: clickhouseBootstrapUser,
+    password: clickhouseBootstrapPassword,
+  });
   clickhouseReady = true;
 };
 
@@ -128,7 +141,10 @@ const flushToClickhouse = async (messages: StreamMessage[]) => {
   });
 
   const body = `INSERT INTO ${clickhouseDatabase}.order_events FORMAT JSONEachRow\n${rows.join("\n")}`;
-  await runClickhouseQuery(body);
+  await runClickhouseQuery(body, {
+    user: clickhouseUser,
+    password: clickhousePassword,
+  });
 };
 
 const ackMessages = async (messages: StreamMessage[]) => {
