@@ -238,6 +238,35 @@ export interface BusinessMembership {
   createdAt: string;
 }
 
+// ─── Reviews ────────────────────────────────────────────────
+
+export type ReviewScope = "recent" | "all";
+
+export type ReviewListItem = {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
+  likesCount: number;
+  likedByCustomer?: boolean;
+};
+
+export type ReviewSummary = {
+  averageRating: number;
+  totalReviews: number;
+  ratingCounts: Record<1 | 2 | 3 | 4 | 5, number>;
+};
+
+export type ReviewListResponse = {
+  reviews: ReviewListItem[];
+  summary: ReviewSummary;
+  page: number;
+  limit: number;
+  total: number;
+  scope: ReviewScope;
+  ratingFilter: number | null;
+};
+
 export interface BusinessRejection {
   id: string;
   reason: string | null;
@@ -357,6 +386,7 @@ export interface CustomerOrderSummary {
   paymentMethod: PaymentMethod;
   createdAt: string;
   updatedAt: string;
+  reviewId?: string | null;
   business: { id: string; name: string; currencyCode: string } | null;
 }
 

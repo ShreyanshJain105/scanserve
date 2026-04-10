@@ -25,6 +25,23 @@ const run = async () => {
     user: bootstrapUser,
     password: bootstrapPassword,
   });
+  await execClickhouse(`
+    CREATE TABLE IF NOT EXISTS ${database}.reviews (
+      review_id String,
+      order_id String,
+      business_id String,
+      customer_user_id String,
+      rating UInt8,
+      comment Nullable(String),
+      likes_count UInt32,
+      created_at DateTime,
+      ingested_at DateTime DEFAULT now()
+    ) ENGINE = ReplacingMergeTree
+    ORDER BY (business_id, created_at, review_id)
+  `, {
+    user: bootstrapUser,
+    password: bootstrapPassword,
+  });
   // Smoke check
   await execClickhouse(`SELECT 1`, {
     user: bootstrapUser,

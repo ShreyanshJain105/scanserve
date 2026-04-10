@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { apiFetch } from "../../lib/api";
 import { showToast } from "../../lib/toast";
 import { useAuth } from "../../lib/auth-context";
+import type { ReviewListResponse, ReviewListItem, ReviewScope, ReviewSummary } from "@scan2serve/shared";
 
 type PublicMenuItem = {
   id: string;
@@ -123,6 +124,13 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
   const [customerPhone, setCustomerPhone] = React.useState("");
   const [paymentMethod, setPaymentMethod] = React.useState<"razorpay" | "cash">("razorpay");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [reviews, setReviews] = React.useState<ReviewListItem[]>([]);
+  const [reviewSummary, setReviewSummary] = React.useState<ReviewSummary | null>(null);
+  const [reviewScope, setReviewScope] = React.useState<ReviewScope>("recent");
+  const [reviewRatingFilter, setReviewRatingFilter] = React.useState<number | null>(null);
+  const [reviewPage, setReviewPage] = React.useState(1);
+  const [reviewTotal, setReviewTotal] = React.useState(0);
+  const [reviewLoading, setReviewLoading] = React.useState(true);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -143,6 +151,43 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(cartKey, JSON.stringify(cart));
   }, [cart, cartKey]);
+
+  React.useEffect(() => {
+    let active = true;
+    const loadReviews = async () => {
+      setReviewLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("businessId", data.business.id);
+        params.set("page", String(reviewPage));
+        params.set("limit", "10");
+        params.set("scope", reviewScope);
+        if (reviewRatingFilter) {
+          params.set("rating", String(reviewRatingFilter));
+        }
+        const response = await apiFetch<ReviewListResponse>(
+          `/api/public/reviews?${params.toString()}`
+        );
+        if (!active) return;
+        setReviews(response.reviews);
+        setReviewSummary(response.summary);
+        setReviewTotal(response.total);
+      } catch (error) {
+        if (!active) return;
+        showToast({
+          variant: "error",
+          message: error instanceof Error ? error.message : "Unable to load reviews.",
+        });
+      } finally {
+        if (active) setReviewLoading(false);
+      }
+    };
+
+    void loadReviews();
+    return () => {
+      active = false;
+    };
+  }, [data.business.id, reviewPage, reviewRatingFilter, reviewScope]);
 
   const total = React.useMemo(
     () =>
@@ -311,6 +356,44 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
     }
   };
 
+  const totalReviewPages = Math.max(1, Math.ceil(reviewTotal / 10));
+
+  const handleLikeToggle = async (reviewId: string) => {
+    if (!customerUser) {
+      showToast({ variant: "error", message: "Log in to like reviews." });
+      if (qrToken) {
+        window.location.assign(`/qr/login?token=${encodeURIComponent(qrToken)}`);
+      } else {
+        window.location.assign("/qr/login");
+      }
+      return;
+    }
+    try {
+      const response = await apiFetch<{ liked: boolean; likesCount: number }>(
+        `/api/public/reviews/${reviewId}/like`,
+        { method: "POST" }
+      );
+      setReviews((prev) =>
+        prev.map((review) =>
+          review.id === reviewId
+            ? { ...review, likedByCustomer: response.liked, likesCount: response.likesCount }
+            : review
+        )
+      );
+    } catch (error) {
+      showToast({
+        variant: "error",
+        message: error instanceof Error ? error.message : "Unable to update like.",
+      });
+    }
+  };
+
+  const applyReviewFilter = (scope: ReviewScope, rating: number | null) => {
+    setReviewScope(scope);
+    setReviewRatingFilter(rating);
+    setReviewPage(1);
+  };
+
   return (
     <div className="relative">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -444,6 +527,150 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
             })}
           </div>
         )}
+
+        <div className="mt-10 rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Customer reviews
+              </p>
+              <h2 className="mt-2 font-display text-2xl text-slate-900">
+                What diners are saying
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Recent feedback from completed orders.
+              </p>
+            </div>
+            {reviewSummary ? (
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-right shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Average rating
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">
+                  {reviewSummary.averageRating.toFixed(1)}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {reviewSummary.totalReviews} reviews
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => applyReviewFilter("recent", null)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                reviewScope === "recent"
+                  ? "border-rose-300 bg-rose-50 text-rose-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"
+              }`}
+            >
+              Recent
+            </button>
+            <button
+              type="button"
+              onClick={() => applyReviewFilter("all", null)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                reviewScope === "all" && reviewRatingFilter === null
+                  ? "border-rose-300 bg-rose-50 text-rose-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"
+              }`}
+            >
+              All
+            </button>
+            {[5, 4, 3, 2, 1].map((rating) => (
+              <button
+                key={rating}
+                type="button"
+                onClick={() => applyReviewFilter("all", rating)}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  reviewScope === "all" && reviewRatingFilter === rating
+                    ? "border-rose-300 bg-rose-50 text-rose-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"
+                }`}
+              >
+                {rating}★
+              </button>
+            ))}
+          </div>
+
+          {reviewLoading ? (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+              Loading reviews...
+            </div>
+          ) : reviews.length === 0 ? (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+              No reviews yet. Be the first to share feedback.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {reviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <span>{review.rating}★</span>
+                      <span className="text-xs font-medium text-slate-500">
+                        {new Date(review.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleLikeToggle(review.id)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        review.likedByCustomer
+                          ? "border-rose-300 bg-rose-50 text-rose-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"
+                      }`}
+                    >
+                      Helpful · {review.likesCount}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {review.comment || "No comment provided."}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {reviewTotal > 10 ? (
+            <div className="mt-4 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setReviewPage((prev) => Math.max(1, prev - 1))}
+                disabled={reviewPage === 1}
+                className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                  reviewPage === 1
+                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-rose-200"
+                }`}
+              >
+                Previous
+              </button>
+              <p className="text-xs font-semibold text-slate-500">
+                Page {reviewPage} of {totalReviewPages}
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  setReviewPage((prev) => Math.min(totalReviewPages, prev + 1))
+                }
+                disabled={reviewPage >= totalReviewPages}
+                className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                  reviewPage >= totalReviewPages
+                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-rose-200"
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <button

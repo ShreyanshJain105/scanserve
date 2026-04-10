@@ -16,6 +16,7 @@ import { startArchivedBusinessCleanupWorker } from "./services/archivedBusinessC
 import { startOrderEventOutboxWorker } from "./services/orderEventOutbox";
 import { startOrderEventQueueConsumer } from "./services/orderEventQueueConsumer";
 import { startOrderPartitionMaintenance } from "./services/orderPartitionMaintenance";
+import { startReviewMigrationWorker } from "./services/reviewMigration";
 import { requireInternalApiKey } from "./middleware/internalApiKey";
 import { metricsMiddleware, metricsRegistry } from "./metrics";
 
@@ -156,6 +157,7 @@ if (process.env.NODE_ENV !== "test") {
   startOrderEventOutboxWorker();
   startOrderEventQueueConsumer();
   startOrderPartitionMaintenance();
+  startReviewMigrationWorker();
   app.listen(PORT, () => {
     logger.info("api.server.started", {
       port: Number(PORT),

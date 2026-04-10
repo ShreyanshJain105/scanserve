@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { showToast } from "../../lib/toast";
 import type { CustomerOrdersListResponse, CustomerOrderSummary } from "@scan2serve/shared";
+import { ModalDialog } from "../ui/modal-dialog";
 
 type OrderDetailResponse = {
   business: { name: string; currencyCode: string } | null;
@@ -16,6 +17,7 @@ type OrderDetailResponse = {
     paymentStatus: string;
     paymentMethod: string;
     createdAt: string;
+    reviewId?: string | null;
   };
   items: {
     id: string;
@@ -65,6 +67,10 @@ export default function CustomerOrdersHub({
   const [detail, setDetail] = useState<OrderDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const selectedSummary = useMemo(
     () => orders.find((order) => order.id === selectedOrderId) ?? null,
@@ -125,6 +131,49 @@ export default function CustomerOrdersHub({
     }
   };
 
+  const openReviewDialog = () => {
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewDialogOpen(true);
+  };
+
+  const submitReview = async () => {
+    if (!detail) return;
+    setReviewSubmitting(true);
+    try {
+      const response = await apiFetch<{ review: { id: string } }>(
+        "/api/public/reviews",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            orderId: detail.order.id,
+            rating: reviewRating,
+            comment: reviewComment.trim() ? reviewComment.trim() : undefined,
+          }),
+        }
+      );
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === detail.order.id ? { ...order, reviewId: response.review.id } : order
+        )
+      );
+      setDetail((prev) =>
+        prev
+          ? { ...prev, order: { ...prev.order, reviewId: response.review.id } }
+          : prev
+      );
+      setReviewDialogOpen(false);
+      showToast({ variant: "success", message: "Review submitted. Thank you!" });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        message: error instanceof Error ? error.message : "Unable to submit review.",
+      });
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     void loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,6 +185,10 @@ export default function CustomerOrdersHub({
       return;
     }
     void loadOrderDetail(selectedOrderId);
+  }, [selectedOrderId]);
+
+  useEffect(() => {
+    setReviewDialogOpen(false);
   }, [selectedOrderId]);
 
   const handleLoadMore = async () => {
@@ -361,10 +414,100 @@ export default function CustomerOrdersHub({
                   </div>
                 ))}
               </div>
+
+              {detail.order.status === "completed" ? (
+                <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Review
+                  </p>
+                  {detail.order.reviewId ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      Thanks for sharing your feedback. This order is reviewed.
+                    </p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <p className="text-sm text-slate-600">
+                        Share a quick rating to help others.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openReviewDialog}
+                        className="rounded-md bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                      >
+                        Give review
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </>
           )}
         </div>
       </div>
+
+      <ModalDialog
+        open={reviewDialogOpen}
+        onClose={reviewSubmitting ? undefined : () => setReviewDialogOpen(false)}
+        title="Leave a review"
+        subtitle="Rate your experience with this order."
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Rating
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setReviewRating(value)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    reviewRating === value
+                      ? "border-rose-400 bg-rose-50 text-rose-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-rose-200"
+                  }`}
+                >
+                  {value}★
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Comment (optional)
+            </label>
+            <textarea
+              value={reviewComment}
+              onChange={(event) => setReviewComment(event.target.value.slice(0, 250))}
+              rows={4}
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
+              placeholder="Share a short note..."
+            />
+            <p className="mt-1 text-[11px] text-slate-500">
+              {250 - reviewComment.length} characters left
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setReviewDialogOpen(false)}
+              className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              disabled={reviewSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitReview}
+              disabled={reviewSubmitting}
+              className="rounded-md bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              {reviewSubmitting ? "Submitting..." : "Submit review"}
+            </button>
+          </div>
+        </div>
+      </ModalDialog>
     </section>
   );
 }

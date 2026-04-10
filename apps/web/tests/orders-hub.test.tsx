@@ -73,4 +73,74 @@ describe("CustomerOrdersHub", () => {
     expect(await screen.findByText("Latte")).toBeTruthy();
     expect(within(detailPanel).getAllByText("$20.00").length).toBeGreaterThan(0);
   });
+
+  it("opens and submits the review dialog for completed orders", async () => {
+    apiFetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith("/api/public/orders?")) {
+        return Promise.resolve({
+          orders: [
+            {
+              id: "order-1",
+              businessId: "b1",
+              tableId: "t1",
+              status: "completed",
+              totalAmount: "18.00",
+              paymentStatus: "paid",
+              paymentMethod: "razorpay",
+              createdAt: "2026-03-30T10:00:00.000Z",
+              updatedAt: "2026-03-30T10:00:00.000Z",
+              reviewId: null,
+              business: { id: "b1", name: "Bravo", currencyCode: "USD" },
+            },
+          ],
+          nextCursor: null,
+        });
+      }
+      if (path.startsWith("/api/public/orders/order-1")) {
+        return Promise.resolve({
+          business: { name: "Bravo", currencyCode: "USD" },
+          order: {
+            id: "order-1",
+            businessId: "b1",
+            tableId: "t1",
+            status: "completed",
+            totalAmount: "18.00",
+            paymentStatus: "paid",
+            paymentMethod: "razorpay",
+            createdAt: "2026-03-30T10:00:00.000Z",
+            reviewId: null,
+          },
+          items: [
+            {
+              id: "oi-1",
+              menuItemId: "m1",
+              name: "Latte",
+              quantity: 2,
+              unitPrice: "9.00",
+              specialInstructions: null,
+            },
+          ],
+        });
+      }
+      if (path === "/api/public/reviews" && options?.method === "POST") {
+        return Promise.resolve({ review: { id: "review-1" } });
+      }
+      return Promise.reject(new Error("Unknown request"));
+    });
+
+    render(<CustomerOrdersHub />);
+
+    expect(await screen.findByText("Give review")).toBeTruthy();
+    screen.getByText("Give review").click();
+
+    expect(await screen.findByText("Leave a review")).toBeTruthy();
+    screen.getByText("Submit review").click();
+
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        "/api/public/reviews",
+        expect.objectContaining({ method: "POST" })
+      )
+    );
+  });
 });

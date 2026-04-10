@@ -198,6 +198,16 @@ pnpm db:studio    # open Prisma Studio GUI
 - Sample seed now formats ClickHouse event timestamps as `YYYY-MM-DD HH:MM:SS` to satisfy JSONEachRow parsing (`scripts/seed-sample-data.ts`).
 - Sample seed now populates order status actors and builds ~60-day order history per business when data is sparse (`scripts/seed-sample-data.ts`).
 - Sample seed now targets ~120 orders per business across ~180 days (`scripts/seed-sample-data.ts`).
+- Added customer reviews storage: Prisma `Review` + `ReviewLike` models with migration and ClickHouse `reviews` table bootstrap (`prisma/schema.prisma`, `prisma/migrations/20260410120000_reviews`, `scripts/clickhouse-bootstrap.ts`).
+- Added review cache + migration worker and public review endpoints (create/list/like) with order reviewId surfacing (`src/services/reviewCache.ts`, `src/services/reviewMigration.ts`, `src/routes/public.ts`).
+- Fixed order partition maintenance to move rows out of the default partition before attaching new monthly partitions, preventing constraint violations (`src/services/orderPartitionMaintenance.ts`).
+- Adjusted recent review ordering to sort by newest first (likes-based ordering remains for all/filtered views) (`src/routes/public.ts`).
+- Review list now filters by business via review or order relation to avoid missing reviews when businessId mismatches (`src/routes/public.ts`).
+- Hardened public review routes to avoid crashing when Prisma client is outdated (guarded review/reviewLike model access) (`src/routes/public.ts`).
+- Clamped `REVIEW_HOT_DAYS` to at least 1 day to prevent recent scope returning empty due to `0` config (`src/routes/public.ts`, `src/services/reviewMigration.ts`).
+- Switched review cache to versioned keys per business to avoid stale cache reads; invalidation bumps version (`src/services/reviewCache.ts`, `src/routes/public.ts`).
+- Review cache version initialization now seeds to a timestamp when missing/low to avoid reusing stale `v1` keys (`src/services/reviewCache.ts`).
+- Trimmed milliseconds from ClickHouse `order_events` ingestion timestamps to match DateTime parsing (`src/services/orderEventQueueConsumer.ts`).
 
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.

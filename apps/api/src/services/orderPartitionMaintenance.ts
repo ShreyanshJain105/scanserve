@@ -38,14 +38,81 @@ const listMonthsBetween = (start: Date, end: Date) => {
   return months;
 };
 
-const createPartition = async (table: string, column: string, start: Date, end: Date) => {
+const getDefaultPartitionCount = async (table: string, column: string, startIso: string, endIso: string) => {
+  const rows = await prisma.$queryRawUnsafe<Array<{ count: bigint | number | string }>>(
+    `SELECT COUNT(*) as count FROM ${table}_p_default WHERE ${column} >= '${startIso}' AND ${column} < '${endIso}'`
+  );
+  const raw = rows[0]?.count ?? 0;
+  return typeof raw === "bigint" ? Number(raw) : Number(raw);
+};
+
+const createPartition = async (
+  table: string,
+  column: string,
+  start: Date,
+  end: Date,
+  existingPartitions: Set<string>
+) => {
   const partitionName = `${table}_p_${formatMonthKey(start)}`;
   const startIso = start.toISOString().slice(0, 10);
   const endIso = end.toISOString().slice(0, 10);
+
+  if (existingPartitions.has(partitionName)) {
+    return;
+  }
+
+  const defaultPartition = `${table}_p_default`;
+  if (!existingPartitions.has(defaultPartition)) {
+    await prisma.$executeRawUnsafe(
+      `CREATE TABLE IF NOT EXISTS ${partitionName} PARTITION OF ${table} FOR VALUES FROM ('${startIso}') TO ('${endIso}')`
+    );
+    logger.info("orders.partition.created", {
+      table,
+      partition: partitionName,
+      start: startIso,
+      end: endIso,
+      column,
+    });
+    existingPartitions.add(partitionName);
+    return;
+  }
+
+  const defaultCount = await getDefaultPartitionCount(table, column, startIso, endIso);
+  if (defaultCount === 0) {
+    await prisma.$executeRawUnsafe(
+      `CREATE TABLE IF NOT EXISTS ${partitionName} PARTITION OF ${table} FOR VALUES FROM ('${startIso}') TO ('${endIso}')`
+    );
+    logger.info("orders.partition.created", {
+      table,
+      partition: partitionName,
+      start: startIso,
+      end: endIso,
+      column,
+    });
+    existingPartitions.add(partitionName);
+    return;
+  }
+
   await prisma.$executeRawUnsafe(
-    `CREATE TABLE IF NOT EXISTS ${partitionName} PARTITION OF ${table} FOR VALUES FROM ('${startIso}') TO ('${endIso}')`
+    `CREATE TABLE IF NOT EXISTS ${partitionName} (LIKE ${table} INCLUDING ALL)`
   );
-  logger.info("orders.partition.created", { table, partition: partitionName, start: startIso, end: endIso, column });
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO ${partitionName} SELECT * FROM ${defaultPartition} WHERE ${column} >= '${startIso}' AND ${column} < '${endIso}'`
+  );
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM ${defaultPartition} WHERE ${column} >= '${startIso}' AND ${column} < '${endIso}'`
+  );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE ${table} ATTACH PARTITION ${partitionName} FOR VALUES FROM ('${startIso}') TO ('${endIso}')`
+  );
+  logger.info("orders.partition.attached_from_default", {
+    table,
+    partition: partitionName,
+    start: startIso,
+    end: endIso,
+    movedRows: defaultCount,
+  });
+  existingPartitions.add(partitionName);
 };
 
 const fetchExistingPartitions = async (table: string) => {
@@ -91,15 +158,17 @@ const ensurePartitionsForTable = async (table: string, column: string, now: Date
   const keepFrom = addMonthsUtc(currentMonth, -(retentionMonths - 1));
   const createThrough = addMonthsUtc(currentMonth, futureMonths);
 
+  const existingList = await fetchExistingPartitions(table);
+  const existingPartitions = new Set(existingList);
+
   const monthsToEnsure = listMonthsBetween(keepFrom, createThrough);
   for (const month of monthsToEnsure) {
     const next = addMonthsUtc(month, 1);
-    await createPartition(table, column, month, next);
+    await createPartition(table, column, month, next, existingPartitions);
   }
 
-  const existing = await fetchExistingPartitions(table);
   const keepSet = new Set(monthsToEnsure.map((month) => `${table}_p_${formatMonthKey(month)}`));
-  for (const partition of existing) {
+  for (const partition of existingList) {
     if (partition.endsWith("_p_default")) continue;
     if (keepSet.has(partition)) continue;
     const match = partition.match(/_p_(\d{4}_\d{2})$/);

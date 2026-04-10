@@ -47,6 +47,8 @@ model CustomerUser {
 
   refreshTokens CustomerRefreshToken[]
   orders        Order[]
+  reviews       Review[]
+  reviewLikes   ReviewLike[]
 
   @@map("customer_users")
 }
@@ -87,6 +89,7 @@ model Business {
   tables     Table[]
   qrCodes    QrCode[]
   orders     Order[]
+  reviews    Review[]
   memberships BusinessMembership[]
   rejections BusinessRejection[]
   updateRequests BusinessUpdateRequest[]
@@ -361,6 +364,7 @@ model Order {
   customerUser CustomerUser? @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
   table    Table       @relation(fields: [tableId], references: [id])
   items    OrderItem[]
+  review   Review?
 
   @@id([id, createdAt])
   @@index([businessId, status])
@@ -399,6 +403,46 @@ model OrderItem {
   @@id([id, orderCreatedAt])
   @@index([orderId, orderCreatedAt])
   @@map("order_items")
+}
+
+// ─── Reviews ────────────────────────────────────────────────
+
+model Review {
+  id             String   @id @default(cuid())
+  orderId        String   @map("order_id")
+  orderCreatedAt DateTime @map("order_created_at")
+  businessId     String   @map("business_id")
+  customerUserId String   @map("customer_user_id")
+  rating         Int
+  comment        String?  @db.VarChar(250)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  order        Order        @relation(fields: [orderId, orderCreatedAt], references: [id, createdAt], onDelete: Cascade)
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerUser CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  likes        ReviewLike[]
+
+  @@unique([orderId, orderCreatedAt])
+  @@index([businessId, createdAt])
+  @@index([businessId, rating])
+  @@index([customerUserId])
+  @@map("reviews")
+}
+
+model ReviewLike {
+  id             String   @id @default(cuid())
+  reviewId       String   @map("review_id")
+  customerUserId String   @map("customer_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  review        Review       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  customerUser  CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, customerUserId])
+  @@index([reviewId])
+  @@index([customerUserId])
+  @@map("review_likes")
 }
 
 // ─── Order Event Outbox ─────────────────────────────────────

@@ -9,6 +9,18 @@ import { resolveImageUrl } from "../services/objectStorage";
 import { sendError, sendSuccess } from "../utils/response";
 import { fetchOrderSnapshot, publishOrderEventBestEffort } from "../services/orderEvents";
 import { isRazorpayConfigured } from "../services/razorpay";
+import {
+  buildReviewCacheKey,
+  getReviewCacheVersion,
+  getReviewCache,
+  invalidateReviewCacheForBusiness,
+  setReviewCache,
+} from "../services/reviewCache";
+import {
+  fetchWarehouseReviewIdsByOrderIds,
+  fetchWarehouseReviewSummary,
+  fetchWarehouseReviews,
+} from "../services/reviewWarehouse";
 
 const router: express.Router = express.Router();
 
@@ -34,7 +46,41 @@ const verifyPaymentSchema = z.object({
   razorpay_signature: z.string().min(1),
 });
 
+const reviewCreateSchema = z.object({
+  orderId: z.string().min(1),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(250).optional().nullable(),
+});
+
+const reviewListQuerySchema = z.object({
+  businessId: z.string().min(1),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  scope: z.enum(["recent", "all"]).default("recent"),
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const reviewHotDays = Math.max(1, Number(process.env.REVIEW_HOT_DAYS || 90));
+
+const buildRatingCounts = () => ({
+  1: 0,
+  2: 0,
+  3: 0,
+  4: 0,
+  5: 0,
+} as Record<1 | 2 | 3 | 4 | 5, number>);
+
+const getReviewCutoff = () => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - reviewHotDays);
+  return cutoff;
+};
+
+const normalizeCreatedAt = (value: string) => {
+  const parsed = new Date(value.includes("T") ? value : `${value}Z`);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+};
 
 const readCustomerFromRequest = async (req: express.Request) => {
   const token = req.cookies?.qr_customer_access as string | undefined;
@@ -304,6 +350,18 @@ router.get(
     const page = hasNext ? orders.slice(0, limit) : orders;
     const nextCursor = hasNext ? page[page.length - 1]?.id ?? null : null;
 
+    const orderIds = page.map((order) => order.id);
+    const reviewModel = (prisma as typeof prisma & { review?: typeof prisma.review }).review;
+    const reviewRows = reviewModel
+      ? await reviewModel.findMany({
+          where: { orderId: { in: orderIds } },
+          select: { id: true, orderId: true },
+        })
+      : [];
+    const reviewMap = new Map(reviewRows.map((row) => [row.orderId, row.id]));
+    const missingOrderIds = orderIds.filter((id) => !reviewMap.has(id));
+    const warehouseReviewMap = await fetchWarehouseReviewIdsByOrderIds(missingOrderIds);
+
     sendSuccess(res, {
       orders: page.map((order) => ({
         id: order.id,
@@ -315,6 +373,7 @@ router.get(
         paymentMethod: order.paymentMethod,
         createdAt: order.createdAt.toISOString(),
         updatedAt: order.updatedAt.toISOString(),
+        reviewId: reviewMap.get(order.id) ?? warehouseReviewMap.get(order.id) ?? null,
         business: order.business
           ? {
               id: order.business.id,
@@ -497,6 +556,18 @@ router.get(
       sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
       return;
     }
+    const reviewModel = (prisma as typeof prisma & { review?: typeof prisma.review }).review;
+    const reviewRow = reviewModel
+      ? await reviewModel.findFirst({
+          where: { orderId: order.id },
+          select: { id: true },
+        })
+      : null;
+    let reviewId = reviewRow?.id ?? null;
+    if (!reviewId) {
+      const warehouseMap = await fetchWarehouseReviewIdsByOrderIds([order.id]);
+      reviewId = warehouseMap.get(order.id) ?? null;
+    }
     sendSuccess(res, {
       business: order.business
         ? {
@@ -513,6 +584,7 @@ router.get(
         paymentStatus: order.paymentStatus,
         paymentMethod: order.paymentMethod,
         createdAt: order.createdAt.toISOString(),
+        reviewId,
       },
       items: order.items.map((item) => ({
         id: item.id,
@@ -523,6 +595,348 @@ router.get(
         specialInstructions: item.specialInstructions,
       })),
     });
+  })
+);
+
+router.post(
+  "/reviews",
+  asyncHandler(async (req, res) => {
+    const customer = await readCustomerFromRequest(req);
+    if (!customer) {
+      sendError(res, "Customer login required", 401, "CUSTOMER_AUTH_REQUIRED");
+      return;
+    }
+
+    const parsed = reviewCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: parsed.data.orderId, customerUserId: customer.id },
+      select: { id: true, createdAt: true, businessId: true, status: true },
+    });
+    if (!order) {
+      sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
+      return;
+    }
+    if (order.status !== "completed") {
+      sendError(res, "Order is not completed", 409, "ORDER_NOT_COMPLETED");
+      return;
+    }
+
+    const reviewModel = (prisma as typeof prisma & { review?: typeof prisma.review }).review;
+    if (!reviewModel) {
+      sendError(res, "Review service unavailable", 500, "REVIEWS_UNAVAILABLE");
+      return;
+    }
+    const existing = await reviewModel.findFirst({
+      where: { orderId: order.id, orderCreatedAt: order.createdAt },
+      select: { id: true },
+    });
+    if (existing) {
+      sendError(res, "Review already exists", 409, "REVIEW_ALREADY_EXISTS");
+      return;
+    }
+
+    const comment =
+      typeof parsed.data.comment === "string" ? parsed.data.comment.trim() : null;
+
+    const review = await reviewModel.create({
+      data: {
+        orderId: order.id,
+        orderCreatedAt: order.createdAt,
+        businessId: order.businessId,
+        customerUserId: customer.id,
+        rating: parsed.data.rating,
+        comment: comment && comment.length > 0 ? comment : null,
+      },
+    });
+
+    await invalidateReviewCacheForBusiness(order.businessId);
+
+    sendSuccess(res, {
+      review: {
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+        likesCount: 0,
+      },
+    });
+  })
+);
+
+router.post(
+  "/reviews/:id/like",
+  asyncHandler(async (req, res) => {
+    const customer = await readCustomerFromRequest(req);
+    if (!customer) {
+      sendError(res, "Customer login required", 401, "CUSTOMER_AUTH_REQUIRED");
+      return;
+    }
+
+    const reviewModel = (prisma as typeof prisma & { review?: typeof prisma.review }).review;
+    if (!reviewModel) {
+      sendError(res, "Review service unavailable", 500, "REVIEWS_UNAVAILABLE");
+      return;
+    }
+    const review = await reviewModel.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, businessId: true },
+    });
+    if (!review) {
+      sendError(res, "Review not found", 404, "REVIEW_NOT_FOUND");
+      return;
+    }
+
+    const reviewLikeModel = (prisma as typeof prisma & { reviewLike?: typeof prisma.reviewLike }).reviewLike;
+    if (!reviewLikeModel) {
+      sendError(res, "Review service unavailable", 500, "REVIEWS_UNAVAILABLE");
+      return;
+    }
+    const existing = await reviewLikeModel.findUnique({
+      where: {
+        reviewId_customerUserId: {
+          reviewId: review.id,
+          customerUserId: customer.id,
+        },
+      },
+      select: { id: true },
+    });
+
+    let liked = false;
+    if (existing) {
+      await reviewLikeModel.delete({ where: { id: existing.id } });
+    } else {
+      await reviewLikeModel.create({
+        data: {
+          reviewId: review.id,
+          customerUserId: customer.id,
+        },
+      });
+      liked = true;
+    }
+
+    const likesCount = await reviewLikeModel.count({ where: { reviewId: review.id } });
+    await invalidateReviewCacheForBusiness(review.businessId);
+
+    sendSuccess(res, { liked, likesCount });
+  })
+);
+
+router.get(
+  "/reviews",
+  asyncHandler(async (req, res) => {
+    const parsed = reviewListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const { businessId, rating, page, limit, scope } = parsed.data;
+
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true, status: true, archivedAt: true, blocked: true },
+    });
+    if (!business || business.status !== "approved" || business.archivedAt || business.blocked) {
+      sendError(res, "Business is not available", 404, "BUSINESS_NOT_AVAILABLE");
+      return;
+    }
+
+    const ratingFilter = rating ?? null;
+    const cacheVersion = await getReviewCacheVersion(businessId);
+    const cacheKey = buildReviewCacheKey([
+      businessId,
+      `v${cacheVersion}`,
+      scope,
+      ratingFilter ? `rating-${ratingFilter}` : "rating-all",
+      `page-${page}`,
+      `limit-${limit}`,
+    ]);
+
+    const cached = await getReviewCache<{
+      reviews: Array<{
+        id: string;
+        rating: number;
+        comment: string | null;
+        createdAt: string;
+        likesCount: number;
+      }>;
+      summary: {
+        averageRating: number;
+        totalReviews: number;
+        ratingCounts: Record<1 | 2 | 3 | 4 | 5, number>;
+      };
+      page: number;
+      limit: number;
+      total: number;
+      scope: "recent" | "all";
+      ratingFilter: number | null;
+    }>(cacheKey);
+
+    let responsePayload = cached;
+
+    if (!responsePayload) {
+      const cutoff = getReviewCutoff();
+      const where: Prisma.ReviewWhereInput = {
+        OR: [{ businessId }, { order: { businessId } }],
+        ...(ratingFilter ? { rating: ratingFilter } : {}),
+        ...(scope === "recent" ? { createdAt: { gte: cutoff } } : {}),
+      };
+
+      const orderBy: Prisma.ReviewOrderByWithRelationInput[] =
+        scope === "recent"
+          ? [{ createdAt: "desc" }]
+          : [{ likes: { _count: "desc" } }, { createdAt: "desc" }];
+
+      const reviewModel = (prisma as typeof prisma & { review?: typeof prisma.review }).review;
+      if (!reviewModel) {
+        sendError(res, "Review service unavailable", 500, "REVIEWS_UNAVAILABLE");
+        return;
+      }
+
+      const [aggregate, grouped] = await prisma.$transaction([
+        reviewModel.aggregate({
+          where,
+          _count: { _all: true },
+          _avg: { rating: true },
+        }),
+        reviewModel.groupBy({
+          by: ["rating"],
+          where,
+          _count: { _all: true },
+        }),
+      ]);
+
+      const pgSummary = {
+        total: aggregate._count._all ?? 0,
+        avg: aggregate._avg.rating ?? null,
+        ratingCounts: buildRatingCounts(),
+      };
+
+      grouped.forEach((row) => {
+        const ratingValue = row.rating as 1 | 2 | 3 | 4 | 5;
+        pgSummary.ratingCounts[ratingValue] = row._count._all ?? 0;
+      });
+
+      const pgFetchLimit = scope === "all" ? page * limit : limit;
+      const pgReviews = await reviewModel.findMany({
+        where,
+        orderBy,
+        take: pgFetchLimit,
+        skip: scope === "recent" ? (page - 1) * limit : undefined,
+        include: { _count: { select: { likes: true } } },
+      });
+
+      const pgItems = pgReviews.map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+        likesCount: review._count.likes,
+      }));
+
+      let total = pgSummary.total;
+      let summary = {
+        averageRating: pgSummary.total
+          ? Number(((pgSummary.avg ?? 0) as number).toFixed(2))
+          : 0,
+        totalReviews: pgSummary.total,
+        ratingCounts: { ...pgSummary.ratingCounts },
+      };
+
+      let items = pgItems;
+
+      if (scope === "all") {
+        const [warehouseSummary, warehouseRows] = await Promise.all([
+          fetchWarehouseReviewSummary({ businessId, ratingFilter }),
+          fetchWarehouseReviews({ businessId, ratingFilter, limit: page * limit }),
+        ]);
+
+        if (warehouseSummary) {
+          total += warehouseSummary.total;
+          const combinedTotal = pgSummary.total + warehouseSummary.total;
+          const weightedAvg =
+            combinedTotal === 0
+              ? 0
+              : ((pgSummary.avg ?? 0) * pgSummary.total +
+                  (warehouseSummary.avg ?? 0) * warehouseSummary.total) /
+                combinedTotal;
+          summary = {
+            averageRating: Number(weightedAvg.toFixed(2)),
+            totalReviews: combinedTotal,
+            ratingCounts: {
+              1: pgSummary.ratingCounts[1] + warehouseSummary.ratingCounts[1],
+              2: pgSummary.ratingCounts[2] + warehouseSummary.ratingCounts[2],
+              3: pgSummary.ratingCounts[3] + warehouseSummary.ratingCounts[3],
+              4: pgSummary.ratingCounts[4] + warehouseSummary.ratingCounts[4],
+              5: pgSummary.ratingCounts[5] + warehouseSummary.ratingCounts[5],
+            },
+          };
+        }
+
+        const merged = new Map<string, (typeof pgItems)[number]>();
+        pgItems.forEach((item) => merged.set(item.id, item));
+        warehouseRows.forEach((row) => {
+          if (merged.has(row.review_id)) return;
+          merged.set(row.review_id, {
+            id: row.review_id,
+            rating: row.rating,
+            comment: row.comment,
+            createdAt: normalizeCreatedAt(row.created_at),
+            likesCount: row.likes_count,
+          });
+        });
+
+        const sorted = Array.from(merged.values()).sort((a, b) => {
+          if (b.likesCount !== a.likesCount) return b.likesCount - a.likesCount;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        items = sorted.slice((page - 1) * limit, page * limit);
+      }
+
+      responsePayload = {
+        reviews: items,
+        summary,
+        page,
+        limit,
+        total,
+        scope,
+        ratingFilter,
+      };
+
+      await setReviewCache(cacheKey, responsePayload);
+    }
+
+    const customer = await readCustomerFromRequest(req);
+    if (customer && responsePayload.reviews.length > 0) {
+      const reviewLikeModel = (prisma as typeof prisma & { reviewLike?: typeof prisma.reviewLike }).reviewLike;
+      if (!reviewLikeModel) {
+        sendError(res, "Review service unavailable", 500, "REVIEWS_UNAVAILABLE");
+        return;
+      }
+      const likedRows = await reviewLikeModel.findMany({
+        where: {
+          customerUserId: customer.id,
+          reviewId: { in: responsePayload.reviews.map((review) => review.id) },
+        },
+        select: { reviewId: true },
+      });
+      const likedSet = new Set(likedRows.map((row) => row.reviewId));
+      responsePayload = {
+        ...responsePayload,
+        reviews: responsePayload.reviews.map((review) => ({
+          ...review,
+          likedByCustomer: likedSet.has(review.id),
+        })),
+      };
+    }
+
+    sendSuccess(res, responsePayload);
   })
 );
 

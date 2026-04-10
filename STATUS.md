@@ -11,13 +11,25 @@
 
 **Date:** 2026-04-10
 **What was done:**
-- Deepened dark mode styling on dashboard pages and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
+- Implemented ADR-052 reviews end-to-end: Prisma review models + migration, ClickHouse reviews table, review cache + migration worker, and public review endpoints (create/list/like) with reviewId on customer orders (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260410120000_reviews`, `apps/api/scripts/clickhouse-bootstrap.ts`, `apps/api/src/services/reviewCache.ts`, `apps/api/src/services/reviewMigration.ts`, `apps/api/src/routes/public.ts`).
+- Added review UI on customer orders hub (review dialog + reviewed state) and public menu (summary, filters, likes, pagination) (`apps/web/src/components/public/customer-orders-hub.tsx`, `apps/web/src/components/public/public-menu-client.tsx`).
+- Added API + web test coverage for review flows and updated shared review types (`apps/api/tests/publicRoutes.test.ts`, `apps/web/tests/orders-hub.test.tsx`, `apps/web/tests/public-menu.test.tsx`, `packages/shared/src/types.ts`).
+- Updated ADR-052 with like/tie-breaker rules and synced CLAUDE notes (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`, `docs/CLAUDE.md`, `CLAUDE.md`, `apps/api/CLAUDE.md`, `apps/web/CLAUDE.md`, `packages/shared/CLAUDE.md`).
+- Fixed order partition maintenance to move default-partition rows before attaching new monthly partitions (`apps/api/src/services/orderPartitionMaintenance.ts`).
+- Fixed recent reviews ordering to sort by newest first (likes-based ordering remains for all/filtered views) (`apps/api/src/routes/public.ts`).
+- Review list now filters by business via review or order relation to avoid missing reviews when businessId mismatches (`apps/api/src/routes/public.ts`).
+- Hardened public review routes to avoid crashing when Prisma client is outdated (guarded review/reviewLike model access) (`apps/api/src/routes/public.ts`).
+- Clamped `REVIEW_HOT_DAYS` to at least 1 day to prevent recent scope returning empty due to `0` config (`apps/api/src/routes/public.ts`, `apps/api/src/services/reviewMigration.ts`).
+- Switched review cache to versioned keys per business to avoid stale cache reads; invalidation bumps version (`apps/api/src/services/reviewCache.ts`, `apps/api/src/routes/public.ts`).
+- Review cache version initialization now seeds to a timestamp when missing/low to avoid reusing stale `v1` keys (`apps/api/src/services/reviewCache.ts`).
+- Trimmed milliseconds from ClickHouse `order_events` ingestion timestamps to match DateTime parsing (`apps/api/src/services/orderEventQueueConsumer.ts`).
 
 **What's NOT done yet:**
 - Implement the analytics metric expansion from ADR-051.
+- Run API/web test suites after review implementation.
 
 **Next step:**
-1. Confirm ADR-051 questions (metrics list + prewarm scope/strategy), then implement UI/API changes.
+1. Run `pnpm --filter @scan2serve/api test` and `pnpm --filter @scan2serve/web test` to verify review changes.
 
 **Build progress:**
 ```
@@ -1008,6 +1020,49 @@ Layer 11: Polish & Deploy
 - Fixed AppHeader theme toggle ordering to prevent a `themeToggleButton` initialization error.
 ### 2026-04-10 — Session 209: Dark mode depth
 - Deepened dark mode styling on dashboard surfaces and analytics overview widgets.
+### 2026-04-10 — Session 210: ADR-052 drafted
+- Drafted ADR-052 for customer reviews storage, retention, and cache model.
+### 2026-04-10 — Session 211: ADR-052 UX flow
+- Added review submission flow and menu review display/filter requirements to ADR-052.
+### 2026-04-10 — Session 212: ADR-052 cache clarification
+- Clarified cache scope, invalidation, and DB+CH merge rules for reviews.
+### 2026-04-10 — Session 213: ADR-052 answers logged
+- Recorded confirmed review answers (relevance sort/likes, pagination, comment length, completed-only).
+
+### 2026-04-10 — Session 214: ADR-052 task breakdown
+- Added implementation task checklist to ADR-052 to structure review storage/retention work.
+- Updated root and docs CLAUDE notes with the ADR-052 checklist addition.
+
+### 2026-04-10 — Session 215: ADR-052 accepted
+- Marked ADR-052 as accepted and added test coverage expectations to the checklist.
+
+### 2026-04-10 — Session 216: ADR-052 review implementation
+- Implemented review storage (Prisma models + migration), ClickHouse reviews table, review cache + migration worker, and public review endpoints with reviewId surfaced on customer orders.
+- Added review UI on customer orders hub and public menu, plus API/web test coverage and shared review types.
+
+### 2026-04-10 — Session 217: Partition maintenance fix
+- Updated order partition maintenance to move rows out of the default partition before attaching new monthly partitions (prevents `orders_p_default` constraint violations).
+
+### 2026-04-10 — Session 218: Recent review ordering fix
+- Recent reviews now sort by newest first, while all/filtered remain likes-first (`apps/api/src/routes/public.ts`).
+
+### 2026-04-10 — Session 219: Review list business filter fallback
+- Review list now matches by `businessId` on review or order relation to prevent missing reviews when businessId linkage is inconsistent (`apps/api/src/routes/public.ts`).
+
+### 2026-04-10 — Session 220: Review route guardrail
+- Guarded review/reviewLike access in public routes to avoid crashes when Prisma client is outdated (`apps/api/src/routes/public.ts`).
+
+### 2026-04-10 — Session 221: Review hot-days clamp
+- Clamped `REVIEW_HOT_DAYS` to at least 1 day to avoid recent-scope empty results from `0` config (`apps/api/src/routes/public.ts`, `apps/api/src/services/reviewMigration.ts`).
+
+### 2026-04-10 — Session 222: Review cache versioning
+- Review cache now uses per-business versioned keys; invalidation bumps version to avoid stale responses (`apps/api/src/services/reviewCache.ts`, `apps/api/src/routes/public.ts`).
+
+### 2026-04-10 — Session 223: Review cache version seeding
+- Review cache version now seeds to a timestamp when missing/low to avoid reusing stale `v1` cache keys (`apps/api/src/services/reviewCache.ts`).
+
+### 2026-04-10 — Session 224: ClickHouse DateTime fix
+- Trimmed milliseconds from ClickHouse order-event timestamps to avoid DateTime parse errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
 
 
 ## Decisions Log
@@ -1060,6 +1115,8 @@ Layer 11: Polish & Deploy
 | ADR-048 | Prometheus metrics + Grafana monitoring — Accepted | Introduce monitoring stack and metrics endpoint scope | 2026-04-09 |
 | ADR-049 | Dashboard analytics interval selector — Superseded | Superseded by ADR-050 | 2026-04-10 |
 | ADR-050 | Split dashboard vs orders analytics — Accepted | Separate analytics sections with summary vs detail flag and view-more scope | 2026-04-10 |
+| ADR-052 | Customer reviews storage + retention — Proposed | Store recent reviews in Postgres, archive to ClickHouse, cache summaries | 2026-04-10 |
+| ADR-052 | Customer reviews storage + retention — Accepted | Implement review storage, likes-based relevance sorting, and retention/migration workflow | 2026-04-10 |
 
 ---
 

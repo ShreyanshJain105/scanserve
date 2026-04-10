@@ -3,6 +3,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { PublicMenuClient } from "../src/components/public/public-menu-client";
 
+const apiFetchMock = vi.fn();
+vi.mock("../src/lib/api", () => ({
+  apiFetch: (...args: unknown[]) => apiFetchMock(...args),
+}));
+
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams("token=valid-qr-token-123"),
 }));
@@ -49,6 +54,20 @@ const baseData = {
 
 describe("PublicMenuClient", () => {
   beforeEach(() => {
+    apiFetchMock.mockReset();
+    apiFetchMock.mockResolvedValue({
+      reviews: [],
+      summary: {
+        averageRating: 0,
+        totalReviews: 0,
+        ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      },
+      page: 1,
+      limit: 10,
+      total: 0,
+      scope: "recent",
+      ratingFilter: null,
+    });
     const memoryStore: Record<string, string> = {};
     (window as any).localStorage = {
       getItem: (key: string) => memoryStore[key] ?? null,
@@ -114,5 +133,56 @@ describe("PublicMenuClient", () => {
   it("shows descriptions inline on menu rows", () => {
     render(<PublicMenuClient data={baseData} cartKey="cart:test" />);
     expect(screen.getByText("Rich espresso with steamed milk")).toBeTruthy();
+  });
+
+  it("renders review cards and handles likes", async () => {
+    const createdAt = new Date().toISOString();
+    apiFetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith("/api/public/reviews?")) {
+        return Promise.resolve({
+          reviews: [
+            {
+              id: "review-1",
+              rating: 5,
+              comment: "Fantastic service",
+              createdAt,
+              likesCount: 2,
+              likedByCustomer: false,
+            },
+          ],
+          summary: {
+            averageRating: 5,
+            totalReviews: 1,
+            ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 },
+          },
+          page: 1,
+          limit: 10,
+          total: 1,
+          scope: "recent",
+          ratingFilter: null,
+        });
+      }
+      if (path === "/api/public/reviews/review-1/like" && options?.method === "POST") {
+        return Promise.resolve({ liked: true, likesCount: 3 });
+      }
+      return Promise.resolve({
+        reviews: [],
+        summary: {
+          averageRating: 0,
+          totalReviews: 0,
+          ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        },
+        page: 1,
+        limit: 10,
+        total: 0,
+        scope: "recent",
+        ratingFilter: null,
+      });
+    });
+
+    render(<PublicMenuClient data={baseData} cartKey="cart:test" />);
+    expect(await screen.findByText("Fantastic service")).toBeTruthy();
+    fireEvent.click(screen.getByText("Helpful · 2"));
+    expect(await screen.findByText("Helpful · 3")).toBeTruthy();
   });
 });

@@ -149,3 +149,10 @@ Project documentation for architecture decisions, process notes, and operational
 - Drafted ADR-051 to expand analytics page metrics and prewarm interval data on initial load (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
 - Clarified ADR-051 answer for staggered prewarm (summary first, detail after idle) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
 - Selected final analytics metrics for ADR-051 (dashboard + orders) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
+- Drafted ADR-052 for customer reviews storage, retention, and cache model (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Added review insertion UX and menu review display requirements to ADR-052 (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Clarified ADR-052 cache scope (business + star filter + pagination), event-driven invalidation, and DB+CH merge rules for filtered/all reviews (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Recorded ADR-052 confirmed answers (relevance sort, likes, pagination 10, 250-char comments, completed-only) (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Added ADR-052 implementation task checklist to break down review storage work (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Marked ADR-052 as accepted and noted test coverage expectation in the task checklist (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Updated ADR-052 with review-like rules (customer-only, toggle) and relevance tie-breaker (most recent) (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).

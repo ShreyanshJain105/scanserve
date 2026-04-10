@@ -28,8 +28,11 @@ let consumerGroupReady = false;
 
 const orderEventStream = getOrderEventStreamName();
 
-const formatClickhouseDate = (date: Date) =>
-  date.toISOString().replace("T", " ").replace("Z", "");
+const formatClickhouseDate = (date: Date) => {
+  const iso = date.toISOString().replace("T", " ").replace("Z", "");
+  const dotIndex = iso.indexOf(".");
+  return dotIndex === -1 ? iso : iso.slice(0, dotIndex);
+};
 
 const buildAuthHeader = (user: string, password: string) => {
   if (!user && !password) return undefined;

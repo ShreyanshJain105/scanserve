@@ -741,3 +741,18 @@ This section is the high-level source of truth for what is already implemented a
 - Extended dark mode styling across the analytics page and header controls; enabled Tailwind class-based dark mode (`apps/web/src/app/dashboard/analytics/page.tsx`, `apps/web/src/components/layout/app-header.tsx`, `apps/web/tailwind.config.ts`).
 - Fixed AppHeader theme toggle initialization ordering to prevent `themeToggleButton` reference errors (`apps/web/src/components/layout/app-header.tsx`).
 - Deepened dark mode styling on the dashboard page and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
+- Drafted ADR-052 for customer reviews storage, retention, and cache model (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Added review submission and menu review display UX requirements to ADR-052 (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Clarified ADR-052 cache scope (business + star filter + pagination), event-driven invalidation, and DB+CH merge rules (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Recorded ADR-052 confirmed answers (relevance sort, likes, pagination 10, 250-char comments, completed-only) (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Added ADR-052 implementation task checklist to structure review storage work (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Marked ADR-052 as accepted and noted test coverage expectation in the task checklist (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Updated ADR-052 with review-like rules (customer-only, toggle) and relevance tie-breaker (most recent) (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`).
+- Fixed order partition maintenance to move default-partition rows before attaching new partitions, preventing `orders_p_default` constraint violations (`apps/api/src/services/orderPartitionMaintenance.ts`).
+- Adjusted recent review ordering to sort by newest first (likes-based ordering remains for all/filtered views) (`apps/api/src/routes/public.ts`).
+- Review list now filters by business via review or order relation to avoid missing reviews when businessId mismatches (`apps/api/src/routes/public.ts`).
+- Hardened public review routes to avoid crashing when Prisma client is outdated (guarded review/reviewLike model access) (`apps/api/src/routes/public.ts`).
+- Clamped `REVIEW_HOT_DAYS` to at least 1 day to prevent recent scope returning empty due to `0` config (`apps/api/src/routes/public.ts`, `apps/api/src/services/reviewMigration.ts`).
+- Switched review cache to versioned keys per business to avoid stale cache reads; invalidation bumps version (`apps/api/src/services/reviewCache.ts`, `apps/api/src/routes/public.ts`).
+- Review cache version initialization now seeds to a timestamp when missing/low to avoid reusing stale `v1` keys (`apps/api/src/services/reviewCache.ts`).
+- Trimmed milliseconds from ClickHouse `order_events` ingestion timestamps to match DateTime parsing (`apps/api/src/services/orderEventQueueConsumer.ts`).

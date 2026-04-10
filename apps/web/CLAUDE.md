@@ -487,3 +487,4 @@ pnpm lint   # run Next.js ESLint
 - Extended dark mode styling across the analytics page and header controls, and enabled Tailwind class-based dark mode (`apps/web/src/app/dashboard/analytics/page.tsx`, `apps/web/src/components/layout/app-header.tsx`, `apps/web/tailwind.config.ts`).
 - Fixed AppHeader theme toggle reference ordering to prevent client-side crash (`apps/web/src/components/layout/app-header.tsx`).
 - Deepened dark mode styling on the dashboard page and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
+- Added customer review dialog on the orders hub and review section on the public menu (filters, pagination, likes) (`apps/web/src/components/public/customer-orders-hub.tsx`, `apps/web/src/components/public/public-menu-client.tsx`).
