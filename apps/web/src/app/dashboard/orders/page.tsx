@@ -556,7 +556,7 @@ export default function DashboardOrdersPage() {
             </button>
           </div>
           <div className="mt-4">
-            <AnalyticsOverview />
+            <AnalyticsOverview section="orders" />
           </div>
         </header>
 

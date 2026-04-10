@@ -1,14 +1,22 @@
 import express from "express";
 import { z } from "zod";
-import type { AnalyticsSectionResponse, AnalyticsWindow, AnalyticsWindowResult } from "@scan2serve/shared";
+import type {
+  AnalyticsSectionResponse,
+  AnalyticsSection,
+  AnalyticsWindow,
+  AnalyticsWindowResult,
+  AnalyticsGranularity,
+} from "@scan2serve/shared";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendError, sendSuccess } from "../utils/response";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { requireApprovedBusiness } from "../middleware/businessApproval";
 import {
-  fetchPostgresOverviewWindow,
-  fetchWarehouseOverviewWindow,
+  fetchPostgresDashboardWindow,
+  fetchWarehouseDashboardWindow,
+  fetchPostgresOrdersWindow,
+  fetchWarehouseOrdersWindow,
   getPostgresWindows,
   getWarehouseWindows,
 } from "../services/analytics";
@@ -31,6 +39,7 @@ const analyticsRequestSchema = z.object({
       ])
     )
     .optional(),
+  granularity: z.enum(["summary", "detail"]).default("summary"),
 });
 
 const requireBusinessRole = (
@@ -47,7 +56,7 @@ const requireBusinessRole = (
 
 router.use(requireAuth, requireRole("business"));
 
-const buildSectionHandler = (section: AnalyticsSectionResponse["section"]) =>
+const buildSectionHandler = (section: AnalyticsSection) =>
   asyncHandler(async (req, res) => {
     if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
 
@@ -68,9 +77,12 @@ const buildSectionHandler = (section: AnalyticsSectionResponse["section"]) =>
         ? getPostgresWindows(parsed.data.windows)
         : getWarehouseWindows(parsed.data.windows);
 
+    const granularity = parsed.data.granularity ?? "summary";
+
     const response: AnalyticsSectionResponse = {
       section,
       timezone,
+      granularity: granularity as AnalyticsGranularity,
       windows: {},
     };
 
@@ -80,6 +92,7 @@ const buildSectionHandler = (section: AnalyticsSectionResponse["section"]) =>
         ? buildAnalyticsCacheKey([
             parsed.data.source,
             section,
+            granularity,
             req.business!.id,
             timezone,
             window,
@@ -96,9 +109,33 @@ const buildSectionHandler = (section: AnalyticsSectionResponse["section"]) =>
 
       try {
         const result =
-          parsed.data.source === "postgres"
-            ? await fetchPostgresOverviewWindow(req.business!.id, timezone, window)
-            : await fetchWarehouseOverviewWindow(req.business!.id, timezone, window);
+          section === "dashboard"
+            ? parsed.data.source === "postgres"
+              ? await fetchPostgresDashboardWindow(
+                  req.business!.id,
+                  timezone,
+                  window,
+                  granularity
+                )
+              : await fetchWarehouseDashboardWindow(
+                  req.business!.id,
+                  timezone,
+                  window,
+                  granularity
+                )
+            : parsed.data.source === "postgres"
+              ? await fetchPostgresOrdersWindow(
+                  req.business!.id,
+                  timezone,
+                  window,
+                  granularity
+                )
+              : await fetchWarehouseOrdersWindow(
+                  req.business!.id,
+                  timezone,
+                  window,
+                  granularity
+                );
 
         response.windows[window] = result;
         if (cacheKey) {
@@ -109,15 +146,43 @@ const buildSectionHandler = (section: AnalyticsSectionResponse["section"]) =>
           window: window as AnalyticsWindow,
           source: parsed.data.source,
           status: "error",
-          summary: {
-            orderCount: 0,
-            cancelledCount: 0,
-            paidOrderCount: 0,
-            unpaidCashCount: 0,
-            paidRevenue: "0",
-            avgPaidOrderValue: "0",
-          },
-          series: [],
+          summary:
+            granularity === "summary"
+              ? section === "dashboard"
+                ? {
+                    totalOrders: 0,
+                    paidRevenue: "0",
+                    avgPaidOrderValue: "0",
+                    orderGrowthPct: null,
+                  }
+                : {
+                    statusCounts: {},
+                    avgPrepMinutes: null,
+                    cancellationRatePct: null,
+                    paidOrderCount: 0,
+                    unpaidOrderCount: 0,
+                  }
+              : undefined,
+          detail:
+            granularity === "detail"
+              ? section === "dashboard"
+                ? {
+                    ordersSeries: [],
+                    revenueSeries: [],
+                    newVsReturning: null,
+                    ordersPerActiveTable: null,
+                    topCategories: [],
+                    topItems: [],
+                  }
+                : {
+                    statusSeries: {},
+                    statusLatencyMinutes: null,
+                    peakHours: [],
+                    paymentMethodMix: [],
+                    failedPaymentCount: null,
+                    refundedCount: null,
+                  }
+              : undefined,
           error: error instanceof Error ? error.message : "Analytics source unavailable",
         };
         response.windows[window] = fallback;
@@ -127,9 +192,8 @@ const buildSectionHandler = (section: AnalyticsSectionResponse["section"]) =>
     sendSuccess(res, response);
   });
 
-router.post("/overview", requireApprovedBusiness, buildSectionHandler("overview"));
+router.post("/dashboard", requireApprovedBusiness, buildSectionHandler("dashboard"));
 router.post("/orders", requireApprovedBusiness, buildSectionHandler("orders"));
-router.post("/revenue", requireApprovedBusiness, buildSectionHandler("revenue"));
-router.post("/customers", requireApprovedBusiness, buildSectionHandler("customers"));
+router.post("/overview", requireApprovedBusiness, buildSectionHandler("dashboard"));
 
 export default router;

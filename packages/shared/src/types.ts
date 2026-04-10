@@ -105,14 +105,7 @@ export type AnalyticsWindow =
 
 export type AnalyticsSource = "postgres" | "warehouse";
 
-export type AnalyticsWindowSummary = {
-  orderCount: number;
-  cancelledCount: number;
-  paidOrderCount: number;
-  unpaidCashCount: number;
-  paidRevenue: string;
-  avgPaidOrderValue: string;
-};
+export type AnalyticsGranularity = "summary" | "detail";
 
 export type AnalyticsSeriesPoint = {
   bucketStart: string;
@@ -120,23 +113,82 @@ export type AnalyticsSeriesPoint = {
   paidRevenue: string;
 };
 
+export type DashboardAnalyticsSummary = {
+  totalOrders: number;
+  paidRevenue: string;
+  avgPaidOrderValue: string;
+  orderGrowthPct?: number | null;
+};
+
+export type DashboardAnalyticsDetail = {
+  ordersSeries: AnalyticsSeriesPoint[];
+  revenueSeries: AnalyticsSeriesPoint[];
+  newVsReturning?: {
+    newCustomers: number;
+    returningCustomers: number;
+    repeatRatePct?: number | null;
+  };
+  ordersPerActiveTable?: number | null;
+  topCategories?: Array<{
+    categoryId: string;
+    name: string;
+    paidRevenue: string;
+    orderCount: number;
+  }>;
+  topItems?: Array<{
+    itemId: string;
+    name: string;
+    paidRevenue: string;
+    orderCount: number;
+  }>;
+};
+
+export type OrdersAnalyticsSummary = {
+  statusCounts: Partial<Record<OrderStatus, number>>;
+  avgPrepMinutes?: number | null;
+  cancellationRatePct?: number | null;
+  paidOrderCount: number;
+  unpaidOrderCount: number;
+};
+
+export type OrdersAnalyticsDetail = {
+  statusSeries: Partial<Record<OrderStatus, AnalyticsSeriesPoint[]>>;
+  statusLatencyMinutes?: Partial<Record<OrderStatus, number>>;
+  peakHours?: Array<{
+    hour: number;
+    orderCount: number;
+  }>;
+  paymentMethodMix?: Array<{
+    method: PaymentMethod;
+    orderCount: number;
+    paidRevenue: string;
+  }>;
+  failedPaymentCount?: number;
+  refundedCount?: number;
+};
+
 export type AnalyticsWindowResult = {
   window: AnalyticsWindow;
   source: AnalyticsSource;
   status: "ok" | "error";
-  summary: AnalyticsWindowSummary;
-  series: AnalyticsSeriesPoint[];
+  summary?: DashboardAnalyticsSummary | OrdersAnalyticsSummary;
+  detail?: DashboardAnalyticsDetail | OrdersAnalyticsDetail;
   error?: string;
 };
 
+export type AnalyticsSection = "dashboard" | "orders";
+
 export type AnalyticsSectionResponse = {
-  section: "overview" | "orders" | "revenue" | "customers";
+  section: AnalyticsSection;
   timezone: string;
+  granularity: AnalyticsGranularity;
   windows: Partial<Record<AnalyticsWindow, AnalyticsWindowResult>>;
 };
 
 export type AnalyticsSectionRequest = {
   source: AnalyticsSource;
+  windows: AnalyticsWindow[];
+  granularity: AnalyticsGranularity;
 };
 
 export interface Org {

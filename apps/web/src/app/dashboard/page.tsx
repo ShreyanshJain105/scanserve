@@ -164,7 +164,7 @@ export default function DashboardPage() {
 
   if (loading || !orgChecked) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-gray-50 dark:bg-slate-950 dark:text-slate-100">
         <AppHeader leftMeta="Business dashboard" />
         <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
           <p>Loading...</p>
@@ -177,11 +177,11 @@ export default function DashboardPage() {
 
   if (user.role !== "business") {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-gray-50 dark:bg-slate-950 dark:text-slate-100">
         <AppHeader leftMeta="Business dashboard" />
         <section className="mx-auto flex min-h-[60vh] max-w-6xl flex-col items-center justify-center space-y-4 p-6">
           <h1 className="text-3xl font-semibold">Welcome, {user.email}</h1>
-          <p className="text-gray-600">Role: {user.role}</p>
+          <p className="text-gray-600 dark:text-slate-300">Role: {user.role}</p>
         </section>
       </main>
     );
@@ -193,7 +193,7 @@ export default function DashboardPage() {
 
   if (businessLoading) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-gray-50 dark:bg-slate-950 dark:text-slate-100">
         <AppHeader leftMeta="Business dashboard" />
         <section className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center p-6">
           <p>Loading business profile...</p>
@@ -205,14 +205,14 @@ export default function DashboardPage() {
   if (businesses.length === 0) {
     if (!isOrgOwner) {
       return (
-        <main className="min-h-screen bg-gray-50">
+        <main className="min-h-screen bg-gray-50 dark:bg-slate-950 dark:text-slate-100">
           <AppHeader leftMeta="Business dashboard" />
           <section className="mx-auto max-w-3xl p-8">
             <h1 className="text-3xl font-semibold">Waiting for business access</h1>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-gray-600 dark:text-slate-300">
               You are part of an org, but you have not been assigned to a business yet.
             </p>
-            <p className="mt-3 text-sm text-gray-500">
+            <p className="mt-3 text-sm text-gray-500 dark:text-slate-400">
               Ask an owner or manager to grant access to a business.
             </p>
           </section>
@@ -220,11 +220,11 @@ export default function DashboardPage() {
       );
     }
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-gray-50 dark:bg-slate-950 dark:text-slate-100">
         <AppHeader leftMeta="Business dashboard" />
         <section className="mx-auto max-w-3xl p-8">
           <h1 className="text-3xl font-semibold">Create your first business</h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-600 dark:text-slate-300">
             Your org is ready. Add your first business to unlock menus, tables, and orders.
           </p>
           <div className="mt-6 flex gap-3">
@@ -507,19 +507,21 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 dark:bg-slate-950 dark:text-slate-100">
       <AppHeader leftMeta="Business dashboard" />
       <section className="mx-auto max-w-6xl space-y-6 p-6">
         <BodyBackButton />
         {blockedReason && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
             {blockedReason}
           </div>
         )}
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-5">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <div>
             <h1 className="text-2xl font-semibold">Business Dashboard</h1>
-            <p className="text-sm text-gray-600">Manage businesses, archive state, and operations.</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">
+              Manage businesses, archive state, and operations.
+            </p>
           </div>
           {isOrgOwner && (
             <div className="flex gap-2">
@@ -528,7 +530,7 @@ export default function DashboardPage() {
                   if (!guardOrgOwner("Only org owners can add businesses.")) return;
                   router.push("/dashboard/onboarding");
                 }}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:text-slate-200"
               >
                 Add business
               </button>
@@ -541,7 +543,7 @@ export default function DashboardPage() {
             showQuickActions ? "lg:grid-cols-[1fr_320px]" : ""
           }`}
         >
-          <section className="rounded-xl border bg-white p-4">
+          <section className="rounded-xl border bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-medium">Your businesses</p>
               {isOrgOwner && (
@@ -550,7 +552,7 @@ export default function DashboardPage() {
                     if (!guardOrgOwner("Only org owners can view archived businesses.")) return;
                     setShowArchived((current) => !current);
                   }}
-                  className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium"
+                  className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium dark:border-slate-700 dark:text-slate-200"
                 >
                   {showArchived ? "Show active" : "Show archived"}
                 </button>
@@ -564,11 +566,11 @@ export default function DashboardPage() {
                 className={`rounded-lg border p-4 text-left transition ${
                   selectedBusiness?.id === business.id
                     ? business.status === "archived"
-                      ? "border-2 border-red-300 bg-red-100"
-                        : "border-2 border-orange-300 bg-gray-100"
+                      ? "border-2 border-red-300 bg-red-100 dark:border-red-400/60 dark:bg-red-500/10"
+                        : "border-2 border-orange-300 bg-gray-100 dark:border-orange-400/60 dark:bg-slate-800"
                     : business.status === "archived"
-                      ? "border-red-200 bg-red-50 hover:bg-red-100/70"
-                      : "border-gray-200 bg-white hover:bg-gray-50"
+                      ? "border-red-200 bg-red-50 hover:bg-red-100/70 dark:border-red-500/40 dark:bg-red-500/5 dark:hover:bg-red-500/10"
+                      : "border-gray-200 bg-white hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
                 }`}
                 >
                   <div className="flex items-center gap-3">
@@ -576,23 +578,23 @@ export default function DashboardPage() {
                       <img
                         src={business.logoUrl}
                         alt={`${business.name} logo`}
-                        className="h-12 w-12 rounded-md border object-cover"
+                        className="h-12 w-12 rounded-md border object-cover dark:border-slate-700"
                       />
                     ) : (
-                      <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-gray-100 text-xs font-semibold text-gray-600">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-gray-100 text-xs font-semibold text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {business.name.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{business.name}</p>
-                      <p className="truncate text-sm text-gray-600">{business.slug}</p>
+                      <p className="truncate text-sm text-gray-600 dark:text-slate-400">{business.slug}</p>
                     </div>
                   </div>
                   <span
                     className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs capitalize ${
                       business.status === "archived"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-200 text-gray-700"
+                        ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200"
+                        : "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-300"
                     }`}
                   >
                     {business.status}
@@ -600,7 +602,7 @@ export default function DashboardPage() {
                 </button>
               ))}
               {visibleBusinesses.length === 0 && (
-                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500 dark:border-slate-700 dark:text-slate-400">
                   No businesses to show for this view.
                 </div>
               )}
@@ -616,10 +618,10 @@ export default function DashboardPage() {
                       if (!guardBusinessActive()) return;
                       router.push("/dashboard/menu");
                     }}
-                    className="w-full rounded-xl border border-orange-200 bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 p-5 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                    className="w-full rounded-xl border border-orange-200 bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 p-5 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-orange-400/40 dark:from-orange-500/20 dark:via-amber-500/10 dark:to-rose-500/20"
                   >
-                    <p className="text-2xl font-semibold text-slate-900">Manage menu</p>
-                    <p className="mt-2 text-sm text-slate-700">
+                    <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Manage menu</p>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
                       Edit categories, prices, availability, and images.
                     </p>
                   </button>
@@ -629,10 +631,10 @@ export default function DashboardPage() {
                       if (!guardBusinessActive()) return;
                       router.push("/dashboard/tables");
                     }}
-                    className="w-full rounded-xl border border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-100 to-teal-100 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                    className="w-full rounded-xl border border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-100 to-teal-100 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-sky-400/40 dark:from-sky-500/15 dark:via-cyan-500/10 dark:to-emerald-500/10"
                   >
-                    <p className="text-xl font-semibold text-slate-900">Manage tables and QR</p>
-                    <p className="mt-1 text-sm text-slate-700">
+                    <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">Manage tables and QR</p>
+                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                       Create tables, rotate codes, and export downloads.
                     </p>
                   </button>
@@ -644,10 +646,10 @@ export default function DashboardPage() {
                     if (!guardOrgInvite("Only org owners or managers can invite team members.")) return;
                     setInviteDialogOpen(true);
                   }}
-                  className="w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-100 to-slate-50 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  className="w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-100 to-slate-50 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-emerald-400/40 dark:from-emerald-500/15 dark:via-teal-500/10 dark:to-slate-800"
                 >
-                  <p className="text-xl font-semibold text-slate-900">Invite team member</p>
-                  <p className="mt-1 text-sm text-slate-700">
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">Invite team member</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     Add managers or staff to your org and businesses.
                   </p>
                 </button>
@@ -658,10 +660,10 @@ export default function DashboardPage() {
                     if (!guardBusinessManager("Only owners or managers can manage access.")) return;
                     setTeamDialogOpen(true);
                   }}
-                  className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-100 via-sky-100 to-white p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                  className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-100 via-sky-100 to-white p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-indigo-400/40 dark:from-indigo-500/15 dark:via-sky-500/10 dark:to-slate-800"
                 >
-                  <p className="text-xl font-semibold text-slate-900">Manage business access</p>
-                  <p className="mt-1 text-sm text-slate-700">
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">Manage business access</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     Grant staff access to the selected business.
                   </p>
                 </button>
@@ -673,9 +675,9 @@ export default function DashboardPage() {
                       if (!guardBusinessOwner("Only owners can archive businesses.")) return;
                       setArchiveDialogOpen(true);
                     }}
-                    className="rounded-lg border border-red-200 bg-gradient-to-br from-rose-100 via-red-100 to-orange-100 px-4 py-3 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                    className="rounded-lg border border-red-200 bg-gradient-to-br from-rose-100 via-red-100 to-orange-100 px-4 py-3 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-red-400/40 dark:from-red-500/15 dark:via-rose-500/10 dark:to-orange-500/15"
                   >
-                    <p className="text-base font-semibold text-red-800">Archive business</p>
+                    <p className="text-base font-semibold text-red-800 dark:text-red-200">Archive business</p>
                   </button>
                   <button
                     onClick={() =>
@@ -687,7 +689,7 @@ export default function DashboardPage() {
                     }
                     aria-label="Edit business details"
                     title="Edit business details"
-                    className="rounded-lg border border-slate-300 bg-white p-3 text-slate-800 shadow-sm transition hover:scale-[1.01] hover:shadow-md"
+                    className="rounded-lg border border-slate-300 bg-white p-3 text-slate-800 shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   >
                     <PencilIcon />
                   </button>
@@ -700,8 +702,8 @@ export default function DashboardPage() {
         <section
           className={`relative rounded-xl border p-6 ${
             selectedBusiness?.status === "archived"
-              ? "border-red-200 bg-red-50"
-              : "bg-white"
+              ? "border-red-200 bg-red-50 dark:border-red-500/40 dark:bg-red-500/10"
+              : "bg-white dark:border-slate-800 dark:bg-slate-900"
           }`}
         >
           <div className="mb-4 flex items-center justify-between">
@@ -714,7 +716,7 @@ export default function DashboardPage() {
                     if (!guardBusinessActive()) return;
                     router.push("/dashboard/orders");
                   }}
-                  className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700"
+                  className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300"
                 >
                   View orders
                 </button>
@@ -723,7 +725,7 @@ export default function DashboardPage() {
                 <button
                   onClick={runRestore}
                   disabled={restoreSubmitting}
-                  className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium disabled:opacity-50"
+                  className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium disabled:opacity-50 dark:border-slate-700 dark:text-slate-300"
                 >
                   {restoreSubmitting ? "Restoring..." : "Restore business"}
                 </button>
@@ -731,8 +733,8 @@ export default function DashboardPage() {
               <span
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   selectedBusiness?.status === "archived"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-gray-200 text-gray-700"
+                    ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200"
+                    : "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-300"
                 }`}
               >
                 {statusLabel}
@@ -741,24 +743,24 @@ export default function DashboardPage() {
           </div>
 
           <div className={isBlocked ? "pointer-events-none blur-[2px]" : ""}>
-            <AnalyticsOverview />
+            <AnalyticsOverview section="dashboard" showViewMore />
           </div>
 
           {isBlocked && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 p-6">
-              <div className="max-w-md rounded-lg border bg-white p-5 text-center shadow-sm">
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 p-6 dark:bg-slate-950/70">
+              <div className="max-w-md rounded-lg border bg-white p-5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p className="font-semibold">{statusLabel}</p>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
                   Dashboard operations are disabled until this business is approved.
                 </p>
                 {selectedBusiness?.status === "archived" && (
-                  <p className="mt-2 text-xs text-gray-600">
+                  <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">
                     Restore within 30 days to keep this business. After that it is permanently removed.
                   </p>
                 )}
                 {selectedBusiness?.status === "rejected" &&
                   !!selectedBusiness.rejections?.length && (
-                    <div className="mt-3 rounded-md bg-red-50 p-3 text-left text-xs text-red-800">
+                    <div className="mt-3 rounded-md bg-red-50 p-3 text-left text-xs text-red-800 dark:bg-red-500/10 dark:text-red-200">
                       <p className="font-medium">Recent rejection reasons</p>
                       <ul className="mt-1 space-y-1">
                         {selectedBusiness.rejections.slice(0, 3).map((item) => (
@@ -799,7 +801,7 @@ export default function DashboardPage() {
           onClose={() => setInviteDialogOpen(false)}
         >
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
               Email
               <input
                 value={inviteEmail}
@@ -809,7 +811,7 @@ export default function DashboardPage() {
                 }}
                 onBlur={() => void checkInviteEmail()}
                 type="email"
-                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 placeholder="person@example.com"
               />
             </label>
@@ -823,14 +825,14 @@ export default function DashboardPage() {
                   !inviteEmail.trim() ||
                   inviteExists === false
                 }
-                className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900"
               >
                 {inviteSubmitting ? "Sending..." : "Send invite"}
               </button>
               <button
                 type="button"
                 onClick={() => setInviteDialogOpen(false)}
-                className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
               >
                 Cancel
               </button>
@@ -844,27 +846,27 @@ export default function DashboardPage() {
           onClose={() => setTeamDialogOpen(false)}
         >
           <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
               <p className="font-medium">Selected business</p>
-              <p className="mt-1 text-slate-600">
+              <p className="mt-1 text-slate-600 dark:text-slate-400">
                 {selectedBusiness ? `${selectedBusiness.name} (${selectedBusiness.slug})` : "No business selected"}
               </p>
             </div>
 
             {teamLoading && (
-              <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
+              <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 Loading team members...
               </div>
             )}
 
             {!teamLoading && orgMembers.length === 0 && (
-              <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
+              <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 No org members found yet.
               </div>
             )}
 
             {!teamLoading && orgMembers.length > 0 && !canManageAccess && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
                 Only business owners or managers can grant or revoke business access.
               </div>
             )}
@@ -878,21 +880,21 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={member.userId}
-                      className="rounded-lg border border-slate-200 bg-white p-3"
+                      className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{member.email}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{member.email}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             {member.isOwner ? "Org owner" : "Org member"}
                           </p>
                         </div>
                         {displayRole ? (
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
                             Has access ({displayRole})
                           </span>
                         ) : (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                             No access
                           </span>
                         )}
@@ -923,18 +925,18 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={member.userId}
-                      className="rounded-lg border border-slate-200 bg-white p-3"
+                      className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{member.email}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{member.email}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             {member.isOwner ? "Org owner" : "Org member"}
                           </p>
                         </div>
                         {displayRole ? (
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
                               Has access ({displayRole})
                             </span>
                             {canRemove && (
@@ -942,7 +944,7 @@ export default function DashboardPage() {
                                 type="button"
                                 onClick={() => removeMemberFromBusiness(member.userId)}
                                 disabled={assigningMemberId === member.userId}
-                                className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
                               >
                                 {assigningMemberId === member.userId ? "Removing..." : "Remove access"}
                               </button>
@@ -958,7 +960,7 @@ export default function DashboardPage() {
                                   [member.userId]: event.target.value as "manager" | "staff",
                                 }))
                               }
-                              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                              className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                               disabled={!canAssign}
                             >
                               <option value="staff">Staff</option>
@@ -970,7 +972,7 @@ export default function DashboardPage() {
                               type="button"
                               onClick={() => assignMemberToBusiness(member.userId)}
                               disabled={!canAssign || assigningMemberId === member.userId}
-                              className="rounded-md bg-slate-900 px-3 py-1 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                              className="rounded-md bg-slate-900 px-3 py-1 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900"
                             >
                               {assigningMemberId === member.userId ? "Adding..." : "Grant access"}
                             </button>
@@ -987,19 +989,19 @@ export default function DashboardPage() {
       </section>
       {archiveDialogOpen && selectedBusiness && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900">
             <h3 className="text-lg font-semibold">Archive this business?</h3>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
               This will disable operations immediately. The business will be permanently deleted
               after 30 days unless restored.
             </p>
-            <p className="mt-3 text-xs text-gray-600">
+            <p className="mt-3 text-xs text-gray-600 dark:text-slate-400">
               Type <span className="font-semibold">ARCHIVE</span> to confirm.
             </p>
             <input
               value={archiveConfirmText}
               onChange={(event) => setArchiveConfirmText(event.target.value.toUpperCase())}
-              className="mt-2 w-full rounded-md border px-3 py-2"
+              className="mt-2 w-full rounded-md border px-3 py-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               placeholder="ARCHIVE"
             />
             <div className="mt-4 flex justify-end gap-2">
@@ -1008,7 +1010,7 @@ export default function DashboardPage() {
                   setArchiveDialogOpen(false);
                   setArchiveConfirmText("");
                 }}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:text-slate-200"
               >
                 Cancel
               </button>

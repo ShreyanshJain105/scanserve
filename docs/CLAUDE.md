@@ -140,3 +140,12 @@ Project documentation for architecture decisions, process notes, and operational
 - Drafted ADR-047 to store order status actors as `{ userId, email }` objects per status key in `status_actors` (`docs/adr/ADR-047-order-status-actors-with-user-identity.md`).
 - Drafted ADR-048 to introduce Prometheus metrics collection and Grafana monitoring (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).
 - Accepted ADR-048 and captured monitoring scope (API metrics + Postgres exporter + ClickHouse metrics; Grafana exposed via gateway) (`docs/adr/ADR-048-prometheus-grafana-monitoring.md`).
+
+## Updates 2026-04-10
+- Marked ADR-049 as superseded by ADR-050 (`docs/adr/ADR-049-dashboard-analytics-interval-selector.md`).
+- Accepted ADR-050 to split dashboard vs orders analytics with summary vs detail flag and view-more scope (`docs/adr/ADR-050-dashboard-vs-orders-analytics.md`).
+- Added sample data README for seeding demo data across Postgres + ClickHouse (`docs/sample-data/README.md`).
+- Noted compose now runs sample data seed (`docker-compose.yml`).
+- Drafted ADR-051 to expand analytics page metrics and prewarm interval data on initial load (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
+- Clarified ADR-051 answer for staggered prewarm (summary first, detail after idle) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
+- Selected final analytics metrics for ADR-051 (dashboard + orders) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).

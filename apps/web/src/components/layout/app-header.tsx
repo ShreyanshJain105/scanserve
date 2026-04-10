@@ -37,6 +37,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
   const [loadingNotifications, setLoadingNotifications] = React.useState(false);
   const [notifPage, setNotifPage] = React.useState(1);
   const [notifScope, setNotifScope] = React.useState<"unread" | "all">("unread");
+  const [theme, setTheme] = React.useState<"light" | "dark">("light");
   const notifPageSize = 8;
   const fetchNotifications = React.useCallback(
     async (opts?: { resetPage?: boolean; scope?: "unread" | "all" }) => {
@@ -134,6 +135,25 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     }
   }, [notificationsOpen, fetchNotifications]);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("theme");
+    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    const next =
+      stored === "dark" || stored === "light" ? stored : prefersDark ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("theme", next);
+      document.documentElement.classList.toggle("dark", next === "dark");
+    }
+  };
+
   const markNotificationRead = async (inboxId: string) => {
     const endpoint =
       user?.role === "admin"
@@ -177,16 +197,16 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
 
   const businessLoginDropdown = (
     <details className="relative" data-dropdown-root>
-      <summary className="cursor-pointer list-none rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700">
+      <summary className="cursor-pointer list-none rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
         Login
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-44 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+      <div className="absolute right-0 z-30 mt-2 w-44 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <Link
           href="/login"
           className={`block rounded px-2.5 py-2 text-xs ${
             businessUser
               ? "pointer-events-none text-slate-400"
-              : "text-slate-700 hover:bg-slate-50"
+              : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
           }`}
         >
           Login as business
@@ -197,16 +217,16 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
 
   const customerLoginDropdown = (
     <details className="relative" data-dropdown-root>
-      <summary className="cursor-pointer list-none rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700">
+      <summary className="cursor-pointer list-none rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
         Login
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-44 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+      <div className="absolute right-0 z-30 mt-2 w-44 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <Link
           href={customerLoginHref}
           className={`block rounded px-2.5 py-2 text-xs ${
             customerUser
               ? "pointer-events-none text-slate-400"
-              : "text-slate-700 hover:bg-slate-50"
+              : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
           }`}
         >
           Login as customer
@@ -215,18 +235,47 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     </details>
   );
 
+  const showLoginControls = !businessUser && !customerUser;
+  const themeToggleButton = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label="Toggle dark mode"
+      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+    >
+      {theme === "dark" ? (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <path d="M12 3a1 1 0 0 1 1 1v1.2a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Z" />
+          <path d="M12 18.8a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.2a1 1 0 0 1 1-1Z" />
+          <path d="M4.2 12a1 1 0 0 1 1-1H6.4a1 1 0 1 1 0 2H5.2a1 1 0 0 1-1-1Z" />
+          <path d="M17.6 12a1 1 0 0 1 1-1h1.2a1 1 0 1 1 0 2h-1.2a1 1 0 0 1-1-1Z" />
+          <path d="M6.7 6.7a1 1 0 0 1 1.4 0l.85.85a1 1 0 0 1-1.41 1.41l-.84-.85a1 1 0 0 1 0-1.41Z" />
+          <path d="M15.05 15.05a1 1 0 0 1 1.41 0l.85.84a1 1 0 1 1-1.41 1.41l-.85-.84a1 1 0 0 1 0-1.41Z" />
+          <path d="M6.7 17.3a1 1 0 0 1 0-1.41l.84-.84a1 1 0 1 1 1.41 1.41l-.85.84a1 1 0 0 1-1.4 0Z" />
+          <path d="M15.05 8.95a1 1 0 0 1 0-1.41l.85-.84a1 1 0 1 1 1.41 1.41l-.84.84a1 1 0 0 1-1.42 0Z" />
+          <circle cx="12" cy="12" r="3.4" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <path d="M20.6 14.5a8 8 0 0 1-10.1-10 7 7 0 1 0 10.1 10Z" />
+        </svg>
+      )}
+    </button>
+  );
+
   const customerRight = loading ? (
     <p className="text-xs text-slate-500">Loading session...</p>
   ) : customerUser ? (
     <div className="flex items-center gap-2">
+      {themeToggleButton}
       <details className="relative" data-dropdown-root>
-        <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+        <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100">
           {customerUser.email}
         </summary>
-        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <Link
             href="/orders"
-            className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+            className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             View orders
           </Link>
@@ -236,7 +285,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
               void logoutCustomer();
               router.refresh();
             }}
-            className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+            className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Logout customer
           </button>
@@ -246,44 +295,45 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     </div>
   ) : (
     <div className="flex items-center gap-2">
-      <div className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+      {themeToggleButton}
+      <div className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
         Guest session
       </div>
       {customerLoginDropdown}
     </div>
   );
 
-  const showLoginControls = !businessUser && !customerUser;
   const defaultRight = loading ? (
     <p className="text-xs text-slate-500">Loading profile...</p>
   ) : user || businessUser || customerUser ? (
     <div className="flex items-center gap-2">
+      {themeToggleButton}
       {businessUser ? (
         <details className="relative" data-dropdown-root>
-          <summary className="cursor-pointer list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-xs font-medium text-slate-800">
+          <summary className="cursor-pointer list-none rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-xs font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             <span className="max-w-[200px] truncate">{businessUser.email}</span>
-          </summary>
-          <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
-            <div className="px-2.5 py-2 text-[11px] text-slate-500">
-              Business profile
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                void logoutBusiness();
-                router.refresh();
-              }}
-              className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
-            >
-              Logout business
-            </button>
+        </summary>
+        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="px-2.5 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+            Business profile
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              void logoutBusiness();
+              router.refresh();
+            }}
+            className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Logout business
+          </button>
+        </div>
         </details>
       ) : (
         showLoginControls && (
           <Link
             href="/login"
-            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
             Login as business
           </Link>
@@ -291,30 +341,30 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
       )}
       {customerUser ? (
         <details className="relative" data-dropdown-root>
-          <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-right text-xs font-medium text-sky-800">
-            <span className="max-w-[200px] truncate">{customerUser.email}</span>
-          </summary>
-          <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
-            <div className="px-2.5 py-2 text-[11px] text-slate-500">
-              Customer profile
-            </div>
-            <Link
-              href="/orders"
-              className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
-            >
-              View orders
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                void logoutCustomer();
-                router.refresh();
-              }}
-              className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
-            >
-              Logout customer
-            </button>
+        <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-right text-xs font-medium text-sky-800 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100">
+          <span className="max-w-[200px] truncate">{customerUser.email}</span>
+        </summary>
+        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="px-2.5 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+            Customer profile
           </div>
+          <Link
+            href="/orders"
+            className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            View orders
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              void logoutCustomer();
+              router.refresh();
+            }}
+            className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Logout customer
+          </button>
+        </div>
         </details>
       ) : null}
       {null}
@@ -325,7 +375,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
             type="button"
             aria-label="Notifications"
             onClick={() => setNotificationsOpen((prev) => !prev)}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -346,16 +396,16 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+            <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between">
-                <div className="text-[11px] font-semibold text-slate-800">Notifications</div>
+                <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-100">Notifications</div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     className={`rounded px-2 py-1 text-[11px] ${
                       notifScope === "unread"
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-200 text-slate-700"
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                        : "border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
                     }`}
                     onClick={() => fetchNotifications({ resetPage: true, scope: "unread" })}
                   >
@@ -365,8 +415,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                     type="button"
                     className={`rounded px-2 py-1 text-[11px] ${
                       notifScope === "all"
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-200 text-slate-700"
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                        : "border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
                     }`}
                     onClick={() => fetchNotifications({ resetPage: true, scope: "all" })}
                   >
@@ -374,7 +424,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                   </button>
                   <button
                     type="button"
-                    className="text-[11px] text-slate-600 hover:text-slate-800"
+                    className="text-[11px] text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                     onClick={() => setNotificationsOpen(false)}
                   >
                     Close
@@ -384,16 +434,16 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
               {loadingNotifications ? (
                 <p className="mt-2 text-[11px] text-slate-600">Loading…</p>
               ) : notifications.length === 0 ? (
-                <p className="mt-2 text-[11px] text-slate-600">No notifications yet.</p>
+                <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-400">No notifications yet.</p>
               ) : (
                 <>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-700">
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300">
                     <span>Unread: {notificationCount ?? 0}</span>
                     {notifScope === "unread" && (notificationCount ?? 0) > 0 && (
                       <button
                         type="button"
                         onClick={markAllRead}
-                        className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50"
+                        className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
                       >
                         Mark all read
                       </button>
@@ -424,47 +474,47 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                                 {n.businessName}
                               </p>
                             )}
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-700">
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
                               <div className="flex items-center justify-between">
-                                <p className="font-semibold text-slate-900">{n.message}</p>
-                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-700">
+                                <p className="font-semibold text-slate-900 dark:text-slate-100">{n.message}</p>
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                   {n.type}
                                 </span>
                               </div>
                               {n.actorUserId && (
-                                <p className="text-[10px] text-slate-500">
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
                                   Actor: {n.actorUserId.slice(-6)}
                                 </p>
                               )}
                               {inviteId && (
                                 <Link
                                   href={`/dashboard/org-invite/${inviteId}`}
-                                  className="mt-2 inline-flex items-center rounded border border-slate-300 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                                  className="mt-2 inline-flex items-center rounded border border-slate-300 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
                                   View org invite
                                 </Link>
                               )}
                               {payloadEntries && payloadEntries.length > 0 && (
-                                <div className="mt-1 space-y-1 text-[10px] text-slate-600">
+                                <div className="mt-1 space-y-1 text-[10px] text-slate-600 dark:text-slate-400">
                                   {payloadEntries.map(([key, value]) => (
                                     <div key={key} className="flex items-start gap-1">
-                                      <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                                      <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                                         {key}
                                       </span>
-                                      <span className="break-all text-slate-700">
+                                      <span className="break-all text-slate-700 dark:text-slate-200">
                                         {String(value)}
                                       </span>
                                     </div>
                                   ))}
                                 </div>
                               )}
-                              <p className="mt-1 text-[10px] text-slate-400">
+                              <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
                                 {new Date(n.createdAt).toLocaleString()}
                               </p>
                               {n.inboxId && (
                                 <button
                                   type="button"
-                                  className="mt-1 rounded border border-slate-300 px-2 py-1 text-[10px] hover:bg-slate-50"
+                                  className="mt-1 rounded border border-slate-300 px-2 py-1 text-[10px] hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
                                   onClick={() => markNotificationRead(n.inboxId!)}
                                 >
                                   Mark as read
@@ -475,12 +525,12 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                         );
                       })}
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-700">
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300">
                     <button
                       type="button"
                       onClick={() => setNotifPage((p) => Math.max(1, p - 1))}
                       disabled={notifPage === 1}
-                      className="rounded border px-2 py-1 disabled:opacity-40"
+                      className="rounded border px-2 py-1 disabled:opacity-40 dark:border-slate-700"
                     >
                       Prev
                     </button>
@@ -495,7 +545,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                         )
                       }
                       disabled={notifPage * notifPageSize >= notifications.length}
-                      className="rounded border px-2 py-1 disabled:opacity-40"
+                      className="rounded border px-2 py-1 disabled:opacity-40 dark:border-slate-700"
                     >
                       Next
                     </button>
@@ -509,10 +559,11 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     </div>
   ) : (
     <div className="flex items-center gap-2">
+      {themeToggleButton}
       {businessLoginDropdown}
       <Link
         href="/register/business"
-        className="rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white"
+        className="rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white dark:bg-slate-100 dark:text-slate-900"
       >
         Register
       </Link>
@@ -523,24 +574,24 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     <header
       ref={headerRef}
       data-app-header
-      className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur"
+      className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/90"
     >
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-sm font-semibold text-amber-800">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-sm font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
             S2
           </div>
           <div className="min-w-0">
-            <Link href="/home" className="font-semibold tracking-tight text-slate-900">
+            <Link href="/home" className="font-semibold tracking-tight text-slate-900 dark:text-slate-100">
               Scan2Serve
             </Link>
           </div>
         </div>
         {rightSlot ?? (audience === "customer" ? customerRight : defaultRight)}
       </div>
-      <div className="border-t border-slate-200/70">
+      <div className="border-t border-slate-200/70 dark:border-slate-800/80">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-center px-6 py-2">
-          <div className="inline-flex rounded-full border border-slate-200 bg-white px-1 py-1 shadow-sm">
+          <div className="inline-flex rounded-full border border-slate-200 bg-white px-1 py-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             {[
               { label: "Home", href: "/home", visible: true },
               { label: "Explore", href: "/explore", visible: true },
@@ -553,8 +604,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                   href={item.href}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                     pathname?.startsWith(item.href)
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                   }`}
                 >
                   {item.label}

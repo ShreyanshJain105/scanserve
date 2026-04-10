@@ -56,3 +56,6 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 
 ## Updates 2026-04-09
 - Added `StatusActorInfo`/`StatusActors` types and attached `statusActors` to `Order` to support per-status `{ userId, email }` actor metadata.
+
+## Updates 2026-04-10
+- Redesigned shared analytics types for ADR-050: dashboard vs orders sections, summary/detail granularity, and expanded analytics detail structures (`packages/shared/src/types.ts`).

@@ -712,3 +712,32 @@ This section is the high-level source of truth for what is already implemented a
 - Added Grafana Live websocket proxy handling under `/grafana/api/live/` to avoid 400s through the gateway (`gateway/nginx.conf.template`).
 - Added minimal Postgres exporter config file and mounted it to silence missing config warnings (`monitoring/postgres_exporter.yml`, `docker-compose.yml`).
 - Added optional pretty log output format for API logs via `LOG_FORMAT=pretty` (`apps/api/src/utils/logger.ts`, `apps/api/.env`, `apps/api/.env.example`).
+- Marked ADR-049 as superseded by ADR-050 (`docs/adr/ADR-049-dashboard-analytics-interval-selector.md`).
+- Accepted ADR-050 to split dashboard vs orders analytics with summary vs detail flag and view-more scope (`docs/adr/ADR-050-dashboard-vs-orders-analytics.md`).
+- Updated shared analytics types for ADR-050 (dashboard vs orders sections, summary/detail granularity) (`packages/shared/src/types.ts`).
+- Implemented API analytics scaffolding for ADR-050 (dashboard/orders endpoints, summary/detail granularity) (`apps/api/src/services/analytics.ts`, `apps/api/src/routes/analytics.ts`).
+- Updated dashboard/orders analytics summary UI with interval selector and per-section metrics (`apps/web/src/components/dashboard/analytics-overview.tsx`, `apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).
+- Added dashboard analytics detail page with business selector for orders analytics (`apps/web/src/app/dashboard/analytics/page.tsx`, `apps/web/src/components/dashboard/analytics-detail.tsx`).
+- Expanded analytics detail data/visuals for ADR-050 (top categories/items, payment mix, peak hours) (`apps/api/src/services/analytics.ts`, `apps/web/src/components/dashboard/analytics-detail.tsx`).
+- Added previous-window order growth percentage to dashboard summary analytics (`apps/api/src/services/analytics.ts`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
+- Added analytics detail sparklines for orders/revenue trends and status volume list (`apps/web/src/components/dashboard/analytics-detail.tsx`).
+- Added sparkline labels for min/max values and extended sample seed order history (`apps/web/src/components/dashboard/analytics-detail.tsx`, `apps/api/scripts/seed-sample-data.ts`).
+- Added simple axis/tick marks and legend dots to analytics sparklines (`apps/web/src/components/dashboard/analytics-detail.tsx`).
+- Reworked analytics charts into axis-backed mini graphs with area fills and start/end labels (`apps/web/src/components/dashboard/analytics-detail.tsx`).
+- Refined analytics chart aesthetics to match sample layout (`apps/web/src/components/dashboard/analytics-detail.tsx`).
+- Reworked analytics page layout to match the provided reference design (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Added sample data seed script and README for Postgres + ClickHouse demo data (`apps/api/scripts/seed-sample-data.ts`, `docs/sample-data/README.md`).
+- Updated docker-compose dev API startup to run the sample seed (`docker-compose.yml`).
+- Fixed sample seed ClickHouse auth and ordering in compose bootstrap (`apps/api/scripts/seed-sample-data.ts`, `docker-compose.yml`).
+- Fixed ClickHouse seed event timestamps to use CH-friendly datetime format (`apps/api/scripts/seed-sample-data.ts`).
+- Expanded sample seed to include order status actors and a 60-day order history when needed (`apps/api/scripts/seed-sample-data.ts`).
+- Redesigned the analytics page UI to match new dashboard inspirations with a full-width revenue chart, sidebar KPI stack, and richer orders/payment cards (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Drafted ADR-051 for analytics metric expansion and interval prewarming (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
+- Clarified ADR-051 staggered prewarm meaning (summary first, detail after idle) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
+- Selected final analytics metrics for ADR-051 (dashboard + orders) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`).
+- Implemented analytics interval prewarm on the analytics page (summary first, detail after idle) with in-memory window caching (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Added a full-page skeleton state while analytics data is loading/warming (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Added a global light/dark mode toggle in the app header with base dark theme variables (`apps/web/src/components/layout/app-header.tsx`, `apps/web/src/app/globals.css`).
+- Extended dark mode styling across the analytics page and header controls; enabled Tailwind class-based dark mode (`apps/web/src/app/dashboard/analytics/page.tsx`, `apps/web/src/components/layout/app-header.tsx`, `apps/web/tailwind.config.ts`).
+- Fixed AppHeader theme toggle initialization ordering to prevent `themeToggleButton` reference errors (`apps/web/src/components/layout/app-header.tsx`).
+- Deepened dark mode styling on the dashboard page and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).

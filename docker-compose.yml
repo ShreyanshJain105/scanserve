@@ -88,7 +88,7 @@ services:
       CLICKHOUSE_DATABASE: scan2serve
       REDIS_URL: redis://redis:6379
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api db:migrate:deploy && pnpm --filter @scan2serve/api db:generate && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api clickhouse:users && pnpm --filter @scan2serve/api clickhouse:bootstrap && pnpm --filter @scan2serve/api dev"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api db:migrate:deploy && pnpm --filter @scan2serve/api db:generate && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api clickhouse:users && pnpm --filter @scan2serve/api clickhouse:bootstrap && pnpm --filter @scan2serve/api db:seed:sample && pnpm --filter @scan2serve/api dev"
     depends_on:
       db:
         condition: service_healthy

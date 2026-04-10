@@ -190,6 +190,14 @@ pnpm db:studio    # open Prisma Studio GUI
 
 ## Updates 2026-04-10
 - Added optional pretty log output format controlled by `LOG_FORMAT=pretty` for more readable API logs (`src/utils/logger.ts`, `.env`, `.env.example`).
+- Added ADR-050 analytics backend scaffolding: new dashboard/orders analytics windows with summary/detail granularity, and routes for `/api/business/analytics/dashboard` and `/api/business/analytics/orders` (`src/services/analytics.ts`, `src/routes/analytics.ts`).
+- Expanded analytics detail data: postgres dashboard top categories/items, and warehouse orders detail series/peak hours/payment mix (`src/services/analytics.ts`).
+- Added order growth percentage in dashboard analytics summary (previous-window comparison) for Postgres and warehouse windows (`src/services/analytics.ts`).
+- Added sample data seed script that populates Postgres + ClickHouse analytics data (`scripts/seed-sample-data.ts`).
+- Sample seed now reads ClickHouse auth from env and compose runs clickhouse bootstrap before seeding (`scripts/seed-sample-data.ts`, `docker-compose.yml`).
+- Sample seed now formats ClickHouse event timestamps as `YYYY-MM-DD HH:MM:SS` to satisfy JSONEachRow parsing (`scripts/seed-sample-data.ts`).
+- Sample seed now populates order status actors and builds ~60-day order history per business when data is sparse (`scripts/seed-sample-data.ts`).
+- Sample seed now targets ~120 orders per business across ~180 days (`scripts/seed-sample-data.ts`).
 
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.

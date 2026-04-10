@@ -11,13 +11,13 @@
 
 **Date:** 2026-04-10
 **What was done:**
-- Added pretty log output option for API logs and set local `.env` to `LOG_FORMAT=pretty` (`apps/api/src/utils/logger.ts`, `apps/api/.env`, `apps/api/.env.example`).
+- Deepened dark mode styling on dashboard pages and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
 
 **What's NOT done yet:**
-- Restart the API container to pick up `LOG_FORMAT=pretty`.
+- Implement the analytics metric expansion from ADR-051.
 
 **Next step:**
-1. Restart `api` and confirm logs are now formatted in a readable key/value line.
+1. Confirm ADR-051 questions (metrics list + prewarm scope/strategy), then implement UI/API changes.
 
 **Build progress:**
 ```
@@ -950,6 +950,65 @@ Layer 11: Polish & Deploy
 ### 2026-04-09 — Session 180: Orders status actor UI refresh
 - Fixed status update handler to merge the full order payload so status actor labels update immediately in the dashboard UI.
 
+### 2026-04-10 — Session 181: Dashboard analytics interval selector ADR
+- Marked ADR-049 as superseded by ADR-050.
+### 2026-04-10 — Session 182: Dashboard vs orders analytics ADR
+- Accepted ADR-050 to split dashboard vs orders analytics with summary vs detail flag and view-more scope before implementation.
+### 2026-04-10 — Session 183: Shared analytics types
+- Updated shared analytics contracts for ADR-050 (dashboard vs orders sections, summary/detail granularity).
+### 2026-04-10 — Session 184: Analytics backend scaffolding
+- Added dashboard/orders analytics endpoints with summary/detail granularity and window-aware cache keys.
+### 2026-04-10 — Session 185: Analytics summary UI
+- Updated dashboard/orders analytics summary UI with interval selector and per-section summaries.
+### 2026-04-10 — Session 186: Analytics detail page
+- Added dashboard-only analytics detail page with interval selector and orders business picker.
+### 2026-04-10 — Session 187: Analytics detail metrics
+- Expanded analytics detail data (top categories/items, payment mix, peak hours) and improved detail UI.
+### 2026-04-10 — Session 188: Analytics growth metric
+- Added previous-window order growth percentage to dashboard summary analytics.
+### 2026-04-10 — Session 189: Analytics sparklines
+- Added simple trend sparklines for analytics detail views.
+### 2026-04-10 — Session 190: Sample data seeding
+- Added sample data seed script and documentation for Postgres + ClickHouse demo data.
+### 2026-04-10 — Session 191: Compose sample seed
+- Added `db:seed:sample` to the dev compose API startup command.
+### 2026-04-10 — Session 192: Sample seed ClickHouse auth
+- Updated sample seed to read ClickHouse auth from env and reordered compose bootstrap to avoid auth failures.
+### 2026-04-10 — Session 193: Sample seed timestamp fix
+- Updated ClickHouse seed events to use `YYYY-MM-DD HH:MM:SS` timestamps for JSONEachRow parsing.
+### 2026-04-10 — Session 194: Sample seed history + actors
+- Added order status actors and extended order history for analytics coverage.
+### 2026-04-10 — Session 195: Sample seed volume + chart labels
+- Increased sample seed volume and added min/max labels to analytics sparklines.
+### 2026-04-10 — Session 196: Sparkline axes
+- Added axis lines, tick marks, and legend dots to analytics sparklines.
+### 2026-04-10 — Session 197: Chart polish
+- Replaced sparklines with mini charts featuring axes, grids, and labels.
+### 2026-04-10 — Session 198: Chart aesthetic pass
+- Adjusted chart composition to align with the provided sample style.
+### 2026-04-10 — Session 199: Analytics page redesign
+- Reworked the analytics page to match the provided reference layout.
+### 2026-04-10 — Session 200: Analytics page refresh
+- Updated the analytics page visuals to align with the new inspiration dashboards, including a sidebar KPI stack and refined revenue/orders/payment sections.
+### 2026-04-10 — Session 201: Analytics metrics + prewarm ADR
+- Drafted ADR-051 to expand analytics metrics and prewarm interval data on initial load.
+### 2026-04-10 — Session 202: ADR-051 answer clarification
+- Clarified ADR-051 staggered prewarm meaning (summary first, detail after idle).
+### 2026-04-10 — Session 203: ADR-051 metrics selection
+- Selected final analytics metrics for ADR-051 (dashboard + orders).
+### 2026-04-10 — Session 204: Analytics interval prewarm
+- Prefetched all windows on analytics page load (summary first, detail after idle) and switched interval changes to use cached in-memory data.
+### 2026-04-10 — Session 205: Analytics skeleton loading state
+- Added full-page skeleton UI while analytics data is loading/warming.
+### 2026-04-10 — Session 206: Theme toggle
+- Added a light/dark mode switch in the app header with base dark theme variables.
+### 2026-04-10 — Session 207: Dark mode styling
+- Extended dark mode styling across analytics and header UI; enabled Tailwind class-based dark mode.
+### 2026-04-10 — Session 208: Theme toggle crash fix
+- Fixed AppHeader theme toggle ordering to prevent a `themeToggleButton` initialization error.
+### 2026-04-10 — Session 209: Dark mode depth
+- Deepened dark mode styling on dashboard surfaces and analytics overview widgets.
+
 
 ## Decisions Log
 
@@ -999,6 +1058,8 @@ Layer 11: Polish & Deploy
 | ADR-046 | API gateway layer | Front gateway all traffic and require internal API key for non-public API routes | 2026-04-09 |
 | ADR-047 | Order status actors store user identity | Store `{ userId, email }` objects per status key in `status_actors` | 2026-04-09 |
 | ADR-048 | Prometheus metrics + Grafana monitoring — Accepted | Introduce monitoring stack and metrics endpoint scope | 2026-04-09 |
+| ADR-049 | Dashboard analytics interval selector — Superseded | Superseded by ADR-050 | 2026-04-10 |
+| ADR-050 | Split dashboard vs orders analytics — Accepted | Separate analytics sections with summary vs detail flag and view-more scope | 2026-04-10 |
 
 ---
 

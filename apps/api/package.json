@@ -15,6 +15,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:sample": "tsx scripts/seed-sample-data.ts",
     "db:studio": "prisma studio",
     "clickhouse:bootstrap": "tsx scripts/clickhouse-bootstrap.ts",
     "clickhouse:users": "tsx scripts/clickhouse-users-bootstrap.ts"

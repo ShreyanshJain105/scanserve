@@ -199,6 +199,18 @@ pnpm lint   # run Next.js ESLint
   - default header login dropdown now exposes only `Login as business` (`src/components/layout/app-header.tsx`),
   - customer login remains available only on customer surfaces (`headerAudience="customer"` flows).
 
+## Updates 2026-04-10
+- Updated dashboard/orders analytics summary UI to use ADR-050 endpoints with interval selector and per-section summaries (`src/components/dashboard/analytics-overview.tsx`, `src/app/dashboard/page.tsx`, `src/app/dashboard/orders/page.tsx`).
+- Added dashboard analytics detail page with interval selector and business picker for orders analytics (`src/app/dashboard/analytics/page.tsx`, `src/components/dashboard/analytics-detail.tsx`).
+- Enhanced analytics detail UI to show top categories/items and orders payment/peak-hour lists (`src/components/dashboard/analytics-detail.tsx`).
+- Added dashboard summary growth percentage display for the selected interval (`src/components/dashboard/analytics-overview.tsx`).
+- Added simple trend sparklines for orders/revenue and status volume list in analytics detail (`src/components/dashboard/analytics-detail.tsx`).
+- Added basic sparkline min/max labels to clarify analytics trends (`src/components/dashboard/analytics-detail.tsx`).
+- Added simple axis lines and tick marks for analytics sparklines plus legend dots for status volume (`src/components/dashboard/analytics-detail.tsx`).
+- Replaced sparklines with axis-backed mini charts including grid, area fill, and start/end labels (`src/components/dashboard/analytics-detail.tsx`).
+- Refined analytics chart styling to match sample (right-aligned mini chart, clean frame, footer labels) (`src/components/dashboard/analytics-detail.tsx`).
+- Rebuilt the analytics page layout to mirror the provided reference dashboard with a hero revenue chart and KPI cards (`src/app/dashboard/analytics/page.tsx`).
+
 ## Updates 2026-03-27
 - Added static org-invite preview page with accept/decline actions at `src/app/dashboard/org-invite/[inviteId]/page.tsx`.
 - Notifications dropdown now deep-links org invite entries to the preview page.
@@ -466,3 +478,12 @@ pnpm lint   # run Next.js ESLint
 - Added country + timezone fields to business onboarding with country-driven timezone defaults (`apps/web/src/app/dashboard/onboarding/page.tsx`).
 - Added dashboard analytics overview component (per-window cards, partial-load safe) and mounted on dashboard + orders pages (`apps/web/src/components/dashboard/analytics-overview.tsx`, `apps/web/src/app/dashboard/page.tsx`, `apps/web/src/app/dashboard/orders/page.tsx`).
 - Fixed onboarding country/timezone selects to be label-accessible via `htmlFor`/`id` to stabilize tests (`apps/web/src/app/dashboard/onboarding/page.tsx`).
+
+## Updates 2026-04-10
+- Redesigned the analytics page layout and chart styling to mirror the provided inspiration dashboards, including sidebar KPI stack, full-width revenue chart with tooltip, and richer orders/payment visuals (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Implemented analytics interval prewarm on page load (summary first, detail after idle) and switched interval changes to use cached in-memory data (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Added full-page skeleton loading state for analytics while summary/detail data warms (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Added a light/dark theme toggle in the app header and base dark theme CSS variables (`apps/web/src/components/layout/app-header.tsx`, `apps/web/src/app/globals.css`).
+- Extended dark mode styling across the analytics page and header controls, and enabled Tailwind class-based dark mode (`apps/web/src/app/dashboard/analytics/page.tsx`, `apps/web/src/components/layout/app-header.tsx`, `apps/web/tailwind.config.ts`).
+- Fixed AppHeader theme toggle reference ordering to prevent client-side crash (`apps/web/src/components/layout/app-header.tsx`).
+- Deepened dark mode styling on the dashboard page and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
