@@ -506,3 +506,14 @@ pnpm lint   # run Next.js ESLint
 
 ## Updates 2026-04-10
 - Added review analytics section (avg rating, conversion, likes per review, rating distribution, trend) on the analytics page (`apps/web/src/app/dashboard/analytics/page.tsx`).
+
+## Updates 2026-04-11
+- Added host-based routing middleware to split public vs app subdomain routes (`apps/web/src/middleware.ts`).
+- Root page now renders an app landing on `app.scan2serve.com` when logged out and redirects business sessions to `/dashboard` (`apps/web/src/app/page.tsx`).
+- Added site/app URL env vars for host routing (`apps/web/.env`, `apps/web/.env.example`).
+- Updated root-page tests and added middleware redirect tests for host routing (`apps/web/tests/root-page.test.ts`, `apps/web/tests/middleware.test.ts`).
+- Updated local dev env defaults to use `localhost` and `app.localhost` for host-based routing (`apps/web/.env`, `apps/web/.env.example`).
+- Redesigned the app-host landing to a distinct dark operator console layout (`apps/web/src/app/page.tsx`).
+- Updated `apiFetch` to prefer same-origin API calls when host/port match, avoiding CSRF/CORS issues across `app.localhost` (`apps/web/src/lib/api.ts`).
+- Treated `*.localhost` as the same base domain in `apiFetch` so app.localhost uses same-origin CSRF fetches (`apps/web/src/lib/api.ts`).
+- Updated tables QR download helper to use same-origin API base via `getApiBase`, preventing CSRF issues on app.localhost (`apps/web/src/app/dashboard/tables/page.tsx`).

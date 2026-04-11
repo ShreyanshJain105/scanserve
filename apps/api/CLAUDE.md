@@ -364,3 +364,4 @@ pnpm db:studio    # open Prisma Studio GUI
 - Added analytics route tests to validate Postgres/warehouse dispatch for dashboard/orders (`apps/api/tests/analyticsRoutes.test.ts`).
 - Expanded sample seed data (more customers, categories/items, tables/QRs, diverse order statuses, and review + like seeding) to make analytics/UI feel populated (`apps/api/scripts/seed-sample-data.ts`).
 - Added order payment actor attribution (`payment_actors` JSON) and per-user order pins with pin endpoint + list/detail pin state (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260411193000_order_pins_payment_actors/migration.sql`, `apps/api/src/routes/business.ts`, `apps/api/src/utils/paymentActors.ts`).
+- Made CSRF/auth cookie `domain` optional when `COOKIE_DOMAIN` is empty to support host-based local dev (`apps/api/src/routes/auth.ts`, `apps/api/src/utils/csrf.ts`).

@@ -4,6 +4,47 @@ import type { ApiResponse } from "@scan2serve/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+const getBaseDomain = (host: string) => {
+  const hostname = host.split(":")[0] ?? "";
+  if (!hostname || hostname === "localhost") return hostname || "localhost";
+  if (hostname.endsWith(".localhost")) return "localhost";
+  const parts = hostname.split(".");
+  if (parts.length <= 2) return hostname;
+  return parts.slice(-2).join(".");
+};
+
+const getPort = (host: string, protocol: string) => {
+  const parts = host.split(":");
+  if (parts.length > 1) return parts[1] ?? "";
+  return protocol === "https:" ? "443" : "80";
+};
+
+const resolveApiBase = () => {
+  if (!API_URL) return "";
+  if (API_URL.startsWith("/")) return API_URL;
+  if (typeof window === "undefined") return API_URL;
+
+  try {
+    const apiUrl = new URL(API_URL);
+    const apiHost = apiUrl.host;
+    const currentHost = window.location.host;
+    const apiPort = getPort(apiHost, apiUrl.protocol);
+    const currentPort = getPort(currentHost, window.location.protocol);
+    const samePort = apiPort === currentPort;
+    const sameBaseDomain = getBaseDomain(apiHost) === getBaseDomain(currentHost);
+
+    if (samePort && sameBaseDomain) {
+      return "";
+    }
+  } catch {
+    return API_URL;
+  }
+
+  return API_URL;
+};
+
+export const getApiBase = () => resolveApiBase();
+
 const defaultHeaders = {
   "Content-Type": "application/json",
 };
@@ -32,7 +73,8 @@ const getCsrfToken = () => {
 export const ensureCsrfToken = async () => {
   const existing = getCsrfToken();
   if (existing) return existing;
-  const response = await fetch(`${API_URL}/api/auth/csrf`, {
+  const baseUrl = resolveApiBase();
+  const response = await fetch(`${baseUrl}/api/auth/csrf`, {
     method: "GET",
     credentials: "include",
   });
@@ -101,7 +143,8 @@ export async function apiFetch<T>(
 
   const cache = options.cache ?? (method === "GET" ? "no-store" : undefined);
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const baseUrl = resolveApiBase();
+  const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     credentials: "include",
     headers: mergedHeaders,
@@ -117,7 +160,7 @@ export async function apiFetch<T>(
     const refreshHeaders: Record<string, string> = {};
     if (qrTokenHeader) refreshHeaders["x-qr-token"] = qrTokenHeader;
     if (refreshCsrfToken) refreshHeaders[CSRF_HEADER_NAME] = refreshCsrfToken;
-    const refreshed = await fetch(`${API_URL}/api/auth/refresh`, {
+    const refreshed = await fetch(`${baseUrl}/api/auth/refresh`, {
       method: "POST",
       credentials: "include",
       headers: Object.keys(refreshHeaders).length ? refreshHeaders : undefined,

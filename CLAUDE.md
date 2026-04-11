@@ -779,3 +779,12 @@ This section is the high-level source of truth for what is already implemented a
 - Drafted ADR-055 to move business/admin dashboard UI to an `app.<domain>` subdomain using host-based routing (proposed). Decision: start with single deployment + host-aware routing. Impact: future dashboard/public routing, auth redirects, and env config. Next: finalize ADR answers.
 - Updated ADR-055 to allow QR/menu routes on both hosts and clarified unanswered Q&A items (domain + app root) (proposed).
 - Updated ADR-055 to keep QR/menu routes on the main domain only (public entry).
+- Updated ADR-055 to define app root behavior: landing for logged-out, redirect to `/dashboard` when business access token is present.
+- Accepted ADR-055: move dashboard/admin UI to app.scan2serve.com with host-based routing; QR/menu remain on scan2serve.com.
+- Implemented ADR-055 host-based routing with middleware, app-host landing behavior, env config, and web tests for redirects (`apps/web/src/middleware.ts`, `apps/web/src/app/page.tsx`, `apps/web/.env*`, `apps/web/tests/*`).
+- Set local dev host defaults to `localhost` and `app.localhost` for host-based routing (`apps/web/.env`, `apps/web/.env.example`).
+- Made the app-host landing visually distinct with a dark operator-console layout (`apps/web/src/app/page.tsx`).
+- Adjusted `apiFetch` to use same-origin API calls when host/port match, preventing CSRF failures on app.localhost (`apps/web/src/lib/api.ts`).
+- Treated `*.localhost` as the same base domain so app.localhost uses same-origin CSRF fetches (`apps/web/src/lib/api.ts`).
+- Made CSRF/auth cookie domain optional when `COOKIE_DOMAIN` is empty to support host-based local dev (`apps/api/src/routes/auth.ts`, `apps/api/src/utils/csrf.ts`).
+- Updated tables QR download helper to use same-origin API base via `getApiBase`, avoiding CSRF issues on app.localhost (`apps/web/src/app/dashboard/tables/page.tsx`).

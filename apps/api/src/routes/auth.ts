@@ -19,14 +19,16 @@ import type { UserRole } from "@scan2serve/shared";
 const router: express.Router = express.Router();
 
 const isProd = process.env.NODE_ENV === "production";
-const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN?.trim();
+
+const cookieDomainOption = COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {};
 
 const accessCookieOptions = {
   httpOnly: true,
   secure: isProd,
   sameSite: "lax" as const,
   path: "/",
-  domain: COOKIE_DOMAIN,
+  ...cookieDomainOption,
 };
 
 const refreshCookieOptions = {
@@ -34,7 +36,7 @@ const refreshCookieOptions = {
   secure: isProd,
   sameSite: "lax" as const,
   path: "/api/auth/refresh",
-  domain: COOKIE_DOMAIN,
+  ...cookieDomainOption,
 };
 
 const qrAccessCookieOptions = {

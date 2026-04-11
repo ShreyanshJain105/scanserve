@@ -11,14 +11,22 @@
 
 **Date:** 2026-04-11
 **What was done:**
-- Updated ADR-055 to keep QR/menu routes on the main domain only (public entry).
+- Implemented ADR-055 host-based routing in web middleware and added app-host landing behavior for logged-out users (`apps/web/src/middleware.ts`, `apps/web/src/app/page.tsx`).
+- Added site/app URL env vars for host routing (`apps/web/.env`, `apps/web/.env.example`).
+- Updated root-page tests and added middleware redirect tests for host routing (`apps/web/tests/root-page.test.ts`, `apps/web/tests/middleware.test.ts`).
+- Updated local dev env defaults to use `localhost` and `app.localhost` (`apps/web/.env`, `apps/web/.env.example`).
+- Redesigned the app-host landing to a distinct operator-console layout (`apps/web/src/app/page.tsx`).
+- Updated `apiFetch` to prefer same-origin API calls when host/port match, fixing CSRF on app.localhost (`apps/web/src/lib/api.ts`).
+- Treated `*.localhost` as the same base domain in `apiFetch` so app.localhost uses same-origin CSRF fetches (`apps/web/src/lib/api.ts`).
+- Made CSRF/auth cookie `domain` optional when `COOKIE_DOMAIN` is empty to support host-based local dev (`apps/api/src/routes/auth.ts`, `apps/api/src/utils/csrf.ts`).
+- Updated tables QR download helper to use same-origin API base via `getApiBase`, preventing CSRF issues on app.localhost (`apps/web/src/app/dashboard/tables/page.tsx`).
 
 **What's NOT done yet:**
-- Capture ADR-055 answers (exact domain + app root landing) and mark ADR accepted/rejected.
+- Run web tests to verify the new host-routing + CSRF behavior.
 
 **Next step:**
-1. Get ADR-055 questions answered and update the decision.
-2. Implement host-based routing + redirect updates once ADR is accepted.
+1. Run `pnpm --filter @scan2serve/web test`.
+2. Manually verify local host routing with `app.localhost:3000` vs `localhost:3000`.
 
 **Build progress:**
 ```
@@ -1124,6 +1132,7 @@ Layer 11: Polish & Deploy
 | ADR-052 | Customer reviews storage + retention — Proposed | Store recent reviews in Postgres, archive to ClickHouse, cache summaries | 2026-04-10 |
 | ADR-052 | Customer reviews storage + retention — Accepted | Implement review storage, likes-based relevance sorting, and retention/migration workflow | 2026-04-10 |
 | ADR-053 | Review analytics expansion — Accepted | Add review-focused dashboard analytics (rating trends, conversion, likes, distribution) with Postgres + ClickHouse merge | 2026-04-10 |
+| ADR-055 | App subdomain for dashboard UI — Accepted | Serve business/admin UI on app.scan2serve.com with host-based routing; keep QR/menu on scan2serve.com | 2026-04-11 |
 
 ---
 
@@ -1405,3 +1414,15 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 
 ### 2026-04-11 — Session: ADR-055 app subdomain draft
 - Drafted ADR-055 proposing `app.<domain>` host-based routing for the business/admin dashboard UI; awaiting answers.
+- Clarified ADR-055 app root behavior: landing for logged-out users, redirect to `/dashboard` when business access token is present.
+- Accepted ADR-055 with scan2serve.com domain and app.scan2serve.com dashboard host.
+
+### 2026-04-11 — Session: ADR-055 host routing implementation
+- Added host-based routing middleware to split public vs app-only routes (`apps/web/src/middleware.ts`).
+- Root `/` now renders an app landing page on app host when logged out and redirects business sessions to `/dashboard` (`apps/web/src/app/page.tsx`).
+- Added site/app URL env vars and web tests for root + middleware redirects (`apps/web/.env*`, `apps/web/tests/*`).
+- Updated local dev env defaults to use `localhost` and `app.localhost` (`apps/web/.env`, `apps/web/.env.example`).
+- Updated `apiFetch` to prefer same-origin API calls when host/port match to avoid CSRF/CORS issues on app.localhost (`apps/web/src/lib/api.ts`).
+- Treated `*.localhost` as the same base domain in `apiFetch` so app.localhost uses same-origin CSRF fetches (`apps/web/src/lib/api.ts`).
+- Made CSRF/auth cookie domain optional when `COOKIE_DOMAIN` is empty to support host-based local dev (`apps/api/src/routes/auth.ts`, `apps/api/src/utils/csrf.ts`).
+- Updated tables QR download helper to use same-origin API base via `getApiBase`, preventing CSRF issues on app.localhost (`apps/web/src/app/dashboard/tables/page.tsx`).

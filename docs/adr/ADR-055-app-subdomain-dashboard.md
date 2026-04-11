@@ -1,6 +1,6 @@
 ---
 Date: 2026-04-11
-Status: Proposed
+Status: Accepted
 ---
 
 # ADR-055: Move Business Dashboard UI to App Subdomain
@@ -23,7 +23,7 @@ Adopt **host-based routing** within the existing Next.js app (single deployment)
 - Requests to `app.<domain>`:
   - Allow `/dashboard`, `/dashboard/*`, `/admin`, `/login`, `/register`, `/home` (if we keep it), and any auth routes needed for business/admin.
   - Redirect `/menu/*` and `/qr/*` to `<domain>` (public entry only).
-  - Root `/` redirects to `/dashboard` (or a dedicated app landing if desired).
+  - Root `/` shows an app landing page for logged-out users; if a business access token is present, redirect to `/dashboard`.
 - Requests to `<domain>`:
   - Allow public routes (`/home`, `/menu/*`, `/qr/*`, `/orders`, `/login` for business if we keep it here).
   - Redirect dashboard/admin routes to `app.<domain>`.
@@ -54,10 +54,11 @@ Adopt **host-based routing** within the existing Next.js app (single deployment)
 2. Should `app.<domain>` land directly on `/dashboard` (root redirect) or have a distinct app landing page?
 3. Where will the API live in production: behind the gateway on `app.<domain>` or on `api.<domain>`?
 4. Should business/admin login pages live only on `app.<domain>` or remain accessible on the main domain as well?
+5. Should QR + menu routes stay on the main domain only or be served on both hosts?
 
 ### Answers (to be filled by user)
-- A1: TBD (exact domain not provided yet).
-- A2: TBD (should `app.<domain>` root go to `/dashboard` or a distinct landing).
+- A1: scan2serve.com (app is app.scan2serve.com).
+- A2: Root `/` on `app.<domain>` should show a landing page when logged out, and redirect to `/dashboard` when a business access token is present.
 - A3: Behind `app.<domain>` (per user direction).
 - A4: Only on `app.<domain>` (per user direction).
 - A5: QR + menu routes stay on the main domain only (public entry).

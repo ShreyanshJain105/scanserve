@@ -166,3 +166,5 @@ Project documentation for architecture decisions, process notes, and operational
 - Drafted ADR-055 to move business/admin dashboard UI onto an `app.<domain>` subdomain with host-based routing rules (proposed) (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
 - Updated ADR-055 to allow QR/menu routes on both hosts and corrected unanswered Q&A placeholders (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
 - Updated ADR-055 to keep QR/menu routes on the main domain only (public entry) (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
+- Updated ADR-055 to define app root behavior: landing for logged-out, redirect to `/dashboard` for logged-in business users (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
+- Accepted ADR-055: dashboard UI moves to app.scan2serve.com with host-based routing; QR/menu stay on scan2serve.com (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
