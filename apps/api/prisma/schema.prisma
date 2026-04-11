@@ -32,6 +32,7 @@ model User {
   notifications NotificationEvent[]       @relation("NotificationEventUser")
   actedNotifications NotificationEvent[]  @relation("NotificationEventActor")
   inboxEntries   NotificationInbox[]
+  orderPins      OrderPin[]
   
 
   @@map("users")
@@ -89,6 +90,7 @@ model Business {
   tables     Table[]
   qrCodes    QrCode[]
   orders     Order[]
+  orderPins  OrderPin[]
   reviews    Review[]
   memberships BusinessMembership[]
   rejections BusinessRejection[]
@@ -357,6 +359,7 @@ model Order {
   customerName    String        @map("customer_name")
   customerPhone   String?       @map("customer_phone")
   statusActors    Json?         @map("status_actors")
+  paymentActors   Json?         @map("payment_actors")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
@@ -365,12 +368,31 @@ model Order {
   table    Table       @relation(fields: [tableId], references: [id])
   items    OrderItem[]
   review   Review?
+  pins     OrderPin[]
 
   @@id([id, createdAt])
   @@index([businessId, status])
   @@index([businessId, createdAt])
   @@index([customerUserId])
   @@map("orders")
+}
+
+model OrderPin {
+  id             String   @id @default(cuid())
+  orderId        String   @map("order_id")
+  orderCreatedAt DateTime @map("order_created_at")
+  businessId     String   @map("business_id")
+  userId         String   @map("user_id")
+  pinnedAt       DateTime @default(now()) @map("pinned_at")
+
+  order    Order    @relation(fields: [orderId, orderCreatedAt], references: [id, createdAt], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orderId, orderCreatedAt])
+  @@index([userId, businessId])
+  @@index([businessId])
+  @@map("order_pins")
 }
 
 model BusinessMembership {

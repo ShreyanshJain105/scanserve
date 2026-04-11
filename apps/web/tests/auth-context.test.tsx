@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "../src/lib/auth-context";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("../src/lib/api", () => ({

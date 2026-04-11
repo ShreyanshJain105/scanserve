@@ -4,6 +4,7 @@ const clickhouseUrl = process.env.CLICKHOUSE_URL || "http://localhost:8123";
 const clickhouseUser = process.env.CLICKHOUSE_USER || "default";
 const clickhousePassword = process.env.CLICKHOUSE_PASSWORD || "";
 const clickhouseDatabase = process.env.CLICKHOUSE_DATABASE || "scan2serve";
+const clickhouseTimeoutMs = Math.max(1000, Number(process.env.CLICKHOUSE_TIMEOUT_MS || 5000));
 
 const buildAuthHeader = (user?: string, password?: string) => {
   const resolvedUser = user ?? clickhouseUser;
@@ -20,11 +21,26 @@ const runClickhouseRequest = async (query: string, auth?: { user?: string; passw
   const authHeader = buildAuthHeader(auth?.user, auth?.password);
   if (authHeader) headers.Authorization = authHeader;
 
-  return fetch(clickhouseUrl, {
-    method: "POST",
-    headers,
-    body: query,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), clickhouseTimeoutMs);
+
+  try {
+    return await fetch(clickhouseUrl, {
+      method: "POST",
+      headers,
+      body: query,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      const message = `ClickHouse query timed out after ${clickhouseTimeoutMs}ms`;
+      logger.warn("clickhouse.query.timeout", { message });
+      throw new Error(message);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 export const execClickhouse = async (

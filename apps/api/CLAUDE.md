@@ -198,6 +198,10 @@ pnpm db:studio    # open Prisma Studio GUI
 - Sample seed now formats ClickHouse event timestamps as `YYYY-MM-DD HH:MM:SS` to satisfy JSONEachRow parsing (`scripts/seed-sample-data.ts`).
 - Sample seed now populates order status actors and builds ~60-day order history per business when data is sparse (`scripts/seed-sample-data.ts`).
 - Sample seed now targets ~120 orders per business across ~180 days (`scripts/seed-sample-data.ts`).
+
+## Updates 2026-04-11
+- Added OrderPin back-relations to `User`, `Business`, and `Order` for Prisma validation (`prisma/schema.prisma`).
+- Sample seed now populates `paymentActors` for cash-paid orders and seeds per-user order pins (`scripts/seed-sample-data.ts`).
 - Added customer reviews storage: Prisma `Review` + `ReviewLike` models with migration and ClickHouse `reviews` table bootstrap (`prisma/schema.prisma`, `prisma/migrations/20260410120000_reviews`, `scripts/clickhouse-bootstrap.ts`).
 - Added review cache + migration worker and public review endpoints (create/list/like) with order reviewId surfacing (`src/services/reviewCache.ts`, `src/services/reviewMigration.ts`, `src/routes/public.ts`).
 - Fixed order partition maintenance to move rows out of the default partition before attaching new monthly partitions, preventing constraint violations (`src/services/orderPartitionMaintenance.ts`).
@@ -208,6 +212,15 @@ pnpm db:studio    # open Prisma Studio GUI
 - Switched review cache to versioned keys per business to avoid stale cache reads; invalidation bumps version (`src/services/reviewCache.ts`, `src/routes/public.ts`).
 - Review cache version initialization now seeds to a timestamp when missing/low to avoid reusing stale `v1` keys (`src/services/reviewCache.ts`).
 - Trimmed milliseconds from ClickHouse `order_events` ingestion timestamps to match DateTime parsing (`src/services/orderEventQueueConsumer.ts`).
+
+## Updates 2026-04-10
+- Fixed public route review test mocks to include order `businessId`/`status` in select responses and to honor OR-based review filters so review create/list tests reflect runtime logic (`tests/publicRoutes.test.ts`).
+
+## Updates 2026-04-10
+- Expanded analytics aggregations to include revenue growth, avg items per order, new vs returning customers, and failed/refunded counts across Postgres/ClickHouse windows (`src/services/analytics.ts`).
+
+## Updates 2026-04-10
+- Added review analytics aggregation (summary + detail) with Postgres/ClickHouse merge and review conversion math (`src/services/analytics.ts`).
 
 ## Updates 2026-03-24
 - Business profile updates from approved businesses now move the business back to `pending` status for admin re-approval (no slug changes allowed). Patch route `/api/business/profile` sets `status=pending` when current status is `approved` or `rejected`.
@@ -342,3 +355,12 @@ pnpm db:studio    # open Prisma Studio GUI
 
 ## Updates 2026-04-09
 - ClickHouse queue consumer now uses `CLICKHOUSE_BOOTSTRAP_*` for schema creation and `CLICKHOUSE_INGEST_*` for inserts to avoid CREATE DATABASE privilege errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
+
+## Updates 2026-04-11
+- Added ClickHouse request timeout handling to avoid analytics calls hanging when ClickHouse is slow/unreachable (`apps/api/src/services/clickhouseClient.ts`).
+- Added Redis connect timeout + failure logging so analytics cache lookups fail fast when Redis is unavailable (`apps/api/src/services/redisClient.ts`).
+- Documented new env defaults for ClickHouse/Redis timeouts (`apps/api/.env.example`).
+- Fixed review analytics summary queries to derive likes counts via `review_likes` join instead of missing `reviews.likes_count` (`apps/api/src/services/analytics.ts`).
+- Added analytics route tests to validate Postgres/warehouse dispatch for dashboard/orders (`apps/api/tests/analyticsRoutes.test.ts`).
+- Expanded sample seed data (more customers, categories/items, tables/QRs, diverse order statuses, and review + like seeding) to make analytics/UI feel populated (`apps/api/scripts/seed-sample-data.ts`).
+- Added order payment actor attribution (`payment_actors` JSON) and per-user order pins with pin endpoint + list/detail pin state (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260411193000_order_pins_payment_actors/migration.sql`, `apps/api/src/routes/business.ts`, `apps/api/src/utils/paymentActors.ts`).

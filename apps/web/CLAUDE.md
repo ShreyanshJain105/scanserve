@@ -199,6 +199,11 @@ pnpm lint   # run Next.js ESLint
   - default header login dropdown now exposes only `Login as business` (`src/components/layout/app-header.tsx`),
   - customer login remains available only on customer surfaces (`headerAudience="customer"` flows).
 
+## Updates 2026-04-11
+- Added analytics page tests covering summary/review widgets and interval changes (`apps/web/tests/analytics-page.test.tsx`).
+- Analytics interval selection now stays in local state but syncs the `interval` query param via `history.replaceState` (no router navigation) to avoid reloads while keeping shareable URLs (`apps/web/src/app/dashboard/analytics/page.tsx`, `apps/web/tests/analytics-page.test.tsx`).
+- Added per-user order pinning UI and payment actor display in order details (`apps/web/src/app/dashboard/orders/page.tsx`, `apps/web/tests/orders-page.test.tsx`).
+
 ## Updates 2026-04-10
 - Updated dashboard/orders analytics summary UI to use ADR-050 endpoints with interval selector and per-section summaries (`src/components/dashboard/analytics-overview.tsx`, `src/app/dashboard/page.tsx`, `src/app/dashboard/orders/page.tsx`).
 - Added dashboard analytics detail page with interval selector and business picker for orders analytics (`src/app/dashboard/analytics/page.tsx`, `src/components/dashboard/analytics-detail.tsx`).
@@ -488,3 +493,16 @@ pnpm lint   # run Next.js ESLint
 - Fixed AppHeader theme toggle reference ordering to prevent client-side crash (`apps/web/src/components/layout/app-header.tsx`).
 - Deepened dark mode styling on the dashboard page and analytics overview widgets (`apps/web/src/app/dashboard/page.tsx`, `apps/web/src/components/dashboard/analytics-overview.tsx`).
 - Added customer review dialog on the orders hub and review section on the public menu (filters, pagination, likes) (`apps/web/src/components/public/customer-orders-hub.tsx`, `apps/web/src/components/public/public-menu-client.tsx`).
+
+## Updates 2026-04-10
+- Added a Vitest setup shim for `localStorage` and `matchMedia` to stabilize header/theme tests (`apps/web/vitest.setup.ts`).
+- Extended Next.js navigation mocks in web tests to include `useSearchParams` so analytics-aware pages render in tests (`apps/web/tests/app-header.test.tsx`, `apps/web/tests/orders-page.test.tsx`, `apps/web/tests/dashboard.test.tsx`, `apps/web/tests/menu-page.test.tsx`, `apps/web/tests/tables-page.test.tsx`, `apps/web/tests/home-page.test.tsx`, `apps/web/tests/explore-page.test.tsx`, `apps/web/tests/notifications-page.test.tsx`, `apps/web/tests/org-create-page.test.tsx`, `apps/web/tests/org-invite-page.test.tsx`, `apps/web/tests/auth-context.test.tsx`).
+
+## Updates 2026-04-10
+- Expanded analytics page UI to surface revenue growth, avg items per order, returning customer share, top category revenue share, peak hours, and failed/refunded counts (`apps/web/src/app/dashboard/analytics/page.tsx`).
+
+## Updates 2026-04-10
+- Fixed menu page test to wait for updated item name before targeting delete action (`apps/web/tests/menu-page.test.tsx`).
+
+## Updates 2026-04-10
+- Added review analytics section (avg rating, conversion, likes per review, rating distribution, trend) on the analytics page (`apps/web/src/app/dashboard/analytics/page.tsx`).

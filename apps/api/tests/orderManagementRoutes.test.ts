@@ -21,6 +21,8 @@ type OrderRecord = {
   paymentMethod: "razorpay" | "cash";
   customerName: string;
   customerPhone: string | null;
+  statusActors?: Record<string, { userId: string | null; email: string | null }>;
+  paymentActors?: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -39,6 +41,14 @@ type BusinessMembershipRecord = {
   userId: string;
   role: "owner" | "manager" | "staff";
 };
+type OrderPinRecord = {
+  id: string;
+  orderId: string;
+  orderCreatedAt: Date;
+  businessId: string;
+  userId: string;
+  pinnedAt: Date;
+};
 
 const users: UserRecord[] = [];
 const businesses: BusinessRecord[] = [];
@@ -47,10 +57,12 @@ const menuItems: MenuItemRecord[] = [];
 const orders: OrderRecord[] = [];
 const orderItems: OrderItemRecord[] = [];
 const businessMemberships: BusinessMembershipRecord[] = [];
+const orderPins: OrderPinRecord[] = [];
 
 const nextOrderId = () => `order_${orders.length + 1}`;
 const nextOrderItemId = () => `oi_${orderItems.length + 1}`;
 const nextBizMembershipId = () => `bizmem_${businessMemberships.length + 1}`;
+const nextOrderPinId = () => `pin_${orderPins.length + 1}`;
 
 vi.mock("../src/prisma", () => ({
   prisma: {
@@ -207,6 +219,94 @@ vi.mock("../src/prisma", () => ({
         return { count: data.length };
       }),
     },
+    orderPin: {
+      findMany: vi.fn(async ({ where, orderBy, take, include }) => {
+        let list = orderPins.filter(
+          (pin) =>
+            (!where?.userId || pin.userId === where.userId) &&
+            (!where?.businessId || pin.businessId === where.businessId)
+        );
+        if (where?.order?.status) {
+          list = list.filter((pin) => {
+            const order = orders.find((o) => o.id === pin.orderId);
+            return order?.status === where.order.status;
+          });
+        }
+        if (where?.order?.updatedAt?.gte || where?.order?.updatedAt?.lt) {
+          list = list.filter((pin) => {
+            const order = orders.find((o) => o.id === pin.orderId);
+            if (!order) return false;
+            if (where.order.updatedAt?.gte && order.updatedAt < where.order.updatedAt.gte) {
+              return false;
+            }
+            if (where.order.updatedAt?.lt && order.updatedAt >= where.order.updatedAt.lt) {
+              return false;
+            }
+            return true;
+          });
+        }
+        if (orderBy?.pinnedAt === "desc") {
+          list.sort((a, b) => b.pinnedAt.getTime() - a.pinnedAt.getTime());
+        }
+        if (typeof take === "number") {
+          list = list.slice(0, take);
+        }
+        if (include?.order) {
+          return list.map((pin) => {
+            const order = orders.find((o) => o.id === pin.orderId) ?? null;
+            const table = order ? tables.find((t) => t.id === order.tableId) ?? null : null;
+            return {
+              ...pin,
+              order: order
+                ? include?.order?.include?.table
+                  ? { ...order, table }
+                  : order
+                : null,
+            };
+          });
+        }
+        return list;
+      }),
+      findFirst: vi.fn(async ({ where }) => {
+        return (
+          orderPins.find(
+            (pin) =>
+              (!where?.userId || pin.userId === where.userId) &&
+              (!where?.businessId || pin.businessId === where.businessId) &&
+              (!where?.orderId || pin.orderId === where.orderId) &&
+              (!where?.orderCreatedAt ||
+                pin.orderCreatedAt.getTime() === where.orderCreatedAt.getTime())
+          ) ?? null
+        );
+      }),
+      count: vi.fn(async ({ where }) => {
+        return orderPins.filter(
+          (pin) =>
+            (!where?.userId || pin.userId === where.userId) &&
+            (!where?.businessId || pin.businessId === where.businessId)
+        ).length;
+      }),
+      create: vi.fn(async ({ data }) => {
+        const record = {
+          id: nextOrderPinId(),
+          orderId: data.orderId,
+          orderCreatedAt: data.orderCreatedAt,
+          businessId: data.businessId,
+          userId: data.userId,
+          pinnedAt: new Date(),
+        };
+        orderPins.push(record);
+        return record;
+      }),
+      delete: vi.fn(async ({ where }) => {
+        const idx = orderPins.findIndex((pin) => pin.id === where.id);
+        if (idx >= 0) {
+          const [deleted] = orderPins.splice(idx, 1);
+          return deleted;
+        }
+        return null;
+      }),
+    },
   },
 }));
 
@@ -271,6 +371,7 @@ describe("Layer 8 order management routes", () => {
     orders.length = 0;
     orderItems.length = 0;
     businessMemberships.length = 0;
+    orderPins.length = 0;
 
     users.push({ id: "u_business", email: "biz@example.com", role: "business" });
     businesses.push({ id: "b_1", userId: "u_business", status: "approved" });
@@ -457,6 +558,8 @@ describe("Layer 8 order management routes", () => {
     const body = JSON.parse(res._getData());
     expect(res.statusCode).toBe(200);
     expect(body.data.order.paymentStatus).toBe("paid");
+    expect(body.data.order.paymentActors?.paidBy?.email).toBe("biz@example.com");
+    expect(body.data.order.paymentActors?.paidAt).toBeTruthy();
   });
 
   it("rejects completing unpaid orders", async () => {
@@ -485,5 +588,76 @@ describe("Layer 8 order management routes", () => {
     const body = JSON.parse(res._getData());
     expect(res.statusCode).toBe(400);
     expect(body.error.code).toBe("ORDER_NOT_PAID");
+  });
+
+  it("pins and unpins orders", async () => {
+    const orderId = nextOrderId();
+    const createdAt = new Date("2026-03-27T10:00:00Z");
+    orders.push({
+      id: orderId,
+      businessId: "b_1",
+      tableId: "t_1",
+      status: "pending",
+      totalAmount: "75.00",
+      razorpayOrderId: null,
+      razorpayPaymentId: null,
+      paymentStatus: "unpaid",
+      paymentMethod: "cash",
+      customerName: "Rina",
+      customerPhone: null,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    const user = users[0];
+    const pinRes = await run("PATCH", `/orders/${orderId}/pin`, {
+      user,
+      body: { pinned: true },
+    });
+    const pinBody = JSON.parse(pinRes._getData());
+    expect(pinRes.statusCode).toBe(200);
+    expect(pinBody.data.pinned).toBe(true);
+
+    const unpinRes = await run("PATCH", `/orders/${orderId}/pin`, {
+      user,
+      body: { pinned: false },
+    });
+    const unpinBody = JSON.parse(unpinRes._getData());
+    expect(unpinRes.statusCode).toBe(200);
+    expect(unpinBody.data.pinned).toBe(false);
+  });
+
+  it("enforces per-user pin limit", async () => {
+    const user = users[0];
+    const createdAt = new Date("2026-03-27T10:00:00Z");
+    for (let i = 0; i < 4; i += 1) {
+      orders.push({
+        id: `order_pin_${i + 1}`,
+        businessId: "b_1",
+        tableId: "t_1",
+        status: "pending",
+        totalAmount: "10.00",
+        razorpayOrderId: null,
+        razorpayPaymentId: null,
+        paymentStatus: "pending",
+        paymentMethod: "cash",
+        customerName: "Pin User",
+        customerPhone: null,
+        createdAt: new Date(createdAt.getTime() + i * 1000),
+        updatedAt: new Date(createdAt.getTime() + i * 1000),
+      });
+    }
+
+    await run("PATCH", `/orders/order_pin_1/pin`, { user, body: { pinned: true } });
+    await run("PATCH", `/orders/order_pin_2/pin`, { user, body: { pinned: true } });
+    await run("PATCH", `/orders/order_pin_3/pin`, { user, body: { pinned: true } });
+
+    const res = await run("PATCH", `/orders/order_pin_4/pin`, {
+      user,
+      body: { pinned: true },
+    });
+    const body = JSON.parse(res._getData());
+    expect(res.statusCode).toBe(409);
+    expect(body.error.code).toBe("PIN_LIMIT_REACHED");
   });
 });

@@ -23,6 +23,7 @@ const useParamsMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock, push: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   useParams: () => useParamsMock(),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 describe("OrgInvitePage", () => {

@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
     prefetch: vi.fn(),
   }),
   usePathname: () => "/explore",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const useAuthMock = vi.fn();

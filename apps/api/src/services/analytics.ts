@@ -7,6 +7,9 @@ import type {
   AnalyticsGranularity,
   DashboardAnalyticsSummary,
   DashboardAnalyticsDetail,
+  ReviewAnalyticsSummary,
+  ReviewAnalyticsDetail,
+  ReviewSeriesPoint,
   OrdersAnalyticsSummary,
   OrdersAnalyticsDetail,
   OrderStatus,
@@ -24,6 +27,11 @@ type SummaryRow = {
   unpaid_order_count: number;
   paid_revenue: string;
   avg_paid_order_value: string;
+};
+
+type PrevSummaryRow = {
+  order_count: number;
+  paid_revenue: string;
 };
 
 type StatusCountRow = {
@@ -69,6 +77,43 @@ type TopItemRow = {
   order_count: number;
 };
 
+type ItemCountRow = {
+  item_count: number;
+  order_count: number;
+};
+
+type CustomerShareRow = {
+  new_customers: number;
+  returning_customers: number;
+};
+
+type PaymentFailureRow = {
+  failed_count: number;
+  refunded_count: number;
+};
+
+type ReviewSummaryRow = {
+  total_reviews: number;
+  avg_rating: number | null;
+  likes_total: number;
+};
+
+type ReviewRatingCountRow = {
+  rating: number;
+  count: number;
+};
+
+type ReviewSeriesRow = {
+  bucket_start: Date;
+  review_count: number;
+  avg_rating: number | null;
+};
+
+type ReviewConversionRow = {
+  review_count: number;
+  completed_orders: number;
+};
+
 const toSeries = (rows: SeriesRow[]): AnalyticsSeriesPoint[] =>
   rows.map((row) => ({
     bucketStart: row.bucket_start.toISOString(),
@@ -107,6 +152,42 @@ const buildPostgresBounds = (window: AnalyticsWindow, timezone: string) => {
   }
 };
 
+const buildWarehousePostgresBounds = (window: AnalyticsWindow, timezone: string) => {
+  const startOfWeekLocal = Prisma.sql`date_trunc('week', timezone(${timezone}, now()))`;
+  const startOfMonthLocal = Prisma.sql`date_trunc('month', timezone(${timezone}, now()))`;
+  const startOfQuarterLocal = Prisma.sql`date_trunc('quarter', timezone(${timezone}, now()))`;
+  const startOfYearLocal = Prisma.sql`date_trunc('year', timezone(${timezone}, now()))`;
+
+  switch (window) {
+    case "lastWeek":
+      return {
+        startUtc: Prisma.sql`((${startOfWeekLocal} - interval '1 week') AT TIME ZONE ${timezone})`,
+        endUtc: Prisma.sql`(${startOfWeekLocal} AT TIME ZONE ${timezone})`,
+        bucket: "day" as const,
+      };
+    case "lastMonth":
+      return {
+        startUtc: Prisma.sql`((${startOfMonthLocal} - interval '1 month') AT TIME ZONE ${timezone})`,
+        endUtc: Prisma.sql`(${startOfMonthLocal} AT TIME ZONE ${timezone})`,
+        bucket: "day" as const,
+      };
+    case "lastQuarter":
+      return {
+        startUtc: Prisma.sql`((${startOfQuarterLocal} - interval '3 month') AT TIME ZONE ${timezone})`,
+        endUtc: Prisma.sql`(${startOfQuarterLocal} AT TIME ZONE ${timezone})`,
+        bucket: "day" as const,
+      };
+    case "lastYear":
+      return {
+        startUtc: Prisma.sql`((${startOfYearLocal} - interval '1 year') AT TIME ZONE ${timezone})`,
+        endUtc: Prisma.sql`(${startOfYearLocal} AT TIME ZONE ${timezone})`,
+        bucket: "day" as const,
+      };
+    default:
+      throw new Error(`Unsupported warehouse window: ${window}`);
+  }
+};
+
 export const getPostgresWindows = (windows?: AnalyticsWindow[]) =>
   windows ? windows.filter((window) => postgresWindows.includes(window)) : postgresWindows;
 
@@ -115,22 +196,32 @@ export const getWarehouseWindows = (windows?: AnalyticsWindow[]) =>
 
 const buildDashboardSummary = (
   row?: SummaryRow | null,
-  prevOrderCount?: number | null
+  prevOrderCount?: number | null,
+  prevPaidRevenue?: string | number | null,
+  avgItemsPerOrder?: number | null,
+  reviewSummary?: ReviewAnalyticsSummary | null
 ): DashboardAnalyticsSummary => {
   const totalOrders = Number(row?.order_count ?? 0);
   const prev = prevOrderCount ?? 0;
   const orderGrowthPct = prev > 0 ? ((totalOrders - prev) / prev) * 100 : null;
+  const paidRevenue = Number(row?.paid_revenue ?? 0);
+  const prevRevenue = Number(prevPaidRevenue ?? 0);
+  const revenueGrowthPct = prevRevenue > 0 ? ((paidRevenue - prevRevenue) / prevRevenue) * 100 : null;
   return {
     totalOrders,
     paidRevenue: row?.paid_revenue ?? "0",
     avgPaidOrderValue: row?.avg_paid_order_value ?? "0",
     orderGrowthPct,
+    revenueGrowthPct,
+    avgItemsPerOrder: avgItemsPerOrder ?? null,
+    reviews: reviewSummary ?? undefined,
   };
 };
 
 const buildDashboardDetail = (
   series: AnalyticsSeriesPoint[],
-  activeTableCount: number | null
+  activeTableCount: number | null,
+  reviewDetail?: ReviewAnalyticsDetail | null
 ): DashboardAnalyticsDetail => ({
   ordersSeries: series,
   revenueSeries: series,
@@ -141,6 +232,7 @@ const buildDashboardDetail = (
       : null,
   topCategories: [],
   topItems: [],
+  reviews: reviewDetail ?? undefined,
 });
 
 const buildOrdersSummary = (
@@ -166,7 +258,9 @@ const buildOrdersSummary = (
 const buildOrdersDetail = (
   statusSeriesRows: StatusSeriesRow[],
   peakHours: PeakHourRow[],
-  paymentMix: PaymentMixRow[]
+  paymentMix: PaymentMixRow[],
+  failedPaymentCount?: number | null,
+  refundedCount?: number | null
 ): OrdersAnalyticsDetail => {
   const statusSeries: Partial<Record<OrderStatus, AnalyticsSeriesPoint[]>> = {};
   statusSeriesRows.forEach((row) => {
@@ -191,9 +285,85 @@ const buildOrdersDetail = (
       orderCount: Number(row.order_count ?? 0),
       paidRevenue: row.paid_revenue ?? "0",
     })),
-    failedPaymentCount: null,
-    refundedCount: null,
+    failedPaymentCount: failedPaymentCount ?? null,
+    refundedCount: refundedCount ?? null,
   };
+};
+
+const buildReviewCounts = () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<
+  1 | 2 | 3 | 4 | 5,
+  number
+>);
+
+const buildReviewSummary = (
+  summary: ReviewSummaryRow | null | undefined,
+  ratingCounts: Record<1 | 2 | 3 | 4 | 5, number>,
+  conversion: ReviewConversionRow | null | undefined
+): ReviewAnalyticsSummary => {
+  const totalReviews = Number(summary?.total_reviews ?? 0);
+  const avgRating = Number(summary?.avg_rating ?? 0);
+  const likesTotal = Number(summary?.likes_total ?? 0);
+  const likesPerReview = totalReviews > 0 ? likesTotal / totalReviews : 0;
+  const reviewCount = Number(conversion?.review_count ?? totalReviews);
+  const completedOrders = Number(conversion?.completed_orders ?? 0);
+  const reviewConversionPct =
+    completedOrders > 0 ? (reviewCount / completedOrders) * 100 : null;
+  return {
+    averageRating: totalReviews > 0 ? Number(avgRating.toFixed(2)) : 0,
+    totalReviews,
+    likesTotal,
+    likesPerReview: Number(likesPerReview.toFixed(2)),
+    reviewConversionPct,
+    ratingCounts,
+  };
+};
+
+const buildReviewDetail = (
+  seriesRows: ReviewSeriesRow[],
+  ratingCounts: Record<1 | 2 | 3 | 4 | 5, number>
+): ReviewAnalyticsDetail => ({
+  series: seriesRows.map((row) => ({
+    bucketStart: row.bucket_start.toISOString(),
+    reviewCount: Number(row.review_count ?? 0),
+    averageRating: Number((row.avg_rating ?? 0).toFixed(2)),
+  })),
+  ratingCounts,
+});
+
+const sanitizeClickhouseValue = (value: string) =>
+  value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+const buildClickhouseIdExclusion = (ids: string[], column: string) => {
+  if (!ids.length) return "";
+  const values = ids.map((id) => `'${sanitizeClickhouseValue(id)}'`).join(",");
+  return `AND ${column} NOT IN (${values})`;
+};
+
+const mergeReviewSeries = (
+  pgSeries: ReviewSeriesPoint[],
+  chSeries: ReviewSeriesPoint[]
+): ReviewSeriesPoint[] => {
+  const map = new Map<string, { count: number; ratingTotal: number }>();
+  const addSeries = (series: ReviewSeriesPoint[]) => {
+    series.forEach((point) => {
+      const existing = map.get(point.bucketStart) ?? { count: 0, ratingTotal: 0 };
+      const nextCount = existing.count + point.reviewCount;
+      const nextRatingTotal =
+        existing.ratingTotal + point.averageRating * point.reviewCount;
+      map.set(point.bucketStart, { count: nextCount, ratingTotal: nextRatingTotal });
+    });
+  };
+  addSeries(pgSeries);
+  addSeries(chSeries);
+
+  return Array.from(map.entries())
+    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+    .map(([bucketStart, value]) => ({
+      bucketStart,
+      reviewCount: value.count,
+      averageRating:
+        value.count > 0 ? Number((value.ratingTotal / value.count).toFixed(2)) : 0,
+    }));
 };
 
 export const fetchPostgresDashboardWindow = async (
@@ -231,16 +401,67 @@ export const fetchPostgresDashboardWindow = async (
       AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
   `);
 
-  const prevRows = await prisma.$queryRaw<Array<{ order_count: number }>>(Prisma.sql`
+  const prevRows = await prisma.$queryRaw<PrevSummaryRow[]>(Prisma.sql`
     WITH bounds AS (
       SELECT ${prevStartUtc} AS start_utc, ${prevEndUtc} AS end_utc
     )
     SELECT
-      COUNT(*) FILTER (WHERE status != 'cancelled')::int AS order_count
+      COUNT(*) FILTER (WHERE status != 'cancelled')::int AS order_count,
+      COALESCE(
+        SUM(total_amount) FILTER (WHERE payment_status = 'paid'),
+        0
+      )::text AS paid_revenue
     FROM orders
     WHERE business_id = ${businessId}
       AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
       AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+  `);
+
+  const itemCountRows = await prisma.$queryRaw<ItemCountRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    )
+    SELECT
+      COALESCE(SUM(order_items.quantity), 0)::int AS item_count,
+      COUNT(DISTINCT orders.id) FILTER (WHERE orders.status != 'cancelled')::int AS order_count
+    FROM orders
+    JOIN order_items
+      ON order_items.order_id = orders.id
+      AND order_items.order_created_at = orders.created_at
+    WHERE orders.business_id = ${businessId}
+      AND (orders.created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (orders.created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+  `);
+
+  const customerShareRows = await prisma.$queryRaw<CustomerShareRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    ),
+    window_customers AS (
+      SELECT DISTINCT customer_user_id
+      FROM orders
+      WHERE business_id = ${businessId}
+        AND customer_user_id IS NOT NULL
+        AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+        AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    ),
+    first_orders AS (
+      SELECT customer_user_id, MIN(created_at AT TIME ZONE 'UTC') AS first_order_at
+      FROM orders
+      WHERE business_id = ${businessId}
+        AND customer_user_id IS NOT NULL
+      GROUP BY customer_user_id
+    )
+    SELECT
+      COUNT(*) FILTER (
+        WHERE first_order_at >= (SELECT start_utc FROM bounds)
+          AND first_order_at < (SELECT end_utc FROM bounds)
+      )::int AS new_customers,
+      COUNT(*) FILTER (
+        WHERE first_order_at < (SELECT start_utc FROM bounds)
+      )::int AS returning_customers
+    FROM first_orders
+    WHERE customer_user_id IN (SELECT customer_user_id FROM window_customers)
   `);
 
   const seriesRows = await prisma.$queryRaw<SeriesRow[]>(Prisma.sql`
@@ -312,14 +533,125 @@ export const fetchPostgresDashboardWindow = async (
     LIMIT 5
   `);
 
+  const reviewSummaryRows = await prisma.$queryRaw<ReviewSummaryRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    ),
+    review_base AS (
+      SELECT id, rating
+      FROM reviews
+      WHERE business_id = ${businessId}
+        AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+        AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    )
+    SELECT
+      (SELECT COUNT(*)::int FROM review_base) AS total_reviews,
+      (SELECT COALESCE(AVG(rating), 0) FROM review_base) AS avg_rating,
+      (
+        SELECT COUNT(*)::int
+        FROM review_likes
+        JOIN review_base ON review_base.id = review_likes.review_id
+      ) AS likes_total
+  `);
+
+  const reviewRatingRows = await prisma.$queryRaw<ReviewRatingCountRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    )
+    SELECT rating::int AS rating, COUNT(*)::int AS count
+    FROM reviews
+    WHERE business_id = ${businessId}
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    GROUP BY rating
+  `);
+
+  const reviewSeriesRows = await prisma.$queryRaw<ReviewSeriesRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    )
+    SELECT
+      (${bucket === "hour"
+        ? Prisma.sql`date_trunc('hour', (created_at AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})`
+        : Prisma.sql`date_trunc('day', (created_at AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})`}
+        AT TIME ZONE ${timezone}) AS bucket_start,
+      COUNT(*)::int AS review_count,
+      COALESCE(AVG(rating), 0) AS avg_rating
+    FROM reviews
+    WHERE business_id = ${businessId}
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    GROUP BY bucket_start
+    ORDER BY bucket_start
+  `);
+
+  const reviewConversionRows = await prisma.$queryRaw<ReviewConversionRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    ),
+    review_count AS (
+      SELECT COUNT(*)::int AS review_count
+      FROM reviews
+      WHERE business_id = ${businessId}
+        AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+        AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    ),
+    completed_orders AS (
+      SELECT COUNT(*)::int AS completed_orders
+      FROM orders
+      WHERE business_id = ${businessId}
+        AND status = 'completed'
+        AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+        AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    )
+    SELECT review_count.review_count, completed_orders.completed_orders
+    FROM review_count, completed_orders
+  `);
+
   const series = toSeries(seriesRows);
   const activeTableCount = await prisma.table.count({
     where: { businessId, isActive: true },
   });
 
-  const summary = buildDashboardSummary(summaryRows[0], prevRows[0]?.order_count ?? 0);
+  const itemCount = itemCountRows[0]?.item_count ?? 0;
+  const itemOrderCount = itemCountRows[0]?.order_count ?? 0;
+  const avgItemsPerOrder =
+    itemOrderCount > 0 ? Number(itemCount) / Number(itemOrderCount) : null;
+
+  const ratingCounts = buildReviewCounts();
+  reviewRatingRows.forEach((row) => {
+    const rating = row.rating as 1 | 2 | 3 | 4 | 5;
+    if (ratingCounts[rating] !== undefined) {
+      ratingCounts[rating] = Number(row.count ?? 0);
+    }
+  });
+  const reviewSummary = buildReviewSummary(
+    reviewSummaryRows[0],
+    ratingCounts,
+    reviewConversionRows[0]
+  );
+
+  const summary = buildDashboardSummary(
+    summaryRows[0],
+    prevRows[0]?.order_count ?? 0,
+    prevRows[0]?.paid_revenue ?? "0",
+    avgItemsPerOrder,
+    reviewSummary
+  );
+  const newCustomers = customerShareRows[0]?.new_customers ?? 0;
+  const returningCustomers = customerShareRows[0]?.returning_customers ?? 0;
+  const totalCustomers = newCustomers + returningCustomers;
+  const repeatRatePct = totalCustomers > 0 ? (returningCustomers / totalCustomers) * 100 : null;
+  const reviewDetail = buildReviewDetail(reviewSeriesRows, ratingCounts);
   const detail = {
-    ...buildDashboardDetail(series, activeTableCount),
+    ...buildDashboardDetail(series, activeTableCount, reviewDetail),
+    newVsReturning: totalCustomers
+      ? {
+          newCustomers,
+          returningCustomers,
+          repeatRatePct,
+        }
+      : null,
     topCategories: topCategoryRows.map((row) => ({
       categoryId: row.category_id,
       name: row.name,
@@ -409,6 +741,8 @@ export const fetchWarehouseDashboardWindow = async (
   const { start, end } = buildClickhouseBounds(window);
   const { start: prevStart, end: prevEnd } = buildClickhousePrevBounds(window);
   const database = getClickhouseDatabase();
+  const { startUtc: pgStartUtc, endUtc: pgEndUtc, bucket: pgBucket } =
+    buildWarehousePostgresBounds(window, timezone);
 
   const summaryQuery = `
     WITH
@@ -454,7 +788,11 @@ export const fetchWarehouseDashboardWindow = async (
       ${prevStart} AS start_local,
       ${prevEnd} AS end_local
     SELECT
-      countIf(event_type = 'order_created') AS order_count
+      countIf(event_type = 'order_created') AS order_count,
+      sumIf(
+        toFloat64OrZero(JSONExtractString(payload, 'order', 'totalAmount')),
+        event_type = 'order_payment_updated' AND JSONExtractString(payload, 'order', 'paymentStatus') = 'paid'
+      ) AS paid_revenue
     FROM ${database}.order_events
     WHERE business_id = '${businessId}'
       AND toTimeZone(event_created_at, tz) >= start_local
@@ -466,7 +804,10 @@ export const fetchWarehouseDashboardWindow = async (
     user: queryUser,
     password: queryPassword,
   });
-  const prevCountRow = (prevCountResponse.data?.[0] ?? {}) as { order_count?: number };
+  const prevCountRow = (prevCountResponse.data?.[0] ?? {}) as {
+    order_count?: number;
+    paid_revenue?: number;
+  };
 
   const seriesQuery = `
     WITH
@@ -513,6 +854,267 @@ export const fetchWarehouseDashboardWindow = async (
     where: { businessId, isActive: true },
   });
 
+  const pgReviewIdRows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
+    )
+    SELECT id::text AS id
+    FROM reviews
+    WHERE business_id = ${businessId}
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+  `);
+  const pgReviewIds = pgReviewIdRows.map((row) => row.id);
+  const reviewIdExclusion = buildClickhouseIdExclusion(pgReviewIds, "review_id");
+
+  const pgReviewSummaryRows = await prisma.$queryRaw<ReviewSummaryRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
+    ),
+    review_base AS (
+      SELECT id, rating
+      FROM reviews
+      WHERE business_id = ${businessId}
+        AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+        AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    )
+    SELECT
+      (SELECT COUNT(*)::int FROM review_base) AS total_reviews,
+      (SELECT COALESCE(AVG(rating), 0) FROM review_base) AS avg_rating,
+      (
+        SELECT COUNT(*)::int
+        FROM review_likes
+        JOIN review_base ON review_base.id = review_likes.review_id
+      ) AS likes_total
+  `);
+
+  const pgReviewRatingRows = await prisma.$queryRaw<ReviewRatingCountRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
+    )
+    SELECT rating::int AS rating, COUNT(*)::int AS count
+    FROM reviews
+    WHERE business_id = ${businessId}
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    GROUP BY rating
+  `);
+
+  const pgReviewSeriesRows = await prisma.$queryRaw<ReviewSeriesRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
+    )
+    SELECT
+      (${pgBucket === "hour"
+        ? Prisma.sql`date_trunc('hour', (created_at AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})`
+        : Prisma.sql`date_trunc('day', (created_at AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})`}
+        AT TIME ZONE ${timezone}) AS bucket_start,
+      COUNT(*)::int AS review_count,
+      COALESCE(AVG(rating), 0) AS avg_rating
+    FROM reviews
+    WHERE business_id = ${businessId}
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    GROUP BY bucket_start
+    ORDER BY bucket_start
+  `);
+
+  const pgCompletedOrderRows = await prisma.$queryRaw<Array<{ completed_orders: number }>>(
+    Prisma.sql`
+      WITH bounds AS (
+        SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
+      )
+      SELECT COUNT(*)::int AS completed_orders
+      FROM orders
+      WHERE business_id = ${businessId}
+        AND status = 'completed'
+        AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+        AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+    `
+  );
+
+  const pgCompletedOrderIdRows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
+    )
+    SELECT id::text AS id
+    FROM orders
+    WHERE business_id = ${businessId}
+      AND status = 'completed'
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+  `);
+  const pgCompletedOrderIds = pgCompletedOrderIdRows.map((row) => row.id);
+  const orderIdExclusion = buildClickhouseIdExclusion(pgCompletedOrderIds, "order_id");
+
+  const reviewSummaryQuery = `
+    WITH
+      '${timezone}' AS tz,
+      toTimeZone(now(), tz) AS now_local,
+      ${start} AS start_local,
+      ${end} AS end_local
+    SELECT
+      count() AS total_reviews,
+      avg(rating) AS avg_rating,
+      sum(likes_count) AS likes_total
+    FROM ${database}.reviews
+    WHERE business_id = '${businessId}'
+      AND toTimeZone(created_at, tz) >= start_local
+      AND toTimeZone(created_at, tz) < end_local
+      ${reviewIdExclusion}
+    FORMAT JSON
+  `;
+
+  const reviewSummaryResponse = await queryClickhouse(reviewSummaryQuery, {
+    user: queryUser,
+    password: queryPassword,
+  });
+  const reviewSummaryRow = (reviewSummaryResponse.data?.[0] ?? {}) as ReviewSummaryRow;
+
+  const reviewRatingQuery = `
+    WITH
+      '${timezone}' AS tz,
+      toTimeZone(now(), tz) AS now_local,
+      ${start} AS start_local,
+      ${end} AS end_local
+    SELECT
+      rating AS rating,
+      count() AS count
+    FROM ${database}.reviews
+    WHERE business_id = '${businessId}'
+      AND toTimeZone(created_at, tz) >= start_local
+      AND toTimeZone(created_at, tz) < end_local
+      ${reviewIdExclusion}
+    GROUP BY rating
+    FORMAT JSON
+  `;
+
+  const reviewRatingResponse = await queryClickhouse(reviewRatingQuery, {
+    user: queryUser,
+    password: queryPassword,
+  });
+  const reviewRatingRows = (reviewRatingResponse.data ?? []) as ReviewRatingCountRow[];
+
+  const reviewSeriesQuery = `
+    WITH
+      '${timezone}' AS tz,
+      toTimeZone(now(), tz) AS now_local,
+      ${start} AS start_local,
+      ${end} AS end_local
+    SELECT
+      formatDateTime(
+        toTimeZone(toStartOfDay(toTimeZone(created_at, tz)), 'UTC'),
+        '%FT%TZ'
+      ) AS bucket_start,
+      count() AS review_count,
+      avg(rating) AS avg_rating
+    FROM ${database}.reviews
+    WHERE business_id = '${businessId}'
+      AND toTimeZone(created_at, tz) >= start_local
+      AND toTimeZone(created_at, tz) < end_local
+      ${reviewIdExclusion}
+    GROUP BY bucket_start
+    ORDER BY bucket_start
+    FORMAT JSON
+  `;
+
+  const reviewSeriesResponse = await queryClickhouse(reviewSeriesQuery, {
+    user: queryUser,
+    password: queryPassword,
+  });
+  const reviewSeriesRows = (reviewSeriesResponse.data ?? []) as Array<{
+    bucket_start: string;
+    review_count: number;
+    avg_rating: number;
+  }>;
+
+  const reviewConversionQuery = `
+    WITH
+      '${timezone}' AS tz,
+      toTimeZone(now(), tz) AS now_local,
+      ${start} AS start_local,
+      ${end} AS end_local
+    SELECT
+      countIf(event_type = 'order_status_updated' AND JSONExtractString(payload, 'order', 'status') = 'completed') AS completed_orders
+    FROM ${database}.order_events
+    WHERE business_id = '${businessId}'
+      AND toTimeZone(event_created_at, tz) >= start_local
+      AND toTimeZone(event_created_at, tz) < end_local
+      ${orderIdExclusion}
+    FORMAT JSON
+  `;
+
+  const reviewConversionResponse = await queryClickhouse(reviewConversionQuery, {
+    user: queryUser,
+    password: queryPassword,
+  });
+  const reviewConversionRow = (reviewConversionResponse.data?.[0] ?? {}) as {
+    completed_orders?: number;
+  };
+
+  const ratingCounts = buildReviewCounts();
+  reviewRatingRows.forEach((row) => {
+    const rating = row.rating as 1 | 2 | 3 | 4 | 5;
+    if (ratingCounts[rating] !== undefined) {
+      ratingCounts[rating] = Number(row.count ?? 0);
+    }
+  });
+  pgReviewRatingRows.forEach((row) => {
+    const rating = row.rating as 1 | 2 | 3 | 4 | 5;
+    if (ratingCounts[rating] !== undefined) {
+      ratingCounts[rating] += Number(row.count ?? 0);
+    }
+  });
+
+  const pgSummary = pgReviewSummaryRows[0] ?? {
+    total_reviews: 0,
+    avg_rating: 0,
+    likes_total: 0,
+  };
+  const chSummary = {
+    total_reviews: Number(reviewSummaryRow.total_reviews ?? 0),
+    avg_rating: Number(reviewSummaryRow.avg_rating ?? 0),
+    likes_total: Number(reviewSummaryRow.likes_total ?? 0),
+  };
+  const combinedTotal = Number(pgSummary.total_reviews ?? 0) + chSummary.total_reviews;
+  const combinedAvg =
+    combinedTotal > 0
+      ? ((Number(pgSummary.avg_rating ?? 0) * Number(pgSummary.total_reviews ?? 0) +
+          chSummary.avg_rating * chSummary.total_reviews) /
+          combinedTotal)
+      : 0;
+  const combinedLikes = Number(pgSummary.likes_total ?? 0) + chSummary.likes_total;
+  const completedOrders =
+    Number(pgCompletedOrderRows[0]?.completed_orders ?? 0) +
+    Number(reviewConversionRow.completed_orders ?? 0);
+
+  const reviewSummary = buildReviewSummary(
+    {
+      total_reviews: combinedTotal,
+      avg_rating: combinedAvg,
+      likes_total: combinedLikes,
+    },
+    ratingCounts,
+    {
+      review_count: combinedTotal,
+      completed_orders: completedOrders,
+    }
+  );
+
+  const pgSeries = buildReviewDetail(pgReviewSeriesRows, ratingCounts).series;
+  const chSeries = buildReviewDetail(
+    reviewSeriesRows.map((row) => ({
+      bucket_start: new Date(row.bucket_start),
+      review_count: Number(row.review_count ?? 0),
+      avg_rating: Number(row.avg_rating ?? 0),
+    })),
+    ratingCounts
+  ).series;
+  const reviewDetail: ReviewAnalyticsDetail = {
+    series: mergeReviewSeries(pgSeries, chSeries),
+    ratingCounts,
+  };
+
   const summary = buildDashboardSummary(
     {
       order_count: Number(summaryRow.order_count ?? 0),
@@ -522,10 +1124,13 @@ export const fetchWarehouseDashboardWindow = async (
       paid_revenue: String(summaryRow.paid_revenue ?? 0),
       avg_paid_order_value: String(summaryRow.avg_paid_order_value ?? 0),
     },
-    Number(prevCountRow.order_count ?? 0)
+    Number(prevCountRow.order_count ?? 0),
+    String(prevCountRow.paid_revenue ?? 0),
+    null,
+    reviewSummary
   );
 
-  const detail = buildDashboardDetail(series, activeTableCount);
+  const detail = buildDashboardDetail(series, activeTableCount, reviewDetail);
 
   return {
     window,
@@ -637,8 +1242,27 @@ export const fetchPostgresOrdersWindow = async (
     GROUP BY payment_method
   `);
 
+  const paymentFailureRows = await prisma.$queryRaw<PaymentFailureRow[]>(Prisma.sql`
+    WITH bounds AS (
+      SELECT ${startUtc} AS start_utc, ${endUtc} AS end_utc
+    )
+    SELECT
+      COUNT(*) FILTER (WHERE payment_status = 'failed')::int AS failed_count,
+      COUNT(*) FILTER (WHERE payment_status = 'refunded')::int AS refunded_count
+    FROM orders
+    WHERE business_id = ${businessId}
+      AND (created_at AT TIME ZONE 'UTC') >= (SELECT start_utc FROM bounds)
+      AND (created_at AT TIME ZONE 'UTC') < (SELECT end_utc FROM bounds)
+  `);
+
   const summary = buildOrdersSummary(summaryRows[0], statusRows);
-  const detail = buildOrdersDetail(statusSeriesRows, peakHourRows, paymentMixRows);
+  const detail = buildOrdersDetail(
+    statusSeriesRows,
+    peakHourRows,
+    paymentMixRows,
+    paymentFailureRows[0]?.failed_count ?? 0,
+    paymentFailureRows[0]?.refunded_count ?? 0
+  );
 
   return {
     window,
@@ -829,6 +1453,28 @@ export const fetchWarehouseOrdersWindow = async (
       paid_revenue: number;
     }>;
 
+    const paymentFailureQuery = `
+      WITH
+        '${timezone}' AS tz,
+        toTimeZone(now(), tz) AS now_local,
+        ${start} AS start_local,
+        ${end} AS end_local
+      SELECT
+        countIf(event_type = 'order_payment_updated' AND JSONExtractString(payload, 'order', 'paymentStatus') = 'failed') AS failed_count,
+        countIf(event_type = 'order_payment_updated' AND JSONExtractString(payload, 'order', 'paymentStatus') = 'refunded') AS refunded_count
+      FROM ${database}.order_events
+      WHERE business_id = '${businessId}'
+        AND toTimeZone(event_created_at, tz) >= start_local
+        AND toTimeZone(event_created_at, tz) < end_local
+      FORMAT JSON
+    `;
+
+    const paymentFailureResponse = await queryClickhouse(paymentFailureQuery, {
+      user: queryUser,
+      password: queryPassword,
+    });
+    const paymentFailureRow = (paymentFailureResponse.data?.[0] ?? {}) as PaymentFailureRow;
+
     detail = buildOrdersDetail(
       statusSeriesRows.map((row) => ({
         bucket_start: new Date(row.bucket_start),
@@ -844,7 +1490,9 @@ export const fetchWarehouseOrdersWindow = async (
         payment_method: row.payment_method,
         order_count: Number(row.order_count ?? 0),
         paid_revenue: String(row.paid_revenue ?? 0),
-      }))
+      })),
+      paymentFailureRow.failed_count ?? 0,
+      paymentFailureRow.refunded_count ?? 0
     );
   }
 
@@ -853,6 +1501,9 @@ export const fetchWarehouseOrdersWindow = async (
     source: "warehouse",
     status: "ok",
     summary: granularity === "summary" ? summary : undefined,
-    detail: granularity === "detail" ? detail ?? buildOrdersDetail([], [], []) : undefined,
+    detail:
+      granularity === "detail"
+        ? detail ?? buildOrdersDetail([], [], [], 0, 0)
+        : undefined,
   };
 };

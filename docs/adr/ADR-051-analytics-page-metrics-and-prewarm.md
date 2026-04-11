@@ -1,7 +1,7 @@
 # ADR-051: Analytics Page Metrics Expansion + Interval Prewarm
 
 **Date:** 2026-04-10  
-**Status:** Proposed
+**Status:** Accepted
 
 ## Context
 The analytics page currently repeats summary metrics and feels thin on business-oriented insights. The user wants richer, more meaningful analytics on the dashboard analytics page. Additionally, interval switching currently triggers per-interval fetches; the user asked to prewarm intervals on initial load and rely on cache for subsequent switches.

@@ -113,11 +113,34 @@ export type AnalyticsSeriesPoint = {
   paidRevenue: string;
 };
 
+export type ReviewSeriesPoint = {
+  bucketStart: string;
+  reviewCount: number;
+  averageRating: number;
+};
+
+export type ReviewAnalyticsSummary = {
+  averageRating: number;
+  totalReviews: number;
+  likesTotal: number;
+  likesPerReview: number;
+  reviewConversionPct: number | null;
+  ratingCounts: Record<1 | 2 | 3 | 4 | 5, number>;
+};
+
+export type ReviewAnalyticsDetail = {
+  series: ReviewSeriesPoint[];
+  ratingCounts: Record<1 | 2 | 3 | 4 | 5, number>;
+};
+
 export type DashboardAnalyticsSummary = {
   totalOrders: number;
   paidRevenue: string;
   avgPaidOrderValue: string;
   orderGrowthPct?: number | null;
+  revenueGrowthPct?: number | null;
+  avgItemsPerOrder?: number | null;
+  reviews?: ReviewAnalyticsSummary;
 };
 
 export type DashboardAnalyticsDetail = {
@@ -141,6 +164,7 @@ export type DashboardAnalyticsDetail = {
     paidRevenue: string;
     orderCount: number;
   }>;
+  reviews?: ReviewAnalyticsDetail;
 };
 
 export type OrdersAnalyticsSummary = {
@@ -351,6 +375,11 @@ export type StatusActorInfo = {
 
 export type StatusActors = Record<string, StatusActorInfo>;
 
+export type PaymentActors = {
+  paidBy?: StatusActorInfo | null;
+  paidAt?: string | null;
+};
+
 export interface Order {
   id: string;
   businessId: string;
@@ -364,6 +393,7 @@ export interface Order {
   customerName: string;
   customerPhone: string | null;
   statusActors?: StatusActors | null;
+  paymentActors?: PaymentActors | null;
   createdAt: string;
 }
 

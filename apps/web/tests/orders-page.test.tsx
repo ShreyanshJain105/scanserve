@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({
     push: pushMock,
   }),
   usePathname: () => "/dashboard/orders",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const apiFetchMock = vi.fn();
@@ -76,6 +77,8 @@ describe("OrdersPage", () => {
               razorpayPaymentId: null,
               customerName: "Asha",
               customerPhone: null,
+              paymentActors: null,
+              isPinned: false,
               createdAt: "",
               updatedAt: "",
               table: { id: "t1", tableNumber: 1, label: null },
@@ -84,6 +87,7 @@ describe("OrdersPage", () => {
           nextCursor: null,
           hasMore: false,
           businessId: "b1",
+          pinnedOrderIds: [],
         });
       }
       if (url === "/api/business/orders/order_1") {
@@ -100,6 +104,8 @@ describe("OrdersPage", () => {
             razorpayPaymentId: null,
             customerName: "Asha",
             customerPhone: null,
+            paymentActors: null,
+            isPinned: false,
             createdAt: "",
             updatedAt: "",
             table: { id: "t1", tableNumber: 1, label: null },
@@ -130,11 +136,16 @@ describe("OrdersPage", () => {
             razorpayPaymentId: null,
             customerName: "Asha",
             customerPhone: null,
+            paymentActors: null,
+            isPinned: false,
             createdAt: "",
             updatedAt: "",
             table: { id: "t1", tableNumber: 1, label: null },
           },
         });
+      }
+      if (url === "/api/business/orders/order_1/pin") {
+        return Promise.resolve({ pinned: true });
       }
       return Promise.resolve({});
     });
@@ -156,6 +167,14 @@ describe("OrdersPage", () => {
     await waitFor(() => {
       expect(apiFetchMock).toHaveBeenCalledWith(
         "/api/business/orders/order_1/status",
+        expect.objectContaining({ method: "PATCH" })
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Pin order" }));
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        "/api/business/orders/order_1/pin",
         expect.objectContaining({ method: "PATCH" })
       );
     });

@@ -165,6 +165,8 @@ const prismaMock = vi.hoisted(() => ({
         if (select.id) selected.id = order.id;
         if (select.updatedAt) selected.updatedAt = order.updatedAt;
         if (select.createdAt) selected.createdAt = order.createdAt;
+        if (select.businessId) selected.businessId = order.businessId;
+        if (select.status) selected.status = order.status;
         if (select.paymentStatus) selected.paymentStatus = order.paymentStatus;
         if (select.razorpayOrderId) selected.razorpayOrderId = order.razorpayOrderId;
         if (select.paymentMethod) selected.paymentMethod = order.paymentMethod;
@@ -253,7 +255,17 @@ const prismaMock = vi.hoisted(() => ({
       if (where?.orderId?.in) {
         results = results.filter((review) => where.orderId.in.includes(review.orderId));
       }
-      if (where?.businessId) {
+      if (where?.OR?.length) {
+        results = results.filter((review) =>
+          where.OR.some((condition: any) => {
+            if (condition.businessId) return review.businessId === condition.businessId;
+            if (condition.order?.businessId) {
+              return review.businessId === condition.order.businessId;
+            }
+            return false;
+          })
+        );
+      } else if (where?.businessId) {
         results = results.filter((review) => review.businessId === where.businessId);
       }
       if (where?.rating) {
@@ -314,7 +326,20 @@ const prismaMock = vi.hoisted(() => ({
       return match;
     }),
     aggregate: vi.fn(async ({ where }) => {
-      let results = store.reviews.filter((review) => review.businessId === where.businessId);
+      let results = [...store.reviews];
+      if (where?.OR?.length) {
+        results = results.filter((review) =>
+          where.OR.some((condition: any) => {
+            if (condition.businessId) return review.businessId === condition.businessId;
+            if (condition.order?.businessId) {
+              return review.businessId === condition.order.businessId;
+            }
+            return false;
+          })
+        );
+      } else if (where?.businessId) {
+        results = results.filter((review) => review.businessId === where.businessId);
+      }
       if (where?.rating) {
         results = results.filter((review) => review.rating === where.rating);
       }
@@ -329,7 +354,20 @@ const prismaMock = vi.hoisted(() => ({
       return { _count: { _all: total }, _avg: { rating: avg } };
     }),
     groupBy: vi.fn(async ({ where }) => {
-      let results = store.reviews.filter((review) => review.businessId === where.businessId);
+      let results = [...store.reviews];
+      if (where?.OR?.length) {
+        results = results.filter((review) =>
+          where.OR.some((condition: any) => {
+            if (condition.businessId) return review.businessId === condition.businessId;
+            if (condition.order?.businessId) {
+              return review.businessId === condition.order.businessId;
+            }
+            return false;
+          })
+        );
+      } else if (where?.businessId) {
+        results = results.filter((review) => review.businessId === where.businessId);
+      }
       if (where?.rating) {
         results = results.filter((review) => review.rating === where.rating);
       }

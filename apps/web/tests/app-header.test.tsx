@@ -6,6 +6,7 @@ import { AppHeader } from "../src/components/layout/app-header";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const useAuthMock = vi.fn();

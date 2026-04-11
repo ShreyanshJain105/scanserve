@@ -10,7 +10,7 @@ import type {
   OrdersAnalyticsDetail,
   OrdersAnalyticsSummary,
 } from "@scan2serve/shared";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "../../../components/layout/app-header";
 import { BodyBackButton } from "../../../components/layout/body-back-button";
 import { useAuth } from "../../../lib/auth-context";
@@ -59,6 +59,11 @@ const formatMoney = (currencyCode: string, value: string) => {
 const formatPercent = (value?: number | null) => {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   return `${value.toFixed(1)}%`;
+};
+
+const formatDecimal = (value?: number | null, digits = 1) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  return value.toFixed(digits);
 };
 
 const formatCompactMoney = (currencyCode: string, value: number) => {
@@ -258,10 +263,19 @@ const SkeletonBlock = ({ className }: { className?: string }) => (
   />
 );
 
+const emptyReviewCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<
+  1 | 2 | 3 | 4 | 5,
+  number
+>;
+
 export default function DashboardAnalyticsPage() {
   const { user, loading, businesses, selectedBusiness } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [interval, setInterval] = useState<AnalyticsWindow>(() => {
+    if (typeof window === "undefined") return "today";
+    const params = new URLSearchParams(window.location.search);
+    return normalizeWindow(params.get("interval")) ?? "today";
+  });
   const [ordersBusinessId, setOrdersBusinessId] = useState<string | null>(null);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardAnalyticsSummary | null>(null);
   const [dashboardDetail, setDashboardDetail] = useState<DashboardAnalyticsDetail | null>(null);
@@ -296,8 +310,6 @@ export default function DashboardAnalyticsPage() {
   }, [ordersBusinessId, selectedBusiness?.id]);
 
   const sortedBusinesses = useMemo(() => sortBusinesses(businesses), [businesses]);
-  const interval = normalizeWindow(searchParams.get("interval")) ?? "today";
-
   useEffect(() => {
     if (!selectedBusiness?.id) return;
     let cancelled = false;
@@ -542,9 +554,14 @@ export default function DashboardAnalyticsPage() {
   ]);
 
   const onIntervalChange = (value: AnalyticsWindow) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("interval", value);
-    router.replace(`?${params.toString()}`);
+    setInterval(value);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("interval", value);
+      const nextQuery = params.toString();
+      const nextUrl = nextQuery ? `?${nextQuery}` : window.location.pathname;
+      window.history.replaceState(null, "", nextUrl);
+    }
   };
 
   const revenueValues =
@@ -560,11 +577,28 @@ export default function DashboardAnalyticsPage() {
   const statusCounts = ordersSummary?.statusCounts ?? {};
   const statusEntries = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
   const paymentMix = ordersDetail?.paymentMethodMix ?? [];
-  const topItems = dashboardDetail?.topItems ?? [];
+  const topCategories = dashboardDetail?.topCategories ?? [];
+  const reviewSummary = dashboardSummary?.reviews ?? null;
+  const reviewDetail = dashboardDetail?.reviews ?? null;
+  const reviewRatingCounts = reviewDetail?.ratingCounts ?? reviewSummary?.ratingCounts ?? emptyReviewCounts;
+  const reviewTotal =
+    reviewSummary?.totalReviews ??
+    Object.values(reviewRatingCounts).reduce((sum, value) => sum + value, 0);
+  const reviewSeries = reviewDetail?.series ?? [];
+  const reviewSeriesSample = reviewSeries.slice(-6);
 
   const totalStatusCount = statusEntries.reduce((sum, [, count]) => sum + count, 0) || 1;
   const paymentTotal = paymentMix.reduce((sum, item) => sum + item.orderCount, 0) || 1;
-  const topItemMax = Math.max(...topItems.map((item) => item.orderCount), 1);
+  const totalRevenue = Number(dashboardSummary?.paidRevenue ?? 0) || 0;
+  const topCategoryMax = Math.max(
+    ...topCategories.map((item) => Number(item.paidRevenue ?? 0)),
+    1
+  );
+  const peakHours = [...(ordersDetail?.peakHours ?? [])]
+    .sort((a, b) => b.orderCount - a.orderCount)
+    .slice(0, 3);
+  const failedPayments = ordersDetail?.failedPaymentCount ?? null;
+  const refundedPayments = ordersDetail?.refundedCount ?? null;
   const isPageLoading = loadingCharts || dashboardDetailLoading || ordersDetailLoading;
 
   return (
@@ -621,7 +655,7 @@ export default function DashboardAnalyticsPage() {
                     {formatMoney(selectedBusiness?.currencyCode ?? "USD", dashboardSummary?.paidRevenue ?? "0")}
                   </p>
                   <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700">
-                    {formatPercent(dashboardSummary?.orderGrowthPct)} growth
+                    {formatPercent(dashboardSummary?.revenueGrowthPct)} vs prior
                   </span>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
@@ -629,21 +663,29 @@ export default function DashboardAnalyticsPage() {
                   <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
                     {dashboardSummary?.totalOrders ?? 0}
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{WINDOW_LABELS[interval]}</p>
+                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                    {formatPercent(dashboardSummary?.orderGrowthPct)} vs prior
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Avg paid order</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Avg items / order</p>
                   <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
-                    {formatMoney(selectedBusiness?.currencyCode ?? "USD", dashboardSummary?.avgPaidOrderValue ?? "0")}
+                    {formatDecimal(dashboardSummary?.avgItemsPerOrder ?? null, 1)}
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Across paid orders</p>
+                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                    Item density per ticket
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-900 p-3 text-white dark:border-slate-800 dark:bg-slate-950">
-                  <p className="text-xs text-slate-300">Cancellation rate</p>
+                  <p className="text-xs text-slate-300">Returning customers</p>
                   <p className="mt-2 text-xl font-semibold text-white">
-                    {formatPercent(ordersSummary?.cancellationRatePct ?? null)}
+                    {formatPercent(dashboardDetail?.newVsReturning?.repeatRatePct ?? null)}
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-300">Orders analytics</p>
+                  <p className="mt-1 text-[11px] text-slate-300">
+                    {dashboardDetail?.newVsReturning
+                      ? `${dashboardDetail.newVsReturning.returningCustomers} returning · ${dashboardDetail.newVsReturning.newCustomers} new`
+                      : "No customer history yet"}
+                  </p>
                 </div>
               </div>
             </aside>
@@ -702,7 +744,7 @@ export default function DashboardAnalyticsPage() {
                   <StatCard
                     title="Total Orders"
                     value={`${dashboardSummary?.totalOrders ?? 0}`}
-                    badge={`${formatPercent(dashboardSummary?.orderGrowthPct)} growth`}
+                    badge={`${formatPercent(dashboardSummary?.orderGrowthPct)} vs prior`}
                     badgeTone="emerald"
                     icon={
                       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -713,7 +755,7 @@ export default function DashboardAnalyticsPage() {
                   <StatCard
                     title="Paid Revenue"
                     value={formatMoney(selectedBusiness?.currencyCode ?? "USD", dashboardSummary?.paidRevenue ?? "0")}
-                    badge={WINDOW_LABELS[interval]}
+                    badge={`${formatPercent(dashboardSummary?.revenueGrowthPct)} vs prior`}
                     badgeTone="indigo"
                     icon={
                       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -733,13 +775,13 @@ export default function DashboardAnalyticsPage() {
                     }
                   />
                   <StatCard
-                    title="Cancellation Rate"
-                    value={formatPercent(ordersSummary?.cancellationRatePct ?? null)}
-                    badge="Orders analytics"
-                    badgeTone="rose"
+                    title="Orders / Active Table"
+                    value={formatDecimal(dashboardDetail?.ordersPerActiveTable ?? null, 1)}
+                    badge={WINDOW_LABELS[interval]}
+                    badgeTone="emerald"
                     icon={
                       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="M4 7h16M7 12h10M9 17h6" stroke="currentColor" strokeWidth="1.6" />
                       </svg>
                     }
                   />
@@ -765,6 +807,17 @@ export default function DashboardAnalyticsPage() {
                       ))}
                     </select>
                   </div>
+                  <div className="mt-3 grid gap-2 text-[11px] text-slate-500 dark:text-slate-400 sm:grid-cols-3">
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-center dark:bg-slate-800">
+                      Failed: {failedPayments ?? 0}
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-center dark:bg-slate-800">
+                      Refunded: {refundedPayments ?? 0}
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-center dark:bg-slate-800">
+                      Avg prep: {formatDecimal(ordersSummary?.avgPrepMinutes ?? null, 0)} min
+                    </div>
+                  </div>
                   <div className="mt-4 space-y-3">
                     {statusEntries.length ? (
                       statusEntries.map(([status, count]) => (
@@ -788,26 +841,36 @@ export default function DashboardAnalyticsPage() {
                 </div>
 
                 <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_30px_70px_-55px_rgba(15,23,42,0.6)] dark:border-slate-800 dark:bg-slate-900">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top products</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Best sellers this period.</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top categories</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Share of paid revenue.</p>
                   <div className="mt-4 space-y-3">
-                    {topItems.length ? (
-                      topItems.map((item) => (
-                        <div key={item.itemId} className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
-                          <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-                            <span>{item.name}</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">{item.orderCount} sold</span>
+                    {topCategories.length ? (
+                      topCategories.map((item) => {
+                        const revenue = Number(item.paidRevenue ?? 0);
+                        const share = totalRevenue > 0 ? (revenue / totalRevenue) * 100 : 0;
+                        return (
+                          <div key={item.categoryId} className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                            <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
+                              <span>{item.name}</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {formatPercent(share)}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+                              <span>{item.orderCount} orders</span>
+                              <span>{formatMoney(selectedBusiness?.currencyCode ?? "USD", item.paidRevenue ?? "0")}</span>
+                            </div>
+                            <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-800">
+                              <div
+                                className="h-1.5 rounded-full bg-emerald-500"
+                                style={{ width: `${Math.max(12, (revenue / topCategoryMax) * 100)}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-800">
-                            <div
-                              className="h-1.5 rounded-full bg-emerald-500"
-                              style={{ width: `${Math.max(12, (item.orderCount / topItemMax) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
-                      <span className="text-xs text-slate-400">No item data yet.</span>
+                      <span className="text-xs text-slate-400">No category data yet.</span>
                     )}
                   </div>
                 </div>
@@ -822,6 +885,22 @@ export default function DashboardAnalyticsPage() {
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                     {WINDOW_LABELS[interval]}
                   </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  {peakHours.length ? (
+                    peakHours.map((hour) => (
+                      <span
+                        key={`peak-${hour.hour}`}
+                        className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800"
+                      >
+                        Peak {hour.hour}:00 · {hour.orderCount} orders
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800">
+                      No peak hour data yet
+                    </span>
+                  )}
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {paymentMix.length ? (
@@ -850,6 +929,83 @@ export default function DashboardAnalyticsPage() {
                   ) : (
                     <span className="text-xs text-slate-400">No payment data yet.</span>
                   )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_30px_70px_-55px_rgba(15,23,42,0.6)] dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Reviews pulse</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Guest sentiment this window.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                    {WINDOW_LABELS[interval]}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Average rating</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                        {formatDecimal(reviewSummary?.averageRating ?? null, 2)}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                        {reviewTotal} reviews
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Review conversion</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                        {formatPercent(reviewSummary?.reviewConversionPct ?? null)}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Completed orders → reviews</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Likes per review</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                        {formatDecimal(reviewSummary?.likesPerReview ?? null, 2)}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                        {reviewSummary?.likesTotal ?? 0} total likes
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Recent trend</p>
+                      <div className="mt-2 flex items-end gap-1">
+                        {reviewSeriesSample.length ? (
+                          reviewSeriesSample.map((point) => {
+                            const height = Math.max(6, Math.round((point.reviewCount / Math.max(reviewTotal, 1)) * 40));
+                            return (
+                              <div
+                                key={point.bucketStart}
+                                className="flex w-3 flex-col items-center justify-end"
+                                title={`${point.reviewCount} reviews · ${formatDecimal(point.averageRating, 2)} avg`}
+                              >
+                                <span className="block w-full rounded-full bg-indigo-400/80" style={{ height }} />
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <span className="text-xs text-slate-400">No trend data yet.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {[5, 4, 3, 2, 1].map((rating) => {
+                      const count = reviewRatingCounts[rating as 1 | 2 | 3 | 4 | 5] ?? 0;
+                      const pct = reviewTotal > 0 ? (count / reviewTotal) * 100 : 0;
+                      return (
+                        <div key={`rating-${rating}`} className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="w-6 font-medium text-slate-700 dark:text-slate-200">{rating}★</span>
+                          <div className="h-2 flex-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div className="h-2 rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="w-10 text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

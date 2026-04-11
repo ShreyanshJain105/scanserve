@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { logger } from "../utils/logger";
 import { normalizeStatusActors, type StatusActorInfo } from "../utils/statusActors";
+import { normalizePaymentActors, type PaymentActors } from "../utils/paymentActors";
 import { enqueueOrderEventOutbox } from "./orderEventOutbox";
 
 export type OrderEventType = "order_created" | "order_status_updated" | "order_payment_updated";
@@ -16,6 +17,7 @@ export type OrderSnapshot = {
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
   paymentStatus: string;
+  paymentActors: PaymentActors | null;
   customerName: string;
   customerPhone: string | null;
   statusActors: Record<string, StatusActorInfo> | null;
@@ -43,6 +45,7 @@ export const buildOrderSnapshot = (order: {
   customerName: string;
   customerPhone: string | null;
   statusActors?: Prisma.JsonValue | null;
+  paymentActors?: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
 }): OrderSnapshot => ({
@@ -54,6 +57,7 @@ export const buildOrderSnapshot = (order: {
   razorpayOrderId: order.razorpayOrderId,
   razorpayPaymentId: order.razorpayPaymentId,
   paymentStatus: order.paymentStatus,
+  paymentActors: normalizePaymentActors(order.paymentActors),
   customerName: order.customerName,
   customerPhone: order.customerPhone,
   statusActors: normalizeStatusActors(order.statusActors),

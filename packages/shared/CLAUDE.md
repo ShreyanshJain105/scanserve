@@ -60,3 +60,12 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 ## Updates 2026-04-10
 - Redesigned shared analytics types for ADR-050: dashboard vs orders sections, summary/detail granularity, and expanded analytics detail structures (`packages/shared/src/types.ts`).
 - Added shared review types for ADR-052 (review list items, summary, scope, and customer order review id) (`packages/shared/src/types.ts`).
+
+## Updates 2026-04-10
+- Added dashboard analytics summary fields for revenue growth and avg items per order (`packages/shared/src/types.ts`).
+
+## Updates 2026-04-10
+- Added shared review analytics summary/detail types for dashboard analytics (`packages/shared/src/types.ts`).
+
+## Updates 2026-04-11
+- Added `PaymentActors` and attached `paymentActors` to shared `Order` type for mark-paid attribution (`packages/shared/src/types.ts`).

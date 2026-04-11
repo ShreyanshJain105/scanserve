@@ -756,3 +756,26 @@ This section is the high-level source of truth for what is already implemented a
 - Switched review cache to versioned keys per business to avoid stale cache reads; invalidation bumps version (`apps/api/src/services/reviewCache.ts`, `apps/api/src/routes/public.ts`).
 - Review cache version initialization now seeds to a timestamp when missing/low to avoid reusing stale `v1` keys (`apps/api/src/services/reviewCache.ts`).
 - Trimmed milliseconds from ClickHouse `order_events` ingestion timestamps to match DateTime parsing (`apps/api/src/services/orderEventQueueConsumer.ts`).
+- Fixed public review route test mocks to reflect review filtering logic and order select fields (`apps/api/tests/publicRoutes.test.ts`).
+- Added a Vitest setup shim for `localStorage`/`matchMedia` and expanded `next/navigation` mocks with `useSearchParams` so web tests execute under the theme toggle and analytics components (`apps/web/vitest.setup.ts`, `apps/web/tests/*`).
+- Accepted ADR-051 and expanded analytics metrics in API + web (revenue growth, avg items per order, returning customer share, failed/refunded counts, peak hours, top category share) (`docs/adr/ADR-051-analytics-page-metrics-and-prewarm.md`, `apps/api/src/services/analytics.ts`, `apps/web/src/app/dashboard/analytics/page.tsx`, `packages/shared/src/types.ts`).
+- Fixed menu page test to wait for edited item name before clicking delete (`apps/web/tests/menu-page.test.tsx`).
+- Drafted ADR-053 to add review-focused analytics metrics (`docs/adr/ADR-053-review-analytics.md`).
+- Accepted ADR-053 and added review analytics aggregation + UI widgets (summary/detail review metrics, conversion, rating distribution, trend) (`docs/adr/ADR-053-review-analytics.md`, `apps/api/src/services/analytics.ts`, `apps/web/src/app/dashboard/analytics/page.tsx`, `packages/shared/src/types.ts`).
+
+## Updates 2026-04-11
+- Added ClickHouse request timeout handling to prevent analytics calls hanging on slow/unreachable ClickHouse (`apps/api/src/services/clickhouseClient.ts`).
+- Added Redis connect timeout + failure logging to keep analytics cache lookups from stalling when Redis is unavailable (`apps/api/src/services/redisClient.ts`).
+- Documented new ClickHouse/Redis timeout env defaults (`apps/api/.env.example`).
+- Fixed review analytics summary queries to count likes via `review_likes` rather than a non-existent `reviews.likes_count` column (`apps/api/src/services/analytics.ts`).
+- Added analytics page tests and analytics route dispatch tests (`apps/web/tests/analytics-page.test.tsx`, `apps/api/tests/analyticsRoutes.test.ts`).
+- Analytics interval selection now uses local state with a `history.replaceState` sync to the `interval` query param (no router navigation) (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Expanded sample seed data with richer customers, menu items, tables/QRs, order status mix, and reviews/likes for more realistic analytics/UI (`apps/api/scripts/seed-sample-data.ts`).
+- Updated sample data README to document the richer seed content (`docs/sample-data/README.md`).
+- Captured ADR-054 answers for order pinning + mark-paid actor attribution; storage choice for payment actor still pending (`docs/adr/ADR-054-order-pin-and-payment-actor.md`).
+- Implemented ADR-054: payment actor attribution stored in `payment_actors` JSON and per-user order pinning with new endpoint + UI updates (`apps/api/prisma/schema.prisma`, `apps/api/src/routes/business.ts`, `apps/web/src/app/dashboard/orders/page.tsx`).
+- Added OrderPin Prisma back-relations and extended sample seed data with `paymentActors` + order pin rows (`apps/api/prisma/schema.prisma`, `apps/api/scripts/seed-sample-data.ts`).
+- Marked Layer 8 complete in `STATUS.md` and set Layer 9 planning next. Decision: move to Layer 9 planning based on user-confirmed dev-compose verification. Impact: project status tracking. Next: draft Layer 9 ADR.
+- Drafted ADR-055 to move business/admin dashboard UI to an `app.<domain>` subdomain using host-based routing (proposed). Decision: start with single deployment + host-aware routing. Impact: future dashboard/public routing, auth redirects, and env config. Next: finalize ADR answers.
+- Updated ADR-055 to allow QR/menu routes on both hosts and clarified unanswered Q&A items (domain + app root) (proposed).
+- Updated ADR-055 to keep QR/menu routes on the main domain only (public entry).

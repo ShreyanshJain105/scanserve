@@ -9,7 +9,7 @@ import { AppHeader } from "../../../components/layout/app-header";
 import { BodyBackButton } from "../../../components/layout/body-back-button";
 import { AnalyticsOverview } from "../../../components/dashboard/analytics-overview";
 import { ModalDialog } from "../../../components/ui/modal-dialog";
-import type { OrderStatus } from "@scan2serve/shared";
+import type { OrderStatus, PaymentActors } from "@scan2serve/shared";
 
 const ORDER_STATUSES: OrderStatus[] = [
   "pending",
@@ -77,6 +77,8 @@ type OrderSummary = {
   customerName: string;
   customerPhone: string | null;
   statusActors?: Record<string, { userId: string | null; email: string | null } | string> | null;
+  paymentActors?: PaymentActors | null;
+  isPinned?: boolean;
   createdAt: string;
   updatedAt: string;
   table: { id: string; tableNumber: number; label: string | null } | null;
@@ -123,6 +125,7 @@ type OrdersResponse = {
   nextCursor: string | null;
   hasMore: boolean;
   businessId: string;
+  pinnedOrderIds?: string[];
 };
 
 const ActivityTimeline = ({ detailOrder }: { detailOrder: OrderDetail }) => {
@@ -193,6 +196,7 @@ export default function DashboardOrdersPage() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [pinnedOrderIds, setPinnedOrderIds] = useState<string[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -263,7 +267,15 @@ export default function DashboardOrdersPage() {
       headers,
     });
 
-    setOrders((current) => (reset ? data.orders : [...current, ...data.orders]));
+    const nextPinned = data.pinnedOrderIds ?? pinnedOrderIds;
+    setPinnedOrderIds(nextPinned);
+    const decoratePinned = (order: OrderSummary) => ({
+      ...order,
+      isPinned: nextPinned.includes(order.id),
+    });
+    setOrders((current) =>
+      reset ? data.orders.map(decoratePinned) : [...current, ...data.orders.map(decoratePinned)]
+    );
     setNextCursor(data.nextCursor);
     setHasMore(Boolean(data.hasMore));
     return data;
@@ -385,14 +397,10 @@ export default function DashboardOrdersPage() {
         { method: "PATCH", headers }
       );
       setOrders((current) =>
-        current.map((order) =>
-          order.id === orderId ? { ...order, paymentStatus: data.order.paymentStatus } : order
-        )
+        current.map((order) => (order.id === orderId ? { ...order, ...data.order } : order))
       );
       setDetailOrder((current) =>
-        current && current.id === orderId
-          ? { ...current, paymentStatus: data.order.paymentStatus }
-          : current
+        current && current.id === orderId ? { ...current, ...data.order } : current
       );
       showToast({ variant: "success", message: "Marked as paid." });
     } catch (error) {
@@ -402,6 +410,38 @@ export default function DashboardOrdersPage() {
       });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const togglePin = async (orderId: string, pinned: boolean) => {
+    if (!headers || blocked) return;
+    try {
+      const data = await apiFetch<{ pinned: boolean }>(`/api/business/orders/${orderId}/pin`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ pinned }),
+      });
+      const nextPinned = data.pinned
+        ? [orderId, ...pinnedOrderIds.filter((id) => id !== orderId)].slice(0, 3)
+        : pinnedOrderIds.filter((id) => id !== orderId);
+      setPinnedOrderIds(nextPinned);
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === orderId ? { ...order, isPinned: data.pinned } : order
+        )
+      );
+      setDetailOrder((current) =>
+        current && current.id === orderId ? { ...current, isPinned: data.pinned } : current
+      );
+      showToast({
+        title: data.pinned ? "Order pinned" : "Order unpinned",
+        message: data.pinned ? "Pinned orders stay at the top." : "Order removed from pins.",
+      });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        message: error instanceof Error ? error.message : "Failed to update pin.",
+      });
     }
   };
 
@@ -502,7 +542,14 @@ export default function DashboardOrdersPage() {
       const amount = Number(value);
       return Number.isFinite(amount) ? amount : 0;
     };
+    const pinnedIndex = new Map(pinnedOrderIds.map((id, index) => [id, index]));
     return [...visible].sort((a, b) => {
+      const pinnedA = pinnedIndex.has(a.id) || Boolean(a.isPinned);
+      const pinnedB = pinnedIndex.has(b.id) || Boolean(b.isPinned);
+      if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+      if (pinnedA && pinnedB) {
+        return (pinnedIndex.get(a.id) ?? 0) - (pinnedIndex.get(b.id) ?? 0);
+      }
       if (sortOption === "oldest") {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       }
@@ -517,7 +564,7 @@ export default function DashboardOrdersPage() {
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [orders, sortOption, statusFilters]);
+  }, [orders, sortOption, statusFilters, pinnedOrderIds]);
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (!user) return null;
@@ -674,6 +721,21 @@ export default function DashboardOrdersPage() {
                       >
                         {formatPaymentLabel(order.paymentStatus)}
                       </span>
+                      <button
+                        type="button"
+                        aria-label={order.isPinned ? "Unpin order" : "Pin order"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          togglePin(order.id, !order.isPinned);
+                        }}
+                        className={`inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                          order.isPinned
+                            ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : "border-slate-200 bg-white text-slate-600"
+                        }`}
+                      >
+                        {order.isPinned ? "Pinned" : "Pin"}
+                      </button>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
@@ -730,12 +792,12 @@ export default function DashboardOrdersPage() {
         {!detailLoading && detailOrder && (
           <div className="grid gap-6 md:grid-cols-[1.4fr_0.9fr]">
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                      STATUS_BADGE[detailOrder.status]
-                    }`}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                        STATUS_BADGE[detailOrder.status]
+                      }`}
                   >
                     {formatStatusLabel(detailOrder.status)}
                   </span>
@@ -746,20 +808,45 @@ export default function DashboardOrdersPage() {
                   >
                     {formatPaymentLabel(detailOrder.paymentStatus)}
                   </span>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                    {detailOrder.paymentMethod === "cash" ? "Cash" : "Razorpay"}
-                  </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                      {detailOrder.paymentMethod === "cash" ? "Cash" : "Razorpay"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => togglePin(detailOrder.id, !detailOrder.isPinned)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        detailOrder.isPinned
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-white text-slate-600"
+                      }`}
+                    >
+                      {detailOrder.isPinned ? "Pinned" : "Pin"}
+                    </button>
+                  </div>
+                  <p className="text-base font-semibold text-slate-900">
+                    {formatCurrency(detailOrder.totalAmount)}
+                  </p>
                 </div>
-                <p className="text-base font-semibold text-slate-900">
-                  {formatCurrency(detailOrder.totalAmount)}
-                </p>
-              </div>
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm font-medium text-slate-700">Customer</p>
                 <p className="text-sm text-slate-600">{detailOrder.customerName}</p>
                 <p className="text-xs text-slate-500">{detailOrder.customerPhone ?? "No phone"}</p>
               </div>
+              {detailOrder.paymentStatus === "paid" &&
+                (detailOrder.paymentActors?.paidBy || detailOrder.paymentActors?.paidAt) && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-medium text-slate-700">Payment</p>
+                    <p className="text-sm text-slate-600">
+                      Paid by {resolveActorLabel(detailOrder.paymentActors?.paidBy) ?? "Unknown"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {detailOrder.paymentActors?.paidAt
+                        ? new Date(detailOrder.paymentActors.paidAt).toLocaleString()
+                        : "Paid time not recorded"}
+                    </p>
+                  </div>
+                )}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm font-medium text-slate-700">Table</p>
                 <p className="text-sm text-slate-600">

@@ -7,6 +7,7 @@ const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
   usePathname: () => "/dashboard/menu",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const useAuthMock = vi.fn();
@@ -209,6 +210,10 @@ describe("DashboardMenuPage", () => {
         "/api/business/menu-items/i1",
         expect.objectContaining({ method: "PATCH" })
       );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Burger XL")).toBeTruthy();
     });
 
     fireEvent.click(screen.getByLabelText("Delete item Burger XL"));

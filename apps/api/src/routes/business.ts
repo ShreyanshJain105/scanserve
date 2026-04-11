@@ -28,6 +28,7 @@ import {
 } from "../services/deletedAssetCleanup";
 import { fetchOrderSnapshot, publishOrderEventBestEffort } from "../services/orderEvents";
 import { normalizeStatusActors, type StatusActorInfo } from "../utils/statusActors";
+import { normalizePaymentActors } from "../utils/paymentActors";
 
 const notifyAdmins = async (params: {
   businessId: string;
@@ -280,6 +281,9 @@ const resolveDateWindow = (date: "today" | "yesterday", tzOffsetMinutes: number)
 };
 const orderStatusUpdateSchema = z.object({
   status: orderStatusSchema,
+});
+const orderPinSchema = z.object({
+  pinned: z.boolean(),
 });
 const generateItemImageSchema = z.object({
   prompt: z.string().min(4).max(500).optional(),
@@ -594,6 +598,7 @@ const serializeOrderSummary = (order: {
   customerName: string;
   customerPhone: string | null;
   statusActors?: Prisma.JsonValue | null;
+  paymentActors?: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
   table?: { id: string; tableNumber: number; label: string | null } | null;
@@ -610,6 +615,7 @@ const serializeOrderSummary = (order: {
   customerName: order.customerName,
   customerPhone: order.customerPhone,
   statusActors: normalizeStatusActors(order.statusActors),
+  paymentActors: normalizePaymentActors(order.paymentActors),
   createdAt: order.createdAt.toISOString(),
   updatedAt: order.updatedAt.toISOString(),
   table: order.table
@@ -634,6 +640,7 @@ const serializeOrderDetail = (order: {
   customerName: string;
   customerPhone: string | null;
   statusActors?: Prisma.JsonValue | null;
+  paymentActors?: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
   table?: { id: string; tableNumber: number; label: string | null } | null;
@@ -2902,7 +2909,7 @@ router.get(
       return;
     }
 
-    const where: Prisma.OrderWhereInput = {
+    const baseWhere: Prisma.OrderWhereInput = {
       businessId: req.business!.id,
       ...(parsed.data.status ? { status: parsed.data.status } : {}),
     };
@@ -2912,9 +2919,33 @@ router.get(
           ? parsed.data.tzOffset
           : -new Date().getTimezoneOffset();
       const window = resolveDateWindow(parsed.data.date, offsetMinutes);
-      where.updatedAt = { gte: window.start, lt: window.end };
+      baseWhere.updatedAt = { gte: window.start, lt: window.end };
     }
 
+    const pinnedRows = await prisma.orderPin.findMany({
+      where: {
+        userId: req.user!.id,
+        businessId: req.business!.id,
+        order: baseWhere,
+      },
+      orderBy: { pinnedAt: "desc" },
+      take: 3,
+      include: {
+        order: {
+          include: {
+            table: { select: { id: true, tableNumber: true, label: true } },
+          },
+        },
+      },
+    });
+    const pinnedOrderIds = pinnedRows.map((row) => row.orderId);
+    const pinnedSet = new Set(pinnedOrderIds);
+    const pinnedOrders = pinnedRows.map((row) => ({
+      ...serializeOrderSummary(row.order),
+      isPinned: true,
+    }));
+
+    const where: Prisma.OrderWhereInput = { ...baseWhere };
     if (parsed.data.cursor) {
       const cursorOrder = await prisma.order.findFirst({
         where: { id: parsed.data.cursor, businessId: req.business!.id },
@@ -2945,10 +2976,16 @@ router.get(
     const nextCursor = hasMore ? trimmed[trimmed.length - 1]?.id ?? null : null;
 
     sendSuccess(res, {
-      orders: trimmed.map((order) => serializeOrderSummary(order)),
+      orders: [
+        ...pinnedOrders,
+        ...trimmed
+          .filter((order) => !pinnedSet.has(order.id))
+          .map((order) => ({ ...serializeOrderSummary(order), isPinned: false })),
+      ],
       nextCursor,
       hasMore,
       businessId: req.business!.id,
+      pinnedOrderIds,
     });
   })
 );
@@ -2969,8 +3006,16 @@ router.get(
       sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
       return;
     }
+    const pin = await prisma.orderPin.findFirst({
+      where: {
+        userId: req.user!.id,
+        businessId: req.business!.id,
+        orderId: order.id,
+        orderCreatedAt: order.createdAt,
+      },
+    });
 
-    sendSuccess(res, { order: serializeOrderDetail(order) });
+    sendSuccess(res, { order: { ...serializeOrderDetail(order), isPinned: Boolean(pin) } });
   })
 );
 
@@ -3051,9 +3096,16 @@ router.patch(
       return;
     }
 
+    const paidAt = new Date().toISOString();
+    const paymentActor = resolveStatusActorInfo(req);
+    const paymentActors = {
+      paidBy: paymentActor ?? null,
+      paidAt,
+    };
+
     const updated = await prisma.order.update({
       where: { id_createdAt: { id: order.id, createdAt: order.createdAt } },
-      data: { paymentStatus: "paid" },
+      data: { paymentStatus: "paid", paymentActors },
       include: {
         table: { select: { id: true, tableNumber: true, label: true } },
       },
@@ -3069,6 +3121,66 @@ router.patch(
     }
 
     sendSuccess(res, { order: serializeOrderSummary(updated) });
+  })
+);
+
+router.patch(
+  "/orders/:id/pin",
+  requireApprovedBusiness,
+  asyncHandler(async (req, res) => {
+    if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
+    const parsed = orderPinSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
+      return;
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: req.params.id, businessId: req.business!.id },
+      select: { id: true, createdAt: true },
+    });
+    if (!order) {
+      sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
+      return;
+    }
+
+    const existing = await prisma.orderPin.findFirst({
+      where: {
+        userId: req.user!.id,
+        businessId: req.business!.id,
+        orderId: order.id,
+        orderCreatedAt: order.createdAt,
+      },
+    });
+
+    if (parsed.data.pinned) {
+      if (existing) {
+        sendSuccess(res, { pinned: true });
+        return;
+      }
+      const pinCount = await prisma.orderPin.count({
+        where: { userId: req.user!.id, businessId: req.business!.id },
+      });
+      if (pinCount >= 3) {
+        sendError(res, "Pin limit reached", 409, "PIN_LIMIT_REACHED");
+        return;
+      }
+      await prisma.orderPin.create({
+        data: {
+          userId: req.user!.id,
+          businessId: req.business!.id,
+          orderId: order.id,
+          orderCreatedAt: order.createdAt,
+        },
+      });
+      sendSuccess(res, { pinned: true });
+      return;
+    }
+
+    if (existing) {
+      await prisma.orderPin.delete({ where: { id: existing.id } });
+    }
+    sendSuccess(res, { pinned: false });
   })
 );
 

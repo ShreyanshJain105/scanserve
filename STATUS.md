@@ -9,27 +9,16 @@
 
 ## Last Session
 
-**Date:** 2026-04-10
+**Date:** 2026-04-11
 **What was done:**
-- Implemented ADR-052 reviews end-to-end: Prisma review models + migration, ClickHouse reviews table, review cache + migration worker, and public review endpoints (create/list/like) with reviewId on customer orders (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260410120000_reviews`, `apps/api/scripts/clickhouse-bootstrap.ts`, `apps/api/src/services/reviewCache.ts`, `apps/api/src/services/reviewMigration.ts`, `apps/api/src/routes/public.ts`).
-- Added review UI on customer orders hub (review dialog + reviewed state) and public menu (summary, filters, likes, pagination) (`apps/web/src/components/public/customer-orders-hub.tsx`, `apps/web/src/components/public/public-menu-client.tsx`).
-- Added API + web test coverage for review flows and updated shared review types (`apps/api/tests/publicRoutes.test.ts`, `apps/web/tests/orders-hub.test.tsx`, `apps/web/tests/public-menu.test.tsx`, `packages/shared/src/types.ts`).
-- Updated ADR-052 with like/tie-breaker rules and synced CLAUDE notes (`docs/adr/ADR-052-customer-reviews-storage-and-retention.md`, `docs/CLAUDE.md`, `CLAUDE.md`, `apps/api/CLAUDE.md`, `apps/web/CLAUDE.md`, `packages/shared/CLAUDE.md`).
-- Fixed order partition maintenance to move default-partition rows before attaching new monthly partitions (`apps/api/src/services/orderPartitionMaintenance.ts`).
-- Fixed recent reviews ordering to sort by newest first (likes-based ordering remains for all/filtered views) (`apps/api/src/routes/public.ts`).
-- Review list now filters by business via review or order relation to avoid missing reviews when businessId mismatches (`apps/api/src/routes/public.ts`).
-- Hardened public review routes to avoid crashing when Prisma client is outdated (guarded review/reviewLike model access) (`apps/api/src/routes/public.ts`).
-- Clamped `REVIEW_HOT_DAYS` to at least 1 day to prevent recent scope returning empty due to `0` config (`apps/api/src/routes/public.ts`, `apps/api/src/services/reviewMigration.ts`).
-- Switched review cache to versioned keys per business to avoid stale cache reads; invalidation bumps version (`apps/api/src/services/reviewCache.ts`, `apps/api/src/routes/public.ts`).
-- Review cache version initialization now seeds to a timestamp when missing/low to avoid reusing stale `v1` keys (`apps/api/src/services/reviewCache.ts`).
-- Trimmed milliseconds from ClickHouse `order_events` ingestion timestamps to match DateTime parsing (`apps/api/src/services/orderEventQueueConsumer.ts`).
+- Updated ADR-055 to keep QR/menu routes on the main domain only (public entry).
 
 **What's NOT done yet:**
-- Implement the analytics metric expansion from ADR-051.
-- Run API/web test suites after review implementation.
+- Capture ADR-055 answers (exact domain + app root landing) and mark ADR accepted/rejected.
 
 **Next step:**
-1. Run `pnpm --filter @scan2serve/api test` and `pnpm --filter @scan2serve/web test` to verify review changes.
+1. Get ADR-055 questions answered and update the decision.
+2. Implement host-based routing + redirect updates once ADR is accepted.
 
 **Build progress:**
 ```
@@ -40,7 +29,7 @@ Layer 4:  Menu Management     ✅ DONE
 Layer 5:  Table & QR Codes    ✅ DONE
 Layer 6:  Public Menu & Cart  ✅ DONE
 Layer 7:  Ordering & Payments ✅ DONE
-Layer 8:  Order Management
+Layer 8:  Order Management    ✅ DONE
 Layer 9:  Business Dashboard
 Layer 10: Admin Panel
 Layer 11: Polish & Deploy
@@ -1064,6 +1053,23 @@ Layer 11: Polish & Deploy
 ### 2026-04-10 — Session 224: ClickHouse DateTime fix
 - Trimmed milliseconds from ClickHouse order-event timestamps to avoid DateTime parse errors (`apps/api/src/services/orderEventQueueConsumer.ts`).
 
+### 2026-04-10 — Session 225: Test stabilization
+- Fixed API public review test mocks to align with review filtering/select logic (`apps/api/tests/publicRoutes.test.ts`).
+- Added web Vitest shims for `localStorage`/`matchMedia` and expanded `next/navigation` mocks with `useSearchParams` (`apps/web/vitest.setup.ts`, `apps/web/tests/*`).
+- Reinstalled dependencies with `CI=true pnpm install` to resolve Rollup optional dependency.
+- Re-ran API tests (103/103) and web tests (57/57) successfully.
+
+### 2026-04-10 — Session 226: ADR-051 analytics expansion
+- Marked ADR-051 as accepted and updated docs.
+- Added analytics computations for revenue growth, avg items per order, new vs returning customers, and failed/refunded counts across Postgres/ClickHouse windows.
+- Updated shared analytics summary types and analytics page UI to display the new metrics plus top category share and peak hours.
+
+### 2026-04-10 — Session 227: Menu test fix
+- Updated menu page test to wait for edited item name before clicking delete action.
+
+### 2026-04-10 — Session 228: Review analytics expansion
+- Accepted ADR-053 and added review analytics aggregation + UI (avg rating, conversion, likes per review, rating distribution, trend).
+
 
 ## Decisions Log
 
@@ -1117,6 +1123,7 @@ Layer 11: Polish & Deploy
 | ADR-050 | Split dashboard vs orders analytics — Accepted | Separate analytics sections with summary vs detail flag and view-more scope | 2026-04-10 |
 | ADR-052 | Customer reviews storage + retention — Proposed | Store recent reviews in Postgres, archive to ClickHouse, cache summaries | 2026-04-10 |
 | ADR-052 | Customer reviews storage + retention — Accepted | Implement review storage, likes-based relevance sorting, and retention/migration workflow | 2026-04-10 |
+| ADR-053 | Review analytics expansion — Accepted | Add review-focused dashboard analytics (rating trends, conversion, likes, distribution) with Postgres + ClickHouse merge | 2026-04-10 |
 
 ---
 
@@ -1378,3 +1385,23 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 
 ### 2026-04-09 — Session: Grafana dashboard provisioning
 - Added Grafana dashboard provider and a Scan2Serve overview dashboard JSON, mounted into the Grafana container for auto-provisioning (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, `monitoring/grafana/dashboards/scan2serve-overview.json`, `docker-compose.yml`).
+
+### 2026-04-11 — Session: Analytics timeout hardening
+- Added ClickHouse request timeouts and Redis connect timeouts so analytics endpoints return instead of hanging when infra is unavailable (`apps/api/src/services/clickhouseClient.ts`, `apps/api/src/services/redisClient.ts`, `apps/api/.env.example`).
+- Fixed review analytics summary queries to count likes via `review_likes` (no `likes_count` column in Postgres reviews) (`apps/api/src/services/analytics.ts`).
+- Added analytics page tests and analytics route dispatch tests (`apps/web/tests/analytics-page.test.tsx`, `apps/api/tests/analyticsRoutes.test.ts`).
+- Synced analytics interval query param via `history.replaceState` while keeping local state (no router navigation) (`apps/web/src/app/dashboard/analytics/page.tsx`).
+- Expanded sample seed data to add richer customers, menu items, tables/QRs, order-status mix, and reviews/likes (`apps/api/scripts/seed-sample-data.ts`).
+- Updated sample data README to reflect the richer seed content (`docs/sample-data/README.md`).
+- Recorded ADR-054 answers for order pinning + mark-paid actor attribution; payment-actor storage choice still open (`docs/adr/ADR-054-order-pin-and-payment-actor.md`).
+
+### 2026-04-11 — Session: Order pin schema + seed alignment
+- Added missing Prisma back-relations for `OrderPin` on `User`, `Business`, and `Order` (`apps/api/prisma/schema.prisma`).
+- Updated sample seed data to populate cash-payment `paymentActors` and seed per-user order pins (`apps/api/scripts/seed-sample-data.ts`).
+
+### 2026-04-11 — Session: Layer 8 completion + Layer 9 next
+- Confirmed Prisma generate/migrate + sample seed completed successfully via dev-compose run (user-reported).
+- Marked Layer 8 Order Management complete and set Layer 9 Business Dashboard planning as next.
+
+### 2026-04-11 — Session: ADR-055 app subdomain draft
+- Drafted ADR-055 proposing `app.<domain>` host-based routing for the business/admin dashboard UI; awaiting answers.
