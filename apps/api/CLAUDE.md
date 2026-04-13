@@ -384,3 +384,9 @@ pnpm db:studio    # open Prisma Studio GUI
 
 ## Updates 2026-04-13
 - Seed script now ensures window coverage orders and generates reviews from existing completed orders so analytics windows populate (`apps/api/scripts/seed-sample-data.ts`).
+
+## Updates 2026-04-13
+- Fixed sample seed window coverage to use local day/week boundaries (yesterday/currentWeek/lastWeek) instead of relative now-based ranges (`apps/api/scripts/seed-sample-data.ts`).
+
+## Updates 2026-04-13
+- Added `apps/api/scripts` to the production image so `db:seed:sample` runs from the container (`apps/api/Dockerfile`).

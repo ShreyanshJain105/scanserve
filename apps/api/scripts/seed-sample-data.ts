@@ -794,27 +794,39 @@ async function main() {
     };
 
     const ensureWindowCoverage = async () => {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfToday.getDate() - 1);
+      const dayOffset = (startOfToday.getDay() + 6) % 7; // Monday start
+      const startOfCurrentWeek = new Date(startOfToday);
+      startOfCurrentWeek.setDate(startOfToday.getDate() - dayOffset);
+      const startOfLastWeek = new Date(startOfCurrentWeek);
+      startOfLastWeek.setDate(startOfCurrentWeek.getDate() - 7);
+
       const ranges = [
         {
           label: "yesterday",
-          start: daysAgo(1),
-          end: new Date(),
+          start: startOfYesterday,
+          end: startOfToday,
           min: 3,
-          pickDate: (index: number) => addHours(daysAgo(1), 10 + index),
+          pickDate: (index: number) => addHours(startOfYesterday, 9 + index),
         },
         {
           label: "currentWeek",
-          start: daysAgo(6),
-          end: daysAgo(1),
+          start: startOfCurrentWeek,
+          end: startOfToday,
           min: 5,
-          pickDate: (index: number) => addHours(daysAgo(2 + (index % 4)), 12 + index),
+          pickDate: (index: number) =>
+            addHours(new Date(startOfCurrentWeek.getTime() + (index % 4) * 24 * 60 * 60 * 1000), 11),
         },
         {
           label: "lastWeek",
-          start: daysAgo(13),
-          end: daysAgo(7),
+          start: startOfLastWeek,
+          end: startOfCurrentWeek,
           min: 5,
-          pickDate: (index: number) => addHours(daysAgo(7 + (index % 6)), 14 + index),
+          pickDate: (index: number) =>
+            addHours(new Date(startOfLastWeek.getTime() + (index % 5) * 24 * 60 * 60 * 1000), 13),
         },
       ];
 

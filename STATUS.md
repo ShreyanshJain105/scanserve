@@ -11,13 +11,14 @@
 
 **Date:** 2026-04-13
 **What was done:**
-- Updated sample data seeding to backfill reviews from existing completed orders and guarantee yesterday/currentWeek/lastWeek order coverage (`apps/api/scripts/seed-sample-data.ts`).
+- Included `apps/api/scripts` in the production API image so seeding scripts run inside the container (`apps/api/Dockerfile`).
 
 **What's NOT done yet:**
-- Re-run `db:seed:sample` (or `scripts/prod-migrate.sh`) to apply the new sample distribution.
+- Rebuild and recreate the API image, then re-run `db:seed:sample` to populate reviews and older windows.
 
 **Next step:**
-1. Re-run `scripts/prod-migrate.sh` (or `pnpm --filter @scan2serve/api db:seed:sample`).
+1. Rebuild images and recreate the API container.
+2. Re-run `pnpm --filter @scan2serve/api db:seed:sample`.
 
 **Build progress:**
 ```
@@ -1499,3 +1500,11 @@ pnpm --filter @scan2serve/api db:seed      # seed admin user
 
 ### 2026-04-13 — Session: Seed backfill for analytics
 - Seed script now backfills reviews from existing completed orders and ensures yesterday/currentWeek/lastWeek coverage.
+
+
+### 2026-04-13 — Session: Seed window boundary fix
+- Updated sample seed window coverage to use local day/week boundaries.
+
+
+### 2026-04-13 — Session: Seed scripts in prod image
+- Copied API scripts into the production image so seeding works in-container.

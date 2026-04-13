@@ -847,3 +847,9 @@ This section is the high-level source of truth for what is already implemented a
 
 ## Updates 2026-04-13
 - Updated sample data seeding to backfill review data and ensure yesterday/currentWeek/lastWeek order coverage (`apps/api/scripts/seed-sample-data.ts`).
+
+## Updates 2026-04-13
+- Adjusted sample seed window coverage to align with local day/week boundaries for analytics windows (`apps/api/scripts/seed-sample-data.ts`).
+
+## Updates 2026-04-13
+- Included `apps/api/scripts` in the production API image to support in-container seeding (`apps/api/Dockerfile`).
