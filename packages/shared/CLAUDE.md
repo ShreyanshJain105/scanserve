@@ -69,3 +69,9 @@ import { UserRole, OrderStatus, ORDER_STATUS_FLOW } from "@scan2serve/shared";
 
 ## Updates 2026-04-11
 - Added `PaymentActors` and attached `paymentActors` to shared `Order` type for mark-paid attribution (`packages/shared/src/types.ts`).
+
+## Updates 2026-04-12
+- Added a build script and CJS compile output for production consumption; package now exports CJS `dist` for runtime and TS source for dev (`packages/shared/package.json`, `packages/shared/tsconfig.json`).
+
+## Updates 2026-04-13
+- Added TypeScript as a dev dependency so `pnpm --filter @scan2serve/shared build` works in container builds (`packages/shared/package.json`).

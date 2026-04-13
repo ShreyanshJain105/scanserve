@@ -517,3 +517,15 @@ pnpm lint   # run Next.js ESLint
 - Updated `apiFetch` to prefer same-origin API calls when host/port match, avoiding CSRF/CORS issues across `app.localhost` (`apps/web/src/lib/api.ts`).
 - Treated `*.localhost` as the same base domain in `apiFetch` so app.localhost uses same-origin CSRF fetches (`apps/web/src/lib/api.ts`).
 - Updated tables QR download helper to use same-origin API base via `getApiBase`, preventing CSRF issues on app.localhost (`apps/web/src/app/dashboard/tables/page.tsx`).
+
+## Updates 2026-04-12
+- Added production Dockerfile for Next.js build and runtime (`apps/web/Dockerfile`).
+
+## Updates 2026-04-12
+- Web Dockerfile now builds `@scan2serve/shared` before Next build to align with compiled shared package (`apps/web/Dockerfile`).
+
+## Updates 2026-04-13
+- Renamed analytics window loop variables to avoid shadowing `window`, fixing Next build type error (`apps/web/src/app/dashboard/analytics/page.tsx`).
+
+## Updates 2026-04-13
+- Replaced `window.setTimeout` usage with `globalThis` + `setTimeout` in analytics page to avoid Next build typing issues (`apps/web/src/app/dashboard/analytics/page.tsx`).

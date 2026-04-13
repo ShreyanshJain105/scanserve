@@ -2,10 +2,22 @@
   "name": "@scan2serve/shared",
   "version": "0.1.0",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
   }
 }

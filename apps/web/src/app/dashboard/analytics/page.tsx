@@ -316,8 +316,8 @@ export default function DashboardAnalyticsPage() {
     const load = async () => {
       setLoadingCharts(true);
       try {
-        const warmSource = (window: AnalyticsWindow) =>
-          ["today", "yesterday", "currentWeek"].includes(window) ? "postgres" : "warehouse";
+        const warmSource = (windowKey: AnalyticsWindow) =>
+          ["today", "yesterday", "currentWeek"].includes(windowKey) ? "postgres" : "warehouse";
         const windows = WINDOW_OPTIONS;
         const summaryResponse = await apiFetch<AnalyticsSectionResponse>(
           "/api/business/analytics/dashboard",
@@ -326,7 +326,7 @@ export default function DashboardAnalyticsPage() {
             headers: { "x-business-id": selectedBusiness.id },
             body: JSON.stringify({
               source: "postgres",
-              windows: windows.filter((window) => warmSource(window) === "postgres"),
+              windows: windows.filter((windowKey) => warmSource(windowKey) === "postgres"),
               granularity: "summary",
             }),
           }
@@ -338,27 +338,32 @@ export default function DashboardAnalyticsPage() {
             headers: { "x-business-id": selectedBusiness.id },
             body: JSON.stringify({
               source: "warehouse",
-              windows: windows.filter((window) => warmSource(window) === "warehouse"),
+              windows: windows.filter((windowKey) => warmSource(windowKey) === "warehouse"),
               granularity: "summary",
             }),
           }
         );
         if (cancelled) return;
         const mergedSummary: Partial<Record<AnalyticsWindow, DashboardAnalyticsSummary>> = {};
-        for (const window of windows) {
-          const from = warmSource(window) === "postgres" ? summaryResponse : warehouseSummaryResponse;
-          const summary = from.windows?.[window]?.summary as DashboardAnalyticsSummary | undefined;
-          if (summary) mergedSummary[window] = summary;
+        for (const windowKey of windows) {
+          const from = warmSource(windowKey) === "postgres" ? summaryResponse : warehouseSummaryResponse;
+          const summary = from.windows?.[windowKey]?.summary as DashboardAnalyticsSummary | undefined;
+          if (summary) mergedSummary[windowKey] = summary;
         }
         setDashboardSummaryByWindow((prev) => ({ ...prev, ...mergedSummary }));
         setDashboardSummary(mergedSummary[interval] ?? null);
 
         const scheduleDetail = (fn: () => void) => {
-          if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-            (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(fn);
+          const idle = (
+            globalThis as typeof globalThis & {
+              requestIdleCallback?: (cb: () => void) => number;
+            }
+          ).requestIdleCallback;
+          if (typeof idle === "function") {
+            idle(fn);
             return;
           }
-          window.setTimeout(fn, 250);
+          setTimeout(fn, 250);
         };
 
         setDashboardDetailLoading(true);
@@ -373,7 +378,7 @@ export default function DashboardAnalyticsPage() {
                 headers: { "x-business-id": selectedBusiness.id },
                 body: JSON.stringify({
                   source: "postgres",
-                  windows: windows.filter((window) => warmSource(window) === "postgres"),
+                  windows: windows.filter((windowKey) => warmSource(windowKey) === "postgres"),
                   granularity: "detail",
                 }),
               }
@@ -385,17 +390,17 @@ export default function DashboardAnalyticsPage() {
                 headers: { "x-business-id": selectedBusiness.id },
                 body: JSON.stringify({
                   source: "warehouse",
-                  windows: windows.filter((window) => warmSource(window) === "warehouse"),
+                  windows: windows.filter((windowKey) => warmSource(windowKey) === "warehouse"),
                   granularity: "detail",
                 }),
               }
             );
             if (cancelled) return;
             const mergedDetail: Partial<Record<AnalyticsWindow, DashboardAnalyticsDetail>> = {};
-            for (const window of windows) {
-              const from = warmSource(window) === "postgres" ? detailResponse : warehouseDetailResponse;
-              const detail = from.windows?.[window]?.detail as DashboardAnalyticsDetail | undefined;
-              if (detail) mergedDetail[window] = detail;
+            for (const windowKey of windows) {
+              const from = warmSource(windowKey) === "postgres" ? detailResponse : warehouseDetailResponse;
+              const detail = from.windows?.[windowKey]?.detail as DashboardAnalyticsDetail | undefined;
+              if (detail) mergedDetail[windowKey] = detail;
             }
             setDashboardDetailByWindow((prev) => ({ ...prev, ...mergedDetail }));
             setDashboardDetail(mergedDetail[interval] ?? null);
@@ -432,8 +437,8 @@ export default function DashboardAnalyticsPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const warmSource = (window: AnalyticsWindow) =>
-          ["today", "yesterday", "currentWeek"].includes(window) ? "postgres" : "warehouse";
+        const warmSource = (windowKey: AnalyticsWindow) =>
+          ["today", "yesterday", "currentWeek"].includes(windowKey) ? "postgres" : "warehouse";
         const windows = WINDOW_OPTIONS;
         const summaryResponse = await apiFetch<AnalyticsSectionResponse>(
           "/api/business/analytics/orders",
@@ -442,7 +447,7 @@ export default function DashboardAnalyticsPage() {
             headers: { "x-business-id": ordersBusinessId },
             body: JSON.stringify({
               source: "postgres",
-              windows: windows.filter((window) => warmSource(window) === "postgres"),
+              windows: windows.filter((windowKey) => warmSource(windowKey) === "postgres"),
               granularity: "summary",
             }),
           }
@@ -454,27 +459,32 @@ export default function DashboardAnalyticsPage() {
             headers: { "x-business-id": ordersBusinessId },
             body: JSON.stringify({
               source: "warehouse",
-              windows: windows.filter((window) => warmSource(window) === "warehouse"),
+              windows: windows.filter((windowKey) => warmSource(windowKey) === "warehouse"),
               granularity: "summary",
             }),
           }
         );
         if (cancelled) return;
         const mergedSummary: Partial<Record<AnalyticsWindow, OrdersAnalyticsSummary>> = {};
-        for (const window of windows) {
-          const from = warmSource(window) === "postgres" ? summaryResponse : warehouseSummaryResponse;
-          const summary = from.windows?.[window]?.summary as OrdersAnalyticsSummary | undefined;
-          if (summary) mergedSummary[window] = summary;
+        for (const windowKey of windows) {
+          const from = warmSource(windowKey) === "postgres" ? summaryResponse : warehouseSummaryResponse;
+          const summary = from.windows?.[windowKey]?.summary as OrdersAnalyticsSummary | undefined;
+          if (summary) mergedSummary[windowKey] = summary;
         }
         setOrdersSummaryByWindow((prev) => ({ ...prev, ...mergedSummary }));
         setOrdersSummary(mergedSummary[interval] ?? null);
 
         const scheduleDetail = (fn: () => void) => {
-          if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-            (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(fn);
+          const idle = (
+            globalThis as typeof globalThis & {
+              requestIdleCallback?: (cb: () => void) => number;
+            }
+          ).requestIdleCallback;
+          if (typeof idle === "function") {
+            idle(fn);
             return;
           }
-          window.setTimeout(fn, 250);
+          setTimeout(fn, 250);
         };
 
         scheduleDetail(async () => {
@@ -487,7 +497,7 @@ export default function DashboardAnalyticsPage() {
                 headers: { "x-business-id": ordersBusinessId },
                 body: JSON.stringify({
                   source: "postgres",
-                  windows: windows.filter((window) => warmSource(window) === "postgres"),
+                  windows: windows.filter((windowKey) => warmSource(windowKey) === "postgres"),
                   granularity: "detail",
                 }),
               }
@@ -499,17 +509,17 @@ export default function DashboardAnalyticsPage() {
                 headers: { "x-business-id": ordersBusinessId },
                 body: JSON.stringify({
                   source: "warehouse",
-                  windows: windows.filter((window) => warmSource(window) === "warehouse"),
+                  windows: windows.filter((windowKey) => warmSource(windowKey) === "warehouse"),
                   granularity: "detail",
                 }),
               }
             );
             if (cancelled) return;
             const mergedDetail: Partial<Record<AnalyticsWindow, OrdersAnalyticsDetail>> = {};
-            for (const window of windows) {
-              const from = warmSource(window) === "postgres" ? detailResponse : warehouseDetailResponse;
-              const detail = from.windows?.[window]?.detail as OrdersAnalyticsDetail | undefined;
-              if (detail) mergedDetail[window] = detail;
+            for (const windowKey of windows) {
+              const from = warmSource(windowKey) === "postgres" ? detailResponse : warehouseDetailResponse;
+              const detail = from.windows?.[windowKey]?.detail as OrdersAnalyticsDetail | undefined;
+              if (detail) mergedDetail[windowKey] = detail;
             }
             setOrdersDetailByWindow((prev) => ({ ...prev, ...mergedDetail }));
             setOrdersDetail(mergedDetail[interval] ?? null);

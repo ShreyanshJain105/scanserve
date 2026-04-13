@@ -18,3 +18,6 @@ Prometheus + Grafana configuration and provisioning used by the local docker-com
 
 ## Updates 2026-04-10
 - Added minimal Postgres exporter config file and mounted it to silence missing config warnings (`monitoring/postgres_exporter.yml`, `docker-compose.yml`).
+
+## Updates 2026-04-13
+- Added Grafana/Prometheus services to production compose to satisfy gateway upstream (`docker-compose.prod.yml`).

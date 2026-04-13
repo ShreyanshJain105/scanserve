@@ -681,6 +681,64 @@ async function main() {
     }
   };
 
+  const seedReviewsForExistingOrders = async (businessId: string) => {
+    const completedOrders = await prisma.order.findMany({
+      where: { businessId, status: "completed" },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+    });
+    if (!completedOrders.length) return;
+
+    const reviewTargets = completedOrders.filter((_, index) => index % 2 === 0);
+    const ratingCycle = [5, 4, 5, 3, 4, 2, 5, 1];
+
+    for (let i = 0; i < reviewTargets.length; i += 1) {
+      const order = reviewTargets[i];
+      const reviewer = customerPool[i % customerPool.length];
+      const rating = ratingCycle[i % ratingCycle.length];
+      const comment = reviewComments[i % reviewComments.length];
+      const createdAt = new Date(order.createdAt.getTime() + (i % 6) * 60 * 60 * 1000);
+
+      const review = await prisma.review.upsert({
+        where: {
+          orderId_orderCreatedAt: {
+            orderId: order.id,
+            orderCreatedAt: order.createdAt,
+          },
+        },
+        update: {
+          rating,
+          comment,
+          customerUserId: reviewer.id,
+          updatedAt: createdAt,
+        },
+        create: {
+          orderId: order.id,
+          orderCreatedAt: order.createdAt,
+          businessId,
+          customerUserId: reviewer.id,
+          rating,
+          comment,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      });
+
+      const likeCandidates = customerPool.filter((user) => user.id !== reviewer.id);
+      const likeCount = i % 4;
+      const likes = likeCandidates.slice(0, likeCount);
+      if (likes.length) {
+        await prisma.reviewLike.createMany({
+          data: likes.map((user) => ({
+            reviewId: review.id,
+            customerUserId: user.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+  };
+
   const createdOrders = [] as Array<{
     orderId: string;
     businessId: string;
@@ -700,7 +758,6 @@ async function main() {
   }) => {
     const existingCount = await prisma.order.count({ where: { businessId: input.businessId } });
     const targetCount = 160;
-    if (existingCount >= targetCount) return [];
 
     const statuses: Array<{
       status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
@@ -717,11 +774,97 @@ async function main() {
     ];
 
     const orders = [];
-    const needed = targetCount - existingCount;
+    const addHours = (date: Date, hours: number) =>
+      new Date(date.getTime() + hours * 60 * 60 * 1000);
+    const baseSlots = [
+      { make: () => hoursAgo(1) },
+      { make: () => addHours(daysAgo(1), 2) },
+      { make: () => addHours(daysAgo(2), 3) },
+      { make: () => addHours(daysAgo(7), 4) },
+    ];
+
+    const pickCreatedAt = (index: number) => {
+      if (index < baseSlots.length) return baseSlots[index].make();
+      const offset = index - baseSlots.length;
+      if (offset < 1) return hoursAgo(2);
+      if (offset < 4) return addHours(daysAgo(1), (offset % 6) + 1);
+      if (offset < 10) return addHours(daysAgo(2 + (offset % 5)), (offset % 6) + 1);
+      if (offset < 16) return addHours(daysAgo(7 + (offset % 7)), (offset % 6) + 1);
+      return addHours(daysAgo(14 + (offset % 120)), (offset % 6) + 1);
+    };
+
+    const ensureWindowCoverage = async () => {
+      const ranges = [
+        {
+          label: "yesterday",
+          start: daysAgo(1),
+          end: new Date(),
+          min: 3,
+          pickDate: (index: number) => addHours(daysAgo(1), 10 + index),
+        },
+        {
+          label: "currentWeek",
+          start: daysAgo(6),
+          end: daysAgo(1),
+          min: 5,
+          pickDate: (index: number) => addHours(daysAgo(2 + (index % 4)), 12 + index),
+        },
+        {
+          label: "lastWeek",
+          start: daysAgo(13),
+          end: daysAgo(7),
+          min: 5,
+          pickDate: (index: number) => addHours(daysAgo(7 + (index % 6)), 14 + index),
+        },
+      ];
+
+      for (const range of ranges) {
+        const existing = await prisma.order.count({
+          where: {
+            businessId: input.businessId,
+            createdAt: {
+              gte: range.start,
+              lt: range.end,
+            },
+          },
+        });
+        const needed = Math.max(0, range.min - existing);
+        for (let i = 0; i < needed; i += 1) {
+          const statusMeta = statuses[(orders.length + i) % statuses.length];
+          const customer =
+            input.customerPool[(orders.length + i + input.businessId.length) % input.customerPool.length];
+          const tableId = input.tableIds[(orders.length + i) % input.tableIds.length];
+          orders.push(
+            await makeOrder({
+              businessId: input.businessId,
+              tableId,
+              customerName: `${customer.name} · ${input.customerPrefix} ${orders.length + 1}`,
+              customerUserId: customer.id,
+              customerPhone: customer.phone,
+              createdAt: range.pickDate(i),
+              status: statusMeta.status,
+              paymentStatus: statusMeta.paymentStatus,
+              paymentMethod: statusMeta.paymentMethod,
+              items: [
+                { menuItemId: input.menuItems[(orders.length + i) % input.menuItems.length].id, quantity: 1 },
+                {
+                  menuItemId: input.menuItems[(orders.length + i + 1) % input.menuItems.length].id,
+                  quantity: 1,
+                },
+              ],
+              statusActors: pickStatusActors(statusMeta.status, ownerUser, managerUser),
+            })
+          );
+        }
+      }
+    };
+
+    await ensureWindowCoverage();
+
+    const needed = Math.max(0, targetCount - existingCount - orders.length);
     for (let i = 0; i < needed; i += 1) {
       const statusMeta = statuses[i % statuses.length];
-      const dayOffset = (i % 180) + 1;
-      const createdAt = i < 8 ? hoursAgo(i + 1) : daysAgo(dayOffset);
+      const createdAt = pickCreatedAt(i);
       const customer = input.customerPool[(i + input.businessId.length) % input.customerPool.length];
       const tableId = input.tableIds[i % input.tableIds.length];
       orders.push(
@@ -810,6 +953,8 @@ async function main() {
 
   await seedReviewsForOrders(cafeOrders, cafe.id);
   await seedReviewsForOrders(bistroOrders, bistro.id);
+  await seedReviewsForExistingOrders(cafe.id);
+  await seedReviewsForExistingOrders(bistro.id);
 
   [...cafeOrders, ...bistroOrders].forEach(({ order, total }) => {
     createdOrders.push({

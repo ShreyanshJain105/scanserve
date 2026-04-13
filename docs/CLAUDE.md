@@ -168,3 +168,21 @@ Project documentation for architecture decisions, process notes, and operational
 - Updated ADR-055 to keep QR/menu routes on the main domain only (public entry) (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
 - Updated ADR-055 to define app root behavior: landing for logged-out, redirect to `/dashboard` for logged-in business users (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
 - Accepted ADR-055: dashboard UI moves to app.scan2serve.com with host-based routing; QR/menu stay on scan2serve.com (`docs/adr/ADR-055-app-subdomain-dashboard.md`).
+
+## Updates 2026-04-12
+- Accepted ADR-056 to compile `@scan2serve/shared` and use compiled output for production runtime (`docs/adr/ADR-056-compile-shared-package.md`).
+
+## Updates 2026-04-12
+- Accepted ADR-057 for a production compose bundle with `.env.prod` (`docs/adr/ADR-057-production-compose-bundle.md`).
+
+## Updates 2026-04-12
+- Added production deployment guide with compose usage and migration notes (`docs/production-deploy.md`).
+
+## Updates 2026-04-13
+- Updated production compose to include monitoring services and documented Grafana access (`docker-compose.prod.yml`, `docs/production-deploy.md`).
+
+## Updates 2026-04-13
+- Documented production migration helper script in deploy guide (`docs/production-deploy.md`).
+
+## Updates 2026-04-13
+- Updated deployment docs to note `prod-migrate.sh` now seeds sample data (`docs/production-deploy.md`).

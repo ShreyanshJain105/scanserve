@@ -17,3 +17,6 @@ Nginx-based gateway that fronts web + API services. It provides a single entry p
 
 ## Updates 2026-04-10
 - Added Grafana Live websocket proxy handling under `/grafana/api/live/` with upgrade headers to avoid 400s (`gateway/nginx.conf.template`).
+
+## Updates 2026-04-12
+- Added a production Dockerfile that bakes the Nginx template into the gateway image (`gateway/Dockerfile`).
