@@ -404,8 +404,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                     type="button"
                     className={`rounded px-2 py-1 text-[11px] ${
                       notifScope === "unread"
-                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                        : "border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                        ? "bg-black text-white"
+                        : "border border-slate-200 text-slate-700"
                     }`}
                     onClick={() => fetchNotifications({ resetPage: true, scope: "unread" })}
                   >
@@ -415,8 +415,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                     type="button"
                     className={`rounded px-2 py-1 text-[11px] ${
                       notifScope === "all"
-                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                        : "border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                        ? "bg-black text-white"
+                        : "border border-slate-200 text-slate-700"
                     }`}
                     onClick={() => fetchNotifications({ resetPage: true, scope: "all" })}
                   >
@@ -476,7 +476,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                             )}
                             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
                               <div className="flex items-center justify-between">
-                                <p className="font-semibold text-slate-900 dark:text-slate-100">{n.message}</p>
+                                <p className="font-black text-black">{n.message}</p>
                                 <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                   {n.type}
                                 </span>
@@ -582,7 +582,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
             S2
           </div>
           <div className="min-w-0">
-            <Link href="/home" className="font-bold tracking-tight text-slate-900 transition hover:opacity-80 dark:text-slate-100">
+            <Link href="/home" className="font-black tracking-tighter text-black transition hover:opacity-80">
               Scan2Serve
             </Link>
           </div>

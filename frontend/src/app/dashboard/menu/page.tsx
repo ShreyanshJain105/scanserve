@@ -148,14 +148,17 @@ export default function DashboardMenuPage() {
     !selectedBusiness ||
     selectedBusiness.blocked ||
     selectedBusiness.status === "pending" ||
-    selectedBusiness.status === "rejected";
+    selectedBusiness.status === "rejected" ||
+    selectedBusiness.status === "archived";
   const blockedReason = selectedBusiness?.blocked
     ? "This business is blocked by an admin. Menu changes are disabled until it is unblocked."
     : selectedBusiness?.status === "pending"
       ? "Menu changes are disabled until your selected business is approved."
       : selectedBusiness?.status === "rejected"
         ? "This business was rejected. Update details in onboarding to resubmit for approval."
-        : null;
+        : selectedBusiness?.status === "archived"
+          ? "This business is archived. Restore it to manage the menu."
+          : null;
 
   const headers = useMemo(
     () =>
@@ -726,35 +729,42 @@ export default function DashboardMenuPage() {
             {blockedReason}
           </div>
         )}
+        <header className="card-standard p-8 mb-6">
+          <h1 className="text-4xl font-black text-black tracking-tighter">Menu Management</h1>
+          <p className="mt-2 text-sm font-medium text-slate-500">
+            Define categories and curate your digital catalog with AI assistance.
+          </p>
+        </header>
+
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <aside className="rounded-xl border bg-white p-4">
-          <h2 className="text-lg font-semibold">Categories</h2>
-          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-            <form onSubmit={createCategory} className="flex gap-2">
+        <aside className="card-standard p-6 h-fit">
+          <h2 className="text-lg font-black text-black tracking-tight border-l-4 border-amber-400 pl-3">Categories</h2>
+          <div className="mt-5 rounded-3xl border border-slate-100 bg-slate-50 p-4">
+            <form onSubmit={createCategory} className="flex flex-col gap-3">
                 <input
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="New category"
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="New category name..."
+                  className="input-standard w-full"
                 />
                 <button
                   type="submit"
                   disabled={busy || blocked}
-                  className="rounded-md bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+                  className="btn-primary w-full py-2"
                 >
-                  Add
+                  Add Category
                 </button>
             </form>
-            <div className="mt-2">
-              <p className="text-[11px] font-medium text-gray-500">Suggestions</p>
-              <div className="mt-1.5 flex min-h-[30px] flex-wrap gap-1.5">
+            <div className="mt-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">AI Smart Suggestions</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {categorySuggestions.map((suggestion) => (
                   <button
                     key={suggestion.label}
                     type="button"
                     onClick={() => setCategoryName(suggestion.label)}
                     disabled={busy || blocked}
-                    className="rounded-full border border-gray-300 px-2 py-1 text-xs"
+                    className="btn-glass px-3 py-1 text-[10px] font-bold uppercase"
                   >
                     {suggestion.label}
                   </button>
@@ -762,12 +772,15 @@ export default function DashboardMenuPage() {
               </div>
             </div>
           </div>
-          <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+          <div className="mt-6 space-y-3">
             {categories.map((category, idx) => (
               <div
                 key={category.id}
-                className={`rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-sm ${
-                  CATEGORY_CARD_TONES[idx % CATEGORY_CARD_TONES.length]
+                onClick={() => setSelectedCategoryId(category.id)}
+                className={`group relative rounded-2xl border-2 p-4 cursor-pointer transition-all ${
+                  selectedCategoryId === category.id 
+                    ? "border-black bg-white shadow-lg ring-4 ring-black/5" 
+                    : "border-slate-50 bg-slate-50/30 hover:border-slate-200"
                 }`}
               >
                 {editingCategoryId === category.id ? (
@@ -775,13 +788,13 @@ export default function DashboardMenuPage() {
                     <input
                       value={editingCategoryName}
                       onChange={(e) => setEditingCategoryName(e.target.value)}
-                      className="w-full rounded border px-2 py-1 text-sm"
+                      className="input-standard w-full text-xs"
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={saveCategoryEdit}
                         disabled={busy}
-                        className="rounded border px-2 py-1 text-xs"
+                        className="btn-primary px-3 py-1 text-[9px] font-black uppercase"
                       >
                         Save
                       </button>
@@ -791,7 +804,7 @@ export default function DashboardMenuPage() {
                           setEditingCategoryName("");
                         }}
                         disabled={busy}
-                        className="rounded border px-2 py-1 text-xs"
+                        className="btn-glass px-3 py-1 text-[9px] font-black uppercase"
                       >
                         Cancel
                       </button>
@@ -805,48 +818,38 @@ export default function DashboardMenuPage() {
                       }}
                       className={`w-full rounded-lg border px-3 py-2 text-left text-sm font-medium transition ${
                         selectedCategoryId === category.id
-                          ? "border-slate-400 bg-slate-100 text-slate-900 shadow-sm"
-                          : "border-slate-200 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
-                      }`}
-                    >
-                      {category.name}
-                    </button>
-                    <div className="flex flex-wrap gap-1.5">
+                          ? "border-black bg-slate-50 text-black shadow-sm"
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-black text-black px-1">{category.name}</span>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => reorderCategory(category, -1)}
+                        onClick={(e) => { e.stopPropagation(); startCategoryEdit(category); }}
+                        disabled={busy || blocked}
+                        className="btn-glass p-1.5"
+                        title="Edit name"
+                      >
+                        <PencilIcon className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); reorderCategory(category, -1); }}
                         disabled={busy || blocked || idx === 0}
-                        aria-label={`Move category ${category.name} up`}
-                        title={`Move ${category.name} up`}
-                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:opacity-40"
+                        className="btn-glass p-1.5 disabled:opacity-20"
                       >
-                        <ChevronUpIcon />
+                        <ChevronUpIcon className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() => reorderCategory(category, 1)}
+                        onClick={(e) => { e.stopPropagation(); reorderCategory(category, 1); }}
                         disabled={busy || blocked || idx === categories.length - 1}
-                        aria-label={`Move category ${category.name} down`}
-                        title={`Move ${category.name} down`}
-                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:opacity-40"
+                        className="btn-glass p-1.5 disabled:opacity-20"
                       >
-                        <ChevronDownIcon />
+                        <ChevronDownIcon className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() => startCategoryEdit(category)}
+                        onClick={(e) => { e.stopPropagation(); requestDeleteCategory(category.id); }}
                         disabled={busy || blocked}
-                        aria-label={`Rename category ${category.name}`}
-                        title={`Rename ${category.name}`}
-                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:opacity-40"
+                        className="btn-glass p-1.5 text-rose-600 hover:bg-rose-50"
                       >
-                        <PencilIcon />
-                      </button>
-                      <button
-                        onClick={() => requestDeleteCategory(category.id)}
-                        disabled={busy || blocked}
-                        aria-label={`Delete category ${category.name}`}
-                        title={`Delete ${category.name}`}
-                        className="rounded-md border border-red-200 bg-white p-1.5 text-red-600 hover:border-red-400 hover:text-red-700 disabled:opacity-40"
-                      >
-                        <TrashIcon />
+                        <TrashIcon className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
@@ -876,164 +879,22 @@ export default function DashboardMenuPage() {
               !hasCategories ? "pointer-events-none select-none blur-[2px] opacity-60" : ""
             }`}
           >
-            <form onSubmit={createItem} className="mt-3 grid gap-2 md:grid-cols-4">
-            <div>
-              <input
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                placeholder="Item name"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="flex items-center rounded-md border bg-white px-2">
-              <span className="pr-2 text-sm font-semibold text-slate-700">
-                {currencySymbol}
-              </span>
-              <input
-                value={itemPrice}
-                onChange={(e) => setItemPrice(e.target.value)}
-                placeholder="0.00"
-                className="w-full flex-1 border-0 bg-transparent px-1 py-2 text-sm focus:outline-none"
-              />
-            </div>
-            <select
-              value={itemTags[0] || ""}
-              onChange={(e) => setItemTags(e.target.value ? [e.target.value] : [])}
-              className="rounded-md border px-3 py-2 text-sm"
-            >
-              <option value="">No dietary tag</option>
-              {DIETARY_TAGS.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              disabled={busy || blocked || !hasCategories}
-              className="rounded-md bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-            >
-              Add item
-            </button>
-            <div className="md:col-span-4">
-              <p className="text-[11px] font-medium text-gray-500">Suggestions</p>
-              <div className="mt-1.5 flex min-h-[30px] flex-wrap gap-1.5">
-                {itemSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    type="button"
-                    onClick={() => {
-                      setItemName(suggestion.label);
-                      setItemTags(suggestion.dietaryTags?.slice(0, 1) ?? []);
-                    }}
-                    disabled={busy || blocked || !hasCategories}
-                    className="rounded-full border border-gray-300 px-2 py-1 text-xs"
-                  >
-                    {suggestion.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="relative md:col-span-4">
-              <textarea
-                value={itemDescription}
-                onChange={(e) => setItemDescription(e.target.value)}
-                placeholder="Item description"
-                className="w-full rounded-md border px-3 py-2 pr-11 text-sm"
-                rows={2}
-              />
-              <button
-                type="button"
-                onClick={handleGenerateCreateDescription}
-                aria-label="Generate description for new item"
-                title={generatingDescription ? "Generating description..." : "Generate description"}
-                disabled={
-                  busy ||
-                  blocked ||
-                  !hasCategories ||
-                  generatingDescription ||
-                  itemName.trim().length < 2
-                }
-                className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 disabled:opacity-50"
-              >
-                <SparkleIcon className={generatingDescription ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
-              </button>
-            </div>
-            </form>
-            <div className="mt-4 space-y-2">
-              {filteredItems.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  {editingItemId === item.id && itemEditDraft ? (
-                      <div className="grid w-full gap-2 md:grid-cols-5">
+            <div className="space-y-6">
+            <section className="card-standard p-6 bg-black text-white">
+              <h2 className="text-xl font-black tracking-tight">Add Menu Item</h2>
+              <p className="text-xs text-white/60 font-medium">Add new dishes to the selected category.</p>
+              
+              <form onSubmit={createItem} className="mt-6 space-y-5">
+                <div className="grid gap-5 md:grid-cols-[1fr_120px]">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/50">Item Name</label>
+                    <div className="flex gap-2">
                       <input
-                        value={itemEditDraft.name}
-                        onChange={(e) =>
-                          setItemEditDraft((prev) => (prev ? { ...prev, name: e.target.value } : prev))
-                        }
-                        className="rounded border px-2 py-1 text-sm"
+                        value={itemName}
+                        onChange={(e) => setItemName(e.target.value)}
+                        placeholder="e.g. Truffle Pasta"
+                        className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 ring-white/10"
                       />
-                      <div className="flex items-center rounded border bg-white px-2">
-                        <span className="pr-2 text-sm font-semibold text-slate-700">
-                          {currencySymbol}
-                        </span>
-                        <input
-                          value={itemEditDraft.price}
-                          onChange={(e) =>
-                            setItemEditDraft((prev) =>
-                              prev ? { ...prev, price: e.target.value } : prev
-                            )
-                          }
-                          className="w-full flex-1 border-0 bg-transparent px-1 py-1 text-sm focus:outline-none"
-                        />
-                      </div>
-                      <select
-                        value={itemEditDraft.categoryId}
-                        onChange={(e) =>
-                          setItemEditDraft((prev) =>
-                            prev ? { ...prev, categoryId: e.target.value } : prev
-                          )
-                        }
-                        className="rounded border px-2 py-1 text-sm"
-                      >
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={itemEditDraft.dietaryTag}
-                        onChange={(e) =>
-                          setItemEditDraft((prev) =>
-                            prev ? { ...prev, dietaryTag: e.target.value } : prev
-                          )
-                        }
-                        className="rounded border px-2 py-1 text-sm"
-                      >
-                        <option value="">No dietary tag</option>
-                        {DIETARY_TAGS.map((tag) => (
-                          <option key={tag} value={tag}>
-                            {tag}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="relative md:col-span-4">
-                        <textarea
-                          value={itemEditDraft.description}
-                          onChange={(e) =>
-                            setItemEditDraft((prev) =>
-                              prev ? { ...prev, description: e.target.value } : prev
-                            )
-                          }
-                          className="w-full rounded border px-2 py-1 pr-10 text-sm"
-                          placeholder="Item description"
-                          rows={2}
-                        />
-                        <button
-                          type="button"
                           onClick={handleGenerateEditDescription}
                           aria-label={`Generate description for ${itemEditDraft.name}`}
                           title={
@@ -1144,7 +1005,7 @@ export default function DashboardMenuPage() {
                           disabled={busy || blocked || idx === 0}
                           aria-label={`Move item ${item.name} up`}
                           title={`Move ${item.name} up`}
-                          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:opacity-40"
+                          className="btn-glass p-1.5"
                         >
                           <ChevronUpIcon />
                         </button>
@@ -1153,7 +1014,7 @@ export default function DashboardMenuPage() {
                           disabled={busy || blocked || idx === filteredItems.length - 1}
                           aria-label={`Move item ${item.name} down`}
                           title={`Move ${item.name} down`}
-                          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:opacity-40"
+                          className="btn-glass p-1.5"
                         >
                           <ChevronDownIcon />
                         </button>
@@ -1162,7 +1023,7 @@ export default function DashboardMenuPage() {
                           disabled={busy || blocked}
                           aria-label={`Edit item ${item.name}`}
                           title={`Edit ${item.name}`}
-                          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:opacity-40"
+                          className="btn-glass p-1.5"
                         >
                           <PencilIcon />
                         </button>
@@ -1196,22 +1057,22 @@ export default function DashboardMenuPage() {
               )}
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t pt-4">
-              <p className="text-xs text-gray-600">
-                Page {itemPage} of {totalPages} ({itemTotal} total items)
+            <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-6">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Page {itemPage} of {totalPages} <span className="mx-2">•</span> {itemTotal} total tasks
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={() => goToPage(itemPage - 1)}
                   disabled={busy || itemPage <= 1}
-                  className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                  className="btn-glass px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-20"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => goToPage(itemPage + 1)}
                   disabled={busy || itemPage >= totalPages}
-                  className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                  className="btn-glass px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-20"
                 >
                   Next
                 </button>
@@ -1231,12 +1092,12 @@ export default function DashboardMenuPage() {
         }
         onClose={busy ? undefined : () => setPendingDelete(null)}
       >
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-3">
           <button
             type="button"
             onClick={() => setPendingDelete(null)}
             disabled={busy}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-50"
+            className="btn-glass"
           >
             Cancel
           </button>
@@ -1244,9 +1105,9 @@ export default function DashboardMenuPage() {
             type="button"
             onClick={() => void confirmDelete()}
             disabled={busy}
-            className="rounded-md bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+            className="btn-danger"
           >
-            {busy ? "Deleting..." : "Confirm delete"}
+            {busy ? "Deleting..." : "Confirm Delete"}
           </button>
         </div>
       </ModalDialog>

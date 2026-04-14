@@ -558,19 +558,19 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {visibleBusinesses.map((business) => (
                 <button
                   key={business.id}
                   onClick={() => selectBusiness(business.id)}
-                className={`rounded-2xl border-2 p-5 text-left transition-all duration-200 ${
+                className={`group rounded-3xl border-2 p-6 text-left transition-all duration-300 ${
                   selectedBusiness?.id === business.id
                     ? business.status === "archived"
-                      ? "border-red-400 bg-red-50"
-                        : "border-black bg-white shadow-md ring-4 ring-black/5"
+                      ? "border-red-400 bg-red-50 shadow-inner"
+                        : "border-black bg-white shadow-xl ring-8 ring-black/5 -translate-y-1"
                     : business.status === "archived"
                       ? "border-red-100 bg-white hover:bg-red-50/50"
-                      : "border-slate-100 bg-white hover:border-slate-300 hover:shadow-sm"
+                      : "border-slate-100 bg-white hover:border-black/20 hover:shadow-lg"
                 }`}
                 >
                   <div className="flex items-center gap-4">
@@ -578,30 +578,31 @@ export default function DashboardPage() {
                       <img
                         src={business.logoUrl}
                         alt={`${business.name} logo`}
-                        className="h-14 w-14 rounded-xl border border-slate-100 object-cover shadow-sm"
+                        className="h-16 w-16 rounded-2xl border border-slate-100 object-cover shadow-md transition-transform group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-50 text-sm font-bold text-slate-400 border border-slate-100">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-black text-xl font-black text-white shadow-lg">
                         {business.name.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-black">{business.name}</p>
-                      <p className="truncate text-xs text-zinc-500 font-medium">/{business.slug}</p>
+                      <p className="truncate text-lg font-black text-black tracking-tight">{business.name}</p>
+                      <p className="truncate text-xs font-bold text-zinc-400 uppercase tracking-widest">/{business.slug}</p>
                     </div>
                   </div>
-                  <div className="mt-4 flex items-center justify-between">
+                  <div className="mt-6 flex items-center justify-between">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
                         business.status === "archived"
                           ? "bg-red-100 text-red-600"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
+                      <span className={`h-1.5 w-1.5 rounded-full ${business.status === 'archived' ? 'bg-red-400' : 'bg-slate-400'}`} />
                       {business.status}
                     </span>
                     {selectedBusiness?.id === business.id && (
-                      <div className="h-2 w-2 rounded-full bg-black animate-pulse" />
+                      <div className="h-2 w-2 rounded-full bg-black animate-ping" />
                     )}
                   </div>
                 </button>
@@ -626,21 +627,21 @@ export default function DashboardPage() {
                     className="group w-full rounded-[2rem] border-2 border-amber-400 bg-amber-400 p-6 text-left shadow-xl shadow-amber-400/20 transition-all hover:translate-y-[-4px] hover:shadow-2xl hover:shadow-amber-400/30 active:scale-95"
                   >
                     <p className="text-2xl font-black text-slate-950">Manage menu</p>
-                    <p className="mt-2 text-sm font-bold text-slate-900 opacity-80">
+                    <p className="mt-2 text-sm font-bold text-black opacity-80">
                       Edit categories, prices, and images.
                     </p>
                   </button>
-                  <button
+                   <button
                     onClick={() => {
                       if (!guardBusinessManager("Only owners or managers can manage tables.")) return;
                       if (!guardBusinessActive()) return;
                       router.push("/dashboard/tables");
                     }}
-                    className="w-full card-standard p-6 text-left hover:border-black active:scale-95"
+                    className="w-full card-standard p-6 text-left hover:border-black active:scale-[0.98] transition-all"
                   >
-                    <p className="text-xl font-bold text-black">Tables & QR codes</p>
-                    <p className="mt-1 text-sm text-zinc-500 font-medium">
-                      Create tables and rotate digital codes.
+                    <p className="text-xl font-black text-black tracking-tight">Tables & QR codes</p>
+                    <p className="mt-1 text-sm text-zinc-400 font-bold uppercase tracking-tighter">
+                      Create & Rotate Codes
                     </p>
                   </button>
                 </>
@@ -653,7 +654,7 @@ export default function DashboardPage() {
                   }}
                   className="w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-100 via-teal-100 to-slate-50 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-emerald-400/40 dark:from-emerald-500/15 dark:via-teal-500/10 dark:to-slate-800"
                 >
-                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">Invite team member</p>
+                  <p className="text-xl font-black text-black">Invite team member</p>
                   <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     Add managers or staff to your org and businesses.
                   </p>
@@ -667,7 +668,7 @@ export default function DashboardPage() {
                   }}
                   className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-100 via-sky-100 to-white p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-indigo-400/40 dark:from-indigo-500/15 dark:via-sky-500/10 dark:to-slate-800"
                 >
-                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">Manage business access</p>
+                  <p className="text-xl font-black text-black">Manage business access</p>
                   <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                     Grant staff access to the selected business.
                   </p>
@@ -711,8 +712,7 @@ export default function DashboardPage() {
               : "bg-white dark:border-slate-800 dark:bg-slate-900"
           }`}
         >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Active business overview</h2>
+            <h2 className="text-xl font-black text-black tracking-tight border-l-4 border-amber-400 pl-3">Active business overview</h2>
             <div className="flex items-center gap-2">
               {canViewOrders && (
                 <button
@@ -721,7 +721,7 @@ export default function DashboardPage() {
                     if (!guardBusinessActive()) return;
                     router.push("/dashboard/orders");
                   }}
-                  className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300"
+                  className="btn-glass px-4 py-1.5 text-[10px] font-black uppercase tracking-widest"
                 >
                   View orders
                 </button>
@@ -830,7 +830,7 @@ export default function DashboardPage() {
                   !inviteEmail.trim() ||
                   inviteExists === false
                 }
-                className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900"
+                className="flex-1 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {inviteSubmitting ? "Sending..." : "Send invite"}
               </button>
@@ -870,119 +870,88 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {!teamLoading && orgMembers.length > 0 && !canManageAccess && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-                Only business owners or managers can grant or revoke business access.
-              </div>
-            )}
-
-            {!teamLoading && orgMembers.length > 0 && !canManageAccess && (
-              <div className="space-y-3">
-                {orgMembers.map((member) => {
-                  const existingRole = businessMemberMap.get(member.userId) ?? null;
-                  const displayRole = existingRole ?? null;
-
-                  return (
-                    <div
-                      key={member.userId}
-                      className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{member.email}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {member.isOwner ? "Org owner" : "Org member"}
-                          </p>
-                        </div>
-                        {displayRole ? (
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
-                            Has access ({displayRole})
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            No access
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {!teamLoading && orgMembers.length > 0 && canManageAccess && (
-              <div className="space-y-3">
+            {!teamLoading && orgMembers.length > 0 && (
+              <div className="space-y-2 border-t border-slate-100 pt-4">
+                <div className="grid grid-cols-[1fr_auto] px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <span>Member Email</span>
+                  <span>Action</span>
+                </div>
                 {orgMembers.map((member) => {
                   const existingRole = businessMemberMap.get(member.userId) ?? null;
                   const displayRole = existingRole ?? null;
                   const selectedRole = memberRoleSelections[member.userId] ?? "staff";
-                  const canAssign =
-                    !displayRole &&
-                    selectedBusiness &&
-                    canManageAccess;
+                  const canAssign = !canManageAccess ? false : (!displayRole && selectedBusiness);
                   const canRemove =
-                    !!displayRole &&
+                    !canManageAccess ? false : (!!displayRole &&
                     displayRole !== "owner" &&
                     member.userId !== user?.id &&
                     (selectedBusinessRole === "owner" ||
-                      (selectedBusinessRole === "manager" && displayRole === "staff"));
+                      (selectedBusinessRole === "manager" && displayRole === "staff")));
 
                   return (
                     <div
                       key={member.userId}
-                      className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:bg-slate-50"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{member.email}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {member.isOwner ? "Org owner" : "Org member"}
-                          </p>
-                        </div>
-                        {displayRole ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
-                              Has access ({displayRole})
+                          <p className="truncate text-sm font-black text-black tracking-tight">{member.email}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                              {member.isOwner ? "Org owner" : "Org member"}
                             </span>
-                            {canRemove && (
+                            {displayRole && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600">
+                                  Access: {displayRole}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {!displayRole ? (
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={selectedRole}
+                                onChange={(event) =>
+                                  setMemberRoleSelections((current) => ({
+                                    ...current,
+                                    [member.userId]: event.target.value as "manager" | "staff",
+                                  }))
+                                }
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-black focus:outline-none focus:ring-2 ring-black/5"
+                                disabled={!canAssign}
+                              >
+                                <option value="staff">Staff Role</option>
+                                <option value="manager" disabled={!canAssignManagerRole}>
+                                  Manager Role
+                                </option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => assignMemberToBusiness(member.userId)}
+                                disabled={!canAssign || assigningMemberId === member.userId}
+                                className="btn-primary py-1.5 px-4 text-[10px] font-black uppercase tracking-widest"
+                              >
+                                {assigningMemberId === member.userId ? "Adding..." : "Grant"}
+                              </button>
+                            </div>
+                          ) : (
+                            canRemove && (
                               <button
                                 type="button"
                                 onClick={() => removeMemberFromBusiness(member.userId)}
                                 disabled={assigningMemberId === member.userId}
-                                className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                                className="btn-danger py-1.5 px-4 text-[10px] font-black uppercase tracking-widest"
                               >
-                                {assigningMemberId === member.userId ? "Removing..." : "Remove access"}
+                                {assigningMemberId === member.userId ? "Wait..." : "Revoke"}
                               </button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <select
-                              value={selectedRole}
-                              onChange={(event) =>
-                                setMemberRoleSelections((current) => ({
-                                  ...current,
-                                  [member.userId]: event.target.value as "manager" | "staff",
-                                }))
-                              }
-                              className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                              disabled={!canAssign}
-                            >
-                              <option value="staff">Staff</option>
-                              <option value="manager" disabled={!canAssignManagerRole}>
-                                Manager
-                              </option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => assignMemberToBusiness(member.userId)}
-                              disabled={!canAssign || assigningMemberId === member.userId}
-                              className="rounded-md bg-slate-900 px-3 py-1 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900"
-                            >
-                              {assigningMemberId === member.userId ? "Adding..." : "Grant access"}
-                            </button>
-                          </div>
-                        )}
+                            )
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

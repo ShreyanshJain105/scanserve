@@ -21,28 +21,28 @@ const ORDER_STATUSES: OrderStatus[] = [
 ];
 
 const STATUS_BADGE: Record<OrderStatus, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  confirmed: "bg-blue-100 text-blue-800",
-  preparing: "bg-indigo-100 text-indigo-800",
-  ready: "bg-emerald-100 text-emerald-800",
-  completed: "bg-slate-200 text-slate-800",
-  cancelled: "bg-rose-100 text-rose-800",
+  pending: "bg-amber-500 text-white",
+  confirmed: "bg-blue-600 text-white",
+  preparing: "bg-indigo-600 text-white",
+  ready: "bg-emerald-600 text-white",
+  completed: "bg-slate-300 text-slate-700",
+  cancelled: "bg-rose-600 text-white",
 };
 
-const STATUS_CARD: Record<OrderStatus, string> = {
-  pending: "border-amber-200 bg-amber-50/70",
-  confirmed: "border-blue-200 bg-blue-50/70",
-  preparing: "border-indigo-200 bg-indigo-50/70",
-  ready: "border-emerald-200 bg-emerald-50/70",
-  completed: "border-slate-200 bg-slate-50",
-  cancelled: "border-rose-200 bg-rose-50/70",
+const STATUS_INDICATOR: Record<OrderStatus, string> = {
+  pending: "bg-amber-400",
+  confirmed: "bg-blue-400",
+  preparing: "bg-indigo-400 animate-pulse",
+  ready: "bg-emerald-400 animate-bounce",
+  completed: "bg-slate-400",
+  cancelled: "bg-rose-400",
 };
 
 const PAYMENT_BADGE: Record<OrderSummary["paymentStatus"], string> = {
   unpaid: "bg-rose-100 text-rose-800",
   pending: "bg-amber-100 text-amber-800",
   paid: "bg-emerald-100 text-emerald-800",
-  failed: "bg-rose-100 text-rose-800",
+  failed: "bg-rose-600 text-white",
   refunded: "bg-slate-200 text-slate-800",
 };
 
@@ -155,7 +155,7 @@ const ActivityTimeline = ({ detailOrder }: { detailOrder: OrderDetail }) => {
                 />
                 <span
                   className={`text-sm ${
-                    isActive ? "font-semibold text-slate-900" : isComplete ? "text-slate-700" : "text-slate-400"
+                    isActive ? "font-black text-black" : isComplete ? "text-zinc-500" : "text-slate-400"
                   }`}
                 >
                   {step.label}
@@ -582,39 +582,45 @@ export default function DashboardOrdersPage() {
             {blockedReason}
           </div>
         )}
-        <header className="rounded-xl border bg-white p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <header className="card-standard p-8">
+          <div className="flex flex-wrap items-center justify-between gap-6 pb-6 border-b border-slate-100">
             <div>
-              <h1 className="text-2xl font-semibold">Order management</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Track orders by status and update them as they move through the kitchen.
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                {lastUpdated ? `Last updated ${lastUpdated.toLocaleTimeString()}` : "Not updated yet"}
+              <h1 className="text-4xl font-black text-black tracking-tighter">Kitchen Tasks</h1>
+              <p className="mt-2 text-sm font-medium text-slate-500">
+                Live order stream and fulfillment dashboard.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => refreshOrders()}
-              disabled={busy}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {busy ? "Refreshing..." : "Refresh"}
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Heartbeat</p>
+                <p className="text-xs font-black text-black">
+                  {lastUpdated ? lastUpdated.toLocaleTimeString() : "Syncing..."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => refreshOrders()}
+                disabled={busy}
+                className="btn-primary"
+              >
+                {busy ? "Syncing..." : "Refresh Stream"}
+              </button>
+            </div>
           </div>
-          <div className="mt-4">
+          
+          <div className="mt-8">
             <AnalyticsOverview section="orders" />
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="space-y-4">
-            <div className="rounded-xl border bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">Sort by</p>
+        <div className="card-standard p-2 glass">
+          <div className="flex flex-wrap items-center gap-4 p-2">
+            <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <span className="text-xs font-bold text-black uppercase tracking-widest">Sort</span>
               <select
                 value={sortOption}
                 onChange={(event) => setSortOption(event.target.value as SortOption)}
-                className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                className="bg-transparent text-sm font-bold text-black focus:outline-none"
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -623,12 +629,13 @@ export default function DashboardOrdersPage() {
                 ))}
               </select>
             </div>
-            <div className="rounded-xl border bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">Filter by date</p>
+
+            <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <span className="text-xs font-bold text-black uppercase tracking-widest">Window</span>
               <select
                 value={dateFilter}
                 onChange={(event) => setDateFilter(event.target.value as DateFilter)}
-                className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                className="bg-transparent text-sm font-bold text-black focus:outline-none"
               >
                 {DATE_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -637,140 +644,132 @@ export default function DashboardOrdersPage() {
                 ))}
               </select>
             </div>
-            <div className="rounded-xl border bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">Filter by status</p>
-              <div className="mt-3 space-y-2">
-                {ORDER_STATUSES.map((status) => (
-                  <label key={status} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{formatStatusLabel(status)}</span>
-                    <input
-                      type="checkbox"
-                      checked={statusFilters[status]}
-                      onChange={(event) =>
-                        setStatusFilters((current) => ({
-                          ...current,
-                          [status]: event.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-slate-300 text-slate-900"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-          </aside>
 
-          <div className="rounded-xl border bg-white p-4">
-            {initialLoading && (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="rounded-lg border border-slate-200 p-4">
-                    <div className="h-4 w-24 rounded bg-slate-200" />
-                    <div className="mt-2 h-6 w-32 rounded bg-slate-200" />
-                    <div className="mt-3 h-3 w-40 rounded bg-slate-200" />
-                  </div>
-                ))}
-              </div>
-            )}
-            {filteredOrders.length === 0 && !busy && !initialLoading && (
-              <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">
-                No orders match the current filters.
-              </div>
-            )}
+            <div className="flex-1" />
 
-            <div className="space-y-3">
-              {filteredOrders.map((order) => (
-                <div
-                  key={order.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openDetail(order.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openDetail(order.id);
-                    }
-                  }}
-                  className={`relative w-full rounded-lg border p-4 text-left shadow-sm transition hover:shadow-md ${
-                    STATUS_CARD[order.status]
+            <div className="flex flex-wrap items-center gap-2 pr-2">
+              {ORDER_STATUSES.map((status) => (
+                <label 
+                  key={status} 
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                    statusFilters[status] 
+                      ? "border-black bg-black text-white" 
+                      : "border-slate-200 bg-white text-slate-400 hover:border-slate-300"
                   }`}
                 >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-slate-500">Order</p>
-                    <p className="text-lg font-semibold text-slate-900">#{order.id.slice(-6)}</p>
-                    <p className="text-xs text-slate-500">
-                      {order.table
-                        ? `Table ${order.table.label ?? order.table.tableNumber}`
-                        : "Table unknown"}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          STATUS_BADGE[order.status]
-                        }`}
-                      >
-                        {formatStatusLabel(order.status)}
-                      </span>
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          PAYMENT_BADGE[order.paymentStatus]
-                        }`}
-                      >
-                        {formatPaymentLabel(order.paymentStatus)}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={order.isPinned ? "Unpin order" : "Pin order"}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          togglePin(order.id, !order.isPinned);
-                        }}
-                        className={`inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                          order.isPinned
-                            ? "border-amber-200 bg-amber-50 text-amber-700"
-                            : "border-slate-200 bg-white text-slate-600"
-                        }`}
-                      >
-                        {order.isPinned ? "Pinned" : "Pin"}
-                      </button>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {formatCurrency(order.totalAmount)}
-                      </p>
-                      <p className="text-xs text-slate-500">{order.customerName}</p>
-                    </div>
-                    {order.paymentMethod === "cash" && order.paymentStatus !== "paid" && !blocked && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          markCashPaid(order.id);
-                        }}
-                        className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
-                      >
-                        Mark as paid
-                      </button>
-                    )}
-                  </div>
-                </div>
-                </div>
+                  <input
+                    type="checkbox"
+                    checked={statusFilters[status]}
+                    onChange={(event) =>
+                      setStatusFilters((current) => ({
+                        ...current,
+                        [status]: event.target.checked,
+                      }))
+                    }
+                    className="hidden"
+                  />
+                  <span className="text-[10px] font-black uppercase tracking-widest">{status}</span>
+                </label>
               ))}
             </div>
+          </div>
+        </div>
 
-            {hasMore && (
+        <section className="card-standard p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Order</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Table</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Customer</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Payment</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Total</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {initialLoading ? (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <tr key={`skeleton-${idx}`} className="animate-pulse">
+                      <td colSpan={7} className="px-6 py-8"><div className="h-4 w-full bg-slate-100 rounded" /></td>
+                    </tr>
+                  ))
+                ) : filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400 italic">No tasks active.</td>
+                  </tr>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <tr 
+                      key={order.id} 
+                      onClick={() => openDetail(order.id)}
+                      className="group cursor-pointer hover:bg-slate-50/50 transition-colors"
+                    >
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          {order.isPinned && <div className="h-2 w-2 rounded-full bg-amber-400" title="Pinned task" />}
+                          <span className="text-sm font-black text-black tracking-tight">#{order.id.slice(-6).toUpperCase()}</span>
+                        </div>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-black text-white">
+                          {order.table?.tableNumber || "?"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <p className="text-sm font-bold text-black">{order.customerName}</p>
+                        <p className="text-[10px] text-slate-500">{order.customerPhone || "Direct Guest"}</p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${STATUS_BADGE[order.status]}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${STATUS_INDICATOR[order.status]}`} />
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${PAYMENT_BADGE[order.paymentStatus]}`}>
+                          {order.paymentStatus}
+                        </span>
+                        <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter">via {order.paymentMethod}</p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="text-sm font-black text-black">{formatCurrency(order.totalAmount)}</span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); togglePin(order.id, !order.isPinned); }}
+                            className="btn-glass p-2"
+                          >
+                            <span className={order.isPinned ? "text-amber-500" : "text-black"}>★</span>
+                          </button>
+                          <button className="btn-secondary text-[10px] px-3 py-1.5">View</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {hasMore && (
+            <div className="p-6 border-t border-slate-50 bg-slate-50/50 flex justify-center">
               <button
                 onClick={() => loadOrders({ reset: false })}
                 disabled={busy}
-                className="mt-4 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                className="btn-glass text-xs"
               >
-                {busy ? "Loading..." : "Load more"}
+                {busy ? "Loading..." : "Load Older Tasks"}
               </button>
-            )}
-          </div>
+            </div>
+          )}
+        </section>
         </section>
       </section>
 
@@ -823,7 +822,7 @@ export default function DashboardOrdersPage() {
                       {detailOrder.isPinned ? "Pinned" : "Pin"}
                     </button>
                   </div>
-                  <p className="text-base font-semibold text-slate-900">
+                  <p className="text-base font-black text-black">
                     {formatCurrency(detailOrder.totalAmount)}
                   </p>
                 </div>
@@ -861,7 +860,7 @@ export default function DashboardOrdersPage() {
                   {detailOrder.items.map((item) => (
                     <div key={item.id} className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-medium text-slate-900">{item.name ?? "Item"}</p>
+                        <p className="font-black text-black">{item.name ?? "Item"}</p>
                         {item.specialInstructions && (
                           <p className="text-xs text-slate-500">{item.specialInstructions}</p>
                         )}

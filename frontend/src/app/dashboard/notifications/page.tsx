@@ -51,7 +51,7 @@ export default function NotificationsPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
+              <h1 className="text-xl font-black text-black">Notifications</h1>
               <p className="text-sm text-slate-600">Latest updates about your business profile.</p>
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function NotificationsPage() {
                         <p className="text-xs uppercase tracking-wide text-slate-500">
                           {n.businessName}
                         </p>
-                        <p className="text-sm font-semibold text-slate-900">{n.message}</p>
+                        <p className="text-sm font-black text-black">{n.message}</p>
                         <p className="text-xs text-slate-600">Type: {n.type}</p>
                         {payloadText && (
                           <pre className="mt-2 whitespace-pre-wrap rounded bg-white px-3 py-2 text-xs text-slate-700">

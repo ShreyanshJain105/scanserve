@@ -249,7 +249,7 @@ const StatCard = ({
         </div>
         <div className="text-indigo-500">{icon}</div>
       </div>
-      <div className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</div>
+      <div className="mt-3 text-2xl font-black text-black">{value}</div>
       <span className={`mt-3 inline-flex rounded-full px-2 py-1 text-[11px] ${tones[badgeTone]}`}>
         {badge}
       </span>
@@ -655,13 +655,13 @@ export default function DashboardAnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">Overview</p>
-                  <h1 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Business pulse</h1>
+                  <h1 className="mt-1 text-lg font-black text-black">Business pulse</h1>
                 </div>
               </div>
               <div className="mt-6 space-y-4">
                 <div className="rounded-2xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                   <p className="text-xs text-slate-500 dark:text-slate-400">Paid revenue</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                  <p className="mt-2 text-xl font-black text-black">
                     {formatMoney(selectedBusiness?.currencyCode ?? "USD", dashboardSummary?.paidRevenue ?? "0")}
                   </p>
                   <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700">
@@ -670,7 +670,7 @@ export default function DashboardAnalyticsPage() {
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                   <p className="text-xs text-slate-500 dark:text-slate-400">Total orders</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                  <p className="mt-2 text-xl font-black text-black">
                     {dashboardSummary?.totalOrders ?? 0}
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
@@ -679,7 +679,7 @@ export default function DashboardAnalyticsPage() {
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                   <p className="text-xs text-slate-500 dark:text-slate-400">Avg items / order</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                  <p className="mt-2 text-xl font-black text-black">
                     {formatDecimal(dashboardSummary?.avgItemsPerOrder ?? null, 1)}
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
@@ -707,7 +707,7 @@ export default function DashboardAnalyticsPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-400">
                       Revenue
                     </p>
-                    <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    <h2 className="mt-2 text-2xl font-black text-black">
                       Total revenue
                     </h2>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -723,8 +723,8 @@ export default function DashboardAnalyticsPage() {
                           onClick={() => onIntervalChange(window)}
                           className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
                             window === interval
-                              ? "bg-white text-slate-900 shadow dark:bg-slate-900 dark:text-slate-100"
-                              : "text-slate-500 dark:text-slate-400"
+                              ? "bg-black text-white shadow"
+                              : "text-zinc-500 hover:text-black"
                           }`}
                         >
                           {WINDOW_LABELS[window]}
@@ -802,7 +802,7 @@ export default function DashboardAnalyticsPage() {
                 <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_30px_70px_-55px_rgba(15,23,42,0.6)] dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Orders snapshot</p>
+                      <p className="text-sm font-black text-black">Orders snapshot</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Status mix by business.</p>
                     </div>
                     <select
@@ -851,7 +851,7 @@ export default function DashboardAnalyticsPage() {
                 </div>
 
                 <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_30px_70px_-55px_rgba(15,23,42,0.6)] dark:border-slate-800 dark:bg-slate-900">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top categories</p>
+                  <p className="text-sm font-black text-black">Top categories</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Share of paid revenue.</p>
                   <div className="mt-4 space-y-3">
                     {topCategories.length ? (
@@ -889,7 +889,7 @@ export default function DashboardAnalyticsPage() {
               <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_30px_70px_-55px_rgba(15,23,42,0.6)] dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Payment mix</p>
+                    <p className="text-sm font-black text-black">Payment mix</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Paid orders by method.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
@@ -922,7 +922,7 @@ export default function DashboardAnalyticsPage() {
                             {Math.round((item.orderCount / paymentTotal) * 100)}%
                           </span>
                         </div>
-                        <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        <p className="mt-2 text-lg font-black text-black">
                           {item.orderCount}
                         </p>
                         <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -945,7 +945,7 @@ export default function DashboardAnalyticsPage() {
               <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_30px_70px_-55px_rgba(15,23,42,0.6)] dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Reviews pulse</p>
+                    <p className="text-sm font-black text-black">Reviews pulse</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Guest sentiment this window.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
@@ -956,7 +956,7 @@ export default function DashboardAnalyticsPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
                       <p className="text-xs text-slate-500 dark:text-slate-400">Average rating</p>
-                      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="mt-2 text-xl font-black text-black">
                         {formatDecimal(reviewSummary?.averageRating ?? null, 2)}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
@@ -965,14 +965,14 @@ export default function DashboardAnalyticsPage() {
                     </div>
                     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
                       <p className="text-xs text-slate-500 dark:text-slate-400">Review conversion</p>
-                      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="mt-2 text-xl font-black text-black">
                         {formatPercent(reviewSummary?.reviewConversionPct ?? null)}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Completed orders → reviews</p>
                     </div>
                     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
                       <p className="text-xs text-slate-500 dark:text-slate-400">Likes per review</p>
-                      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="mt-2 text-xl font-black text-black">
                         {formatDecimal(reviewSummary?.likesPerReview ?? null, 2)}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">

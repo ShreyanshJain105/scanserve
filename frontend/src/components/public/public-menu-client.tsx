@@ -400,8 +400,8 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm uppercase tracking-wide text-slate-500">Public menu</p>
-            <h1 className="font-display text-3xl text-slate-900">{data.business.name}</h1>
-            <p className="mt-1 text-sm text-slate-600">
+            <h1 className="font-black text-3xl text-black tracking-tighter">{data.business.name}</h1>
+            <p className="mt-1 text-sm font-medium text-zinc-500">
               Table: {data.table ? `#${data.table.number}` : "Not at a table"}
             </p>
           </div>
@@ -424,8 +424,8 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
               return (
                 <div key={category.id} className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-display text-2xl text-slate-900">{category.name}</h2>
-                    <div className="h-px flex-1 bg-gradient-to-r from-slate-200 via-slate-100 to-transparent" />
+                    <h2 className="font-black text-2xl text-black tracking-tight">{category.name}</h2>
+                    <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-400 via-amber-100 to-transparent" />
                   </div>
                   {items.length === 0 ? (
                     <p className="text-sm text-slate-600">No items yet.</p>
@@ -451,7 +451,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                                 </div>
                               )}
                               <div className="space-y-1">
-                                <h3 className="text-base font-semibold text-slate-900">{item.name}</h3>
+                                <h3 className="text-base font-black text-black">{item.name}</h3>
                                 {item.dietaryTags.length > 0 && (
                                   <div className="flex flex-wrap gap-2">
                                     {item.dietaryTags.map((tag) => (
@@ -471,7 +471,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                             </div>
                             <div className="ml-auto flex flex-col items-end gap-2 md:min-w-[180px]">
                               <div className="text-right">
-                                <p className="text-sm font-semibold text-slate-900">
+                                <p className="text-sm font-black text-black">
                                   {formatPrice(item.price, data.business.currencyCode)}
                                 </p>
                                 {!item.isAvailable && (
@@ -534,7 +534,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Customer reviews
               </p>
-              <h2 className="mt-2 font-display text-2xl text-slate-900">
+              <h2 className="mt-2 font-black text-2xl text-black tracking-tight">
                 What diners are saying
               </h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -546,7 +546,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Average rating
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">
+                <p className="mt-1 text-2xl font-black text-black">
                   {reviewSummary.averageRating.toFixed(1)}
                 </p>
                 <p className="text-xs text-slate-500">
@@ -611,7 +611,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                   className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <div className="flex items-center gap-2 text-sm font-black text-black">
                       <span>{review.rating}★</span>
                       <span className="text-xs font-medium text-slate-500">
                         {new Date(review.createdAt).toLocaleDateString()}
@@ -697,8 +697,8 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm uppercase tracking-wide text-slate-500">Cart</p>
-              <h2 className="font-display text-2xl text-slate-900">Your items</h2>
-              <p className="text-sm text-slate-600">Saved locally for this table.</p>
+              <h2 className="font-black text-2xl text-black tracking-tight">Your items</h2>
+              <p className="text-sm font-medium text-zinc-500">Saved locally for this table.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -739,7 +739,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                   className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 p-3"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{item.name}</p>
+                    <p className="text-sm font-black text-black">{item.name}</p>
                     <p className="text-xs text-slate-600">
                       {item.quantity} × {formatPrice(item.price, data.business.currencyCode)}
                     </p>
@@ -792,7 +792,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                       value={customerName}
                       onChange={(event) => setCustomerName(event.target.value)}
                       placeholder="Enter your name"
-                      className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
+                      className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-black focus:border-black focus:outline-none focus:ring-4 ring-black/5"
                     />
                   </div>
                   <div className="space-y-1">
@@ -804,7 +804,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                       value={customerPhone}
                       onChange={(event) => setCustomerPhone(event.target.value)}
                       placeholder="Phone number"
-                      className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
+                      className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-black focus:border-black focus:outline-none focus:ring-4 ring-black/5"
                     />
                   </div>
                 </div>
@@ -821,7 +821,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                       value="razorpay"
                       checked={paymentMethod === "razorpay"}
                       onChange={() => setPaymentMethod("razorpay")}
-                      className="h-4 w-4 text-slate-900"
+                      className="h-4 w-4 text-black"
                     />
                     Pay online (Razorpay)
                   </label>
@@ -832,7 +832,7 @@ export function PublicMenuClient({ data, cartKey }: PublicMenuClientProps) {
                       value="cash"
                       checked={paymentMethod === "cash"}
                       onChange={() => setPaymentMethod("cash")}
-                      className="h-4 w-4 text-slate-900"
+                      className="h-4 w-4 text-black"
                     />
                     Pay with cash
                   </label>

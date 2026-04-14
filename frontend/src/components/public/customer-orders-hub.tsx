@@ -205,7 +205,7 @@ export default function CustomerOrdersHub({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Your orders
           </p>
-          <h1 className="mt-2 font-display text-3xl text-slate-900">Order hub</h1>
+          <h1 className="mt-2 font-black text-3xl text-black tracking-tighter">Order hub</h1>
           <p className="mt-1 text-sm text-slate-600">
             Track current and past orders across all visited businesses.
           </p>
@@ -220,7 +220,7 @@ export default function CustomerOrdersHub({
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[280px,1fr]">
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-slate-900">Orders</p>
+          <p className="text-sm font-black text-black">Orders</p>
           {loading ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               Loading orders...
@@ -256,7 +256,7 @@ export default function CustomerOrdersHub({
                         <p className="text-xs uppercase tracking-wide text-slate-500">
                           {order.business?.name ?? "Unknown business"}
                         </p>
-                        <p className="mt-1 text-base font-semibold text-slate-900 capitalize">
+                        <p className="mt-1 text-base font-black text-black capitalize">
                           {order.status}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
@@ -311,7 +311,7 @@ export default function CustomerOrdersHub({
                             <p className="text-[11px] uppercase tracking-wide text-slate-500">
                               {order.business?.name ?? "Unknown business"}
                             </p>
-                            <p className="mt-1 text-xs font-semibold text-slate-900 capitalize">
+                            <p className="mt-1 text-xs font-black text-black capitalize">
                               {order.status}
                             </p>
                             <p className="mt-1 text-[11px] text-slate-500">
@@ -349,7 +349,7 @@ export default function CustomerOrdersHub({
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Order detail
               </p>
-              <h2 className="mt-2 font-display text-2xl text-slate-900">
+              <h2 className="mt-2 font-black text-2xl text-black tracking-tight">
                 {detail.business?.name ? `${detail.business.name} order` : "Order details"}
               </h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -361,7 +361,7 @@ export default function CustomerOrdersHub({
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Status
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-slate-900 capitalize">
+                  <p className="mt-2 text-lg font-black text-black capitalize">
                     {detail.order.status}
                   </p>
                 </div>
@@ -387,14 +387,14 @@ export default function CustomerOrdersHub({
               </div>
 
               <div className="mt-6 space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Items</p>
+                <p className="text-sm font-black text-black">Items</p>
                 {detail.items.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3"
                   >
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-black text-black">
                         {item.name || "Menu item"}
                       </p>
                       <p className="text-xs text-slate-600">
@@ -481,7 +481,7 @@ export default function CustomerOrdersHub({
               value={reviewComment}
               onChange={(event) => setReviewComment(event.target.value.slice(0, 250))}
               rows={4}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-black focus:border-black focus:outline-none focus:ring-4 ring-black/5"
               placeholder="Share a short note..."
             />
             <p className="mt-1 text-[11px] text-slate-500">

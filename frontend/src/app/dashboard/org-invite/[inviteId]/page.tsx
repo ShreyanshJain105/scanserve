@@ -53,7 +53,7 @@ export default function OrgInvitePage() {
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
           Org Invite Preview
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Sample Org Overview</h1>
+        <h1 className="mt-2 text-2xl font-black text-black">Sample Org Overview</h1>
         <p className="mt-2 text-sm text-slate-600">
           This is a static preview to keep org details private until you accept.
         </p>
@@ -63,7 +63,7 @@ export default function OrgInvitePage() {
         <div className="pointer-events-none absolute inset-0 bg-white/60" />
         <div className="relative space-y-4 blur-sm">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h2 className="text-lg font-semibold text-slate-900">Sample Org: Horizon Foods</h2>
+            <h2 className="text-lg font-black text-black">Sample Org: Horizon Foods</h2>
             <p className="text-sm text-slate-600">Multi-location restaurant group</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -96,7 +96,7 @@ export default function OrgInvitePage() {
           type="button"
           onClick={() => handleAction("accept")}
           disabled={busy !== null}
-          className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="btn-primary flex-1 py-4"
         >
           {busy === "accept" ? "Accepting..." : "Accept Invite"}
         </button>
@@ -104,7 +104,7 @@ export default function OrgInvitePage() {
           type="button"
           onClick={() => handleAction("decline")}
           disabled={busy !== null}
-          className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          className="btn-glass flex-1 py-4 text-rose-600"
         >
           {busy === "decline" ? "Declining..." : "Decline Invite"}
         </button>

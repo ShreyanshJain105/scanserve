@@ -106,6 +106,22 @@ h4, .h4 { @apply text-lg font-bold; }
   @apply btn text-black hover:bg-slate-100;
 }
 
+.btn-danger {
+  @apply btn bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-200;
+}
+
+.btn-success {
+  @apply btn bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-200;
+}
+
+.btn-glass {
+  @apply btn bg-white/40 backdrop-blur-md border border-white/20 text-black hover:bg-white/60 shadow-sm transition-all;
+}
+
+.dark .btn-glass {
+  @apply bg-zinc-800/40 border-zinc-700/50 text-white hover:bg-zinc-800/60;
+}
+
 /* Standard Cards */
 .card-standard {
   @apply rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200;

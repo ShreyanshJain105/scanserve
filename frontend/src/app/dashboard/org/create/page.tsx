@@ -86,7 +86,7 @@ export default function OrgCreatePage() {
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
             Create org
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-900">
+          <h1 className="mt-2 text-3xl font-black text-black tracking-tighter">
             Start your org before adding businesses.
           </h1>
           <p className="mt-3 text-base text-slate-600">
@@ -108,15 +108,15 @@ export default function OrgCreatePage() {
           <button
             onClick={submitOrg}
             disabled={!orgName.trim() || submitting}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="btn-primary px-8 py-3"
           >
-            {submitting ? "Creating..." : "Create org"}
+            {submitting ? "Creating..." : "Create Org"}
           </button>
           <button
             onClick={() => router.push("/explore")}
-            className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700"
+            className="btn-glass px-8 py-3"
           >
-            Back to explore
+            Back to Explore
           </button>
         </div>
       </section>
