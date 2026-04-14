@@ -32,11 +32,12 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --prod
 
-# copy built app + prisma
+# copy built app + prisma schema
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=build /app/prisma ./prisma
+
+# Regenerate Prisma Client exactly for the production node_modules layout
+RUN pnpm dlx prisma generate
 
 ENV NODE_ENV=production
 EXPOSE 4000
