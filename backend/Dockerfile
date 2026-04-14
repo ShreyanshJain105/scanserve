@@ -1,26 +1,42 @@
+# ----------- Dependencies -----------
 FROM node:20-alpine AS deps
 WORKDIR /app
 
 RUN corepack enable
 
-COPY package.json ./
-# Use single pnpm install without workspace
+COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install
 
-FROM deps AS build
+# ----------- Build -----------
+FROM node:20-alpine AS build
 WORKDIR /app
 
+RUN corepack enable
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN pnpm run build:prod
+# 🔥 IMPORTANT: generate prisma client
+RUN npx prisma generate
 
-FROM deps AS runtime
+# build typescript
+RUN pnpm run build
+
+# ----------- Runtime -----------
+FROM node:20-alpine AS runtime
 WORKDIR /app
 
+RUN corepack enable
+
+# only production deps
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --prod
+
+# copy built app + prisma
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/scripts ./scripts
 
 ENV NODE_ENV=production
 EXPOSE 4000
