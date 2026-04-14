@@ -592,6 +592,27 @@ function BusinessOnboardingPageContent() {
               </p>
               <p className="mt-1 text-xs text-gray-500">PNG, JPEG, WEBP</p>
             </div>
+            {logoPreviewUrl ? (
+              <div className="mt-2 flex items-center gap-4 card-standard p-3">
+                <img
+                  src={logoPreviewUrl}
+                  alt="Business logo preview"
+                  className="h-20 w-20 rounded-xl border border-slate-100 object-cover shadow-sm"
+                />
+                <button
+                  type="button"
+                  className="btn-secondary text-xs px-3 py-1.5"
+                  onClick={() => {
+                    setLogoFile(null);
+                    setLogoPreviewUrl(existing?.logoUrl ?? "");
+                  }}
+                >
+                  Remove logo
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           <div className="mt-4 flex flex-col sm:flex-row gap-4">
             <button
               type="submit"
