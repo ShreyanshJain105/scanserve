@@ -5,16 +5,17 @@
 :root {
   --bg: #f6f7fb;
   --surface: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
+  --text: #000000;
+  --muted: #000000;
   --border: #dbe2ea;
+  --accent: #000000;
 }
 
 html.dark {
-  --bg: #0b1220;
-  --surface: #0f172a;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
+  --bg: #010101;
+  --surface: #000000;
+  --text: #ffffff;
+  --muted: #a1a1a1;
   --border: #1e293b;
 }
 
@@ -33,6 +34,19 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+}
+
+/* Enforce pure black text globally for light mode */
+:root body, 
+:root h1, :root h2, :root h3, :root h4, :root h5, :root h6,
+:root p, :root span, :root label, :root input, :root textarea, :root select, :root button,
+:root .text-muted, :root .text-gray-500, :root .text-slate-500 {
+  color: #000000 !important;
+}
+
+:root ::placeholder {
+  color: #000000 !important;
+  opacity: 0.8 !important; /* Slightly transparent black for placeholders */
 }
 
 .font-display {
