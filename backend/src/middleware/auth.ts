@@ -38,7 +38,7 @@ export const requireAuth = async (
     const bearerToken = bearer?.startsWith("Bearer ")
       ? bearer.substring(7)
       : null;
-    const cookieToken = req.cookies?.access_token;
+    const cookieToken = req.cookies?.access_token || req.cookies?.qr_customer_access;
     const token = bearerToken || cookieToken;
     if (!token) return sendAuthError(res);
 

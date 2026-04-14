@@ -30,6 +30,29 @@ const defaultHeaders = {
   "Content-Type": "application/json",
 };
 
+// Simple global token store for Bearer fallback
+let memoryToken: string | null = null;
+const TOKEN_KEY = "s2s_access_token";
+
+export const setStoredToken = (token: string | null) => {
+  memoryToken = token;
+  if (typeof window !== "undefined") {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  }
+};
+
+export const getStoredToken = () => {
+  if (memoryToken) return memoryToken;
+  if (typeof window !== "undefined") {
+    memoryToken = localStorage.getItem(TOKEN_KEY);
+  }
+  return memoryToken;
+};
+
 const CSRF_COOKIE_NAME = "csrf_token";
 export const CSRF_HEADER_NAME = "x-csrf-token";
 
@@ -120,6 +143,11 @@ export async function apiFetch<T>(
       };
   if (needsCsrf && csrfToken) {
     (mergedHeaders as Record<string, string>)[CSRF_HEADER_NAME] = csrfToken;
+  }
+
+  const storedToken = getStoredToken();
+  if (storedToken) {
+    (mergedHeaders as Record<string, string>)["Authorization"] = `Bearer ${storedToken}`;
   }
 
   const cache = options.cache ?? (method === "GET" ? "no-store" : undefined);

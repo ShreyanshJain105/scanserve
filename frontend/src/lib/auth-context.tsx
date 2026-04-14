@@ -8,7 +8,7 @@ import type {
   RegisterRequest,
   BusinessProfile,
 } from "@/shared";
-import { apiFetch } from "./api";
+import { apiFetch, setStoredToken } from "./api";
 
 type CreateBusinessProfileInput = {
   name: string;
@@ -131,6 +131,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       setBusinessUser(sessions.businessUser);
       setCustomerUser(sessions.customerUser);
+      // Note: we don't necessarily get new tokens from sessions endpoint unless we add it,
+      // but refreshProfile calls /me which might soon.
     } catch {
       setBusinessUser(null);
       setCustomerUser(null);
@@ -186,10 +188,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error(message);
     }
     try {
-      const data = await apiFetch<{ user: UserProfile }>("/api/auth/login", {
+      const data = await apiFetch<{ user: UserProfile, accessToken?: string }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify(input),
       });
+      if (data.accessToken) {
+        setStoredToken(data.accessToken);
+      }
       setUser(data.user);
       setBusinessUser(data.user);
       if (data.user.role === "business") {
@@ -282,6 +287,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       body: JSON.stringify({ scope }),
       headers: getScopedAuthHeaders(),
     });
+    if (scope === "all" || scope === "business") {
+      setStoredToken(null);
+    }
     await refreshProfile();
   };
 

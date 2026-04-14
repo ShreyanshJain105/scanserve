@@ -1,5 +1,6 @@
 import express from "express";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { z } from "zod";
 import {
   hashPassword,
@@ -261,12 +262,18 @@ router.post(
     }
     const resolvedRole: UserRole = "business";
     const passwordHash = await hashPassword(password);
+    const apiKey = `s2s_pk_${crypto.randomBytes(24).toString("hex")}`;
     const user = await prisma.user.create({
-      data: { email, passwordHash, role: resolvedRole },
+      data: { email, passwordHash, role: resolvedRole, apiKey },
     });
-    return sendSuccess(res, {
-      user: { id: user.id, email: user.email, role: user.role },
-    }, 201);
+    return sendSuccess(
+      res,
+      {
+        user: { id: user.id, email: user.email, role: user.role },
+        apiKey,
+      },
+      201
+    );
   })
 );
 
@@ -338,6 +345,7 @@ router.post(
           email: customer.email ?? customer.phone ?? "",
           role: "customer",
         },
+        accessToken,
       });
     }
 
@@ -394,6 +402,8 @@ router.post(
 
     return sendSuccess(res, {
       user: { id: user.id, email: user.email, role: user.role },
+      accessToken,
+      apiKey: user.apiKey,
     });
   })
 );
@@ -439,6 +449,7 @@ router.post(
             email: customer.email ?? customer.phone ?? "",
             role: "customer",
           },
+          accessToken,
         });
       }
 
@@ -462,6 +473,8 @@ router.post(
 
       return sendSuccess(res, {
         user: { id: user.id, email: user.email, role: user.role },
+        accessToken,
+        apiKey: user.apiKey,
       });
     } catch (err) {
       return sendError(res, "Invalid or expired refresh token", 401, "INVALID_REFRESH");
@@ -565,6 +578,24 @@ router.get(
         ? { id: customerUser.id, email: customerUser.email, role: customerUser.role }
         : null,
     });
+  })
+);
+
+router.patch(
+  "/api-key/rotate",
+  asyncHandler(async (req, res) => {
+    // This route needs to be authenticated.
+    if (!req.user || req.user.role === "customer") {
+      return sendError(res, "Unauthorized", 401, "UNAUTHORIZED");
+    }
+
+    const newApiKey = `s2s_pk_${crypto.randomBytes(24).toString("hex")}`;
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { apiKey: newApiKey },
+    });
+
+    return sendSuccess(res, { apiKey: newApiKey });
   })
 );
 

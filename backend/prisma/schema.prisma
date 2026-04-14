@@ -33,6 +33,7 @@ model User {
   actedNotifications NotificationEvent[]  @relation("NotificationEventActor")
   inboxEntries   NotificationInbox[]
   orderPins      OrderPin[]
+  apiKey         String?                   @unique @map("api_key")
   
 
   @@map("users")
