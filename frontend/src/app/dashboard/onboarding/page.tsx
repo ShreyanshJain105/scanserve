@@ -349,37 +349,39 @@ function BusinessOnboardingPageContent() {
             {blockedReason}
           </div>
         )}
-        <div className="rounded-xl border bg-white p-6">
-        <h1 className="text-2xl font-semibold">
-          {existing ? "Update your business profile" : "Create your business profile"}
+        <div className="card-standard p-10">
+        <h1 className="text-3xl font-extrabold tracking-tight text-black">
+          {existing ? "Update business profile" : "Create business profile"}
         </h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-zinc-600 font-medium leading-relaxed">
           Share your business details so we can review and approve your account quickly.
-        </p>
-        <p className="mt-1 text-sm text-gray-600">
           Fields marked required are needed for approval and customer discovery.
         </p>
+        
         {existing?.status === "rejected" && !!existing.rejections?.length && (
-          <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">
-            <p className="font-medium">Recent rejection reasons</p>
-            <ul className="mt-1 list-disc pl-4">
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p className="font-bold">Recent rejection reasons</p>
+            <ul className="mt-2 space-y-1 font-medium opacity-90">
               {existing.rejections.slice(0, 3).map((item) => (
-                <li key={item.id}>{item.reason || "No reason provided"}</li>
+                <li key={item.id} className="flex items-start gap-2">
+                  <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-red-600" />
+                  {item.reason || "No reason provided"}
+                </li>
               ))}
             </ul>
           </div>
         )}
 
         <form className="mt-6 grid gap-4" onSubmit={onSubmit}>
-          <label className="grid gap-1 text-sm">
-            <span>Business name</span>
+          <div className="grid gap-1.5">
+            <label className="text-sm font-bold text-black ml-1">Business name</label>
             <input
               value={form.name}
               onChange={(event) =>
                 setForm((current) => ({ ...current, name: event.target.value }))
               }
-              className={`rounded-md border px-3 py-2 ${
-                existing ? "cursor-not-allowed bg-gray-100 text-gray-600" : ""
+              className={`input-standard ${
+                existing ? "cursor-not-allowed bg-slate-50 text-zinc-500" : ""
               }`}
               placeholder="Example: Green Leaf Cafe"
               disabled={!!existing}
@@ -387,27 +389,27 @@ function BusinessOnboardingPageContent() {
               required
             />
             {existing ? (
-              <span className="text-xs text-gray-500">
+              <span className="text-[10px] text-zinc-400 font-bold ml-1 uppercase tracking-tight">
                 Business name is locked after profile creation.
               </span>
             ) : null}
-          </label>
+          </div>
 
-          <label className="grid gap-1 text-sm">
-            <span>Business URL slug (auto-generated)</span>
+          <div className="grid gap-1.5">
+            <label className="text-sm font-bold text-black ml-1">Business URL slug (auto-generated)</label>
             <input
               value={existing?.slug || toSlugPreview(form.name)}
-              className="cursor-not-allowed rounded-md border bg-gray-100 px-3 py-2 text-gray-600"
+              className="input-standard cursor-not-allowed bg-slate-50 text-zinc-500"
               disabled
               readOnly
             />
-            <span className="text-xs text-gray-500">
+            <span className="text-[10px] text-zinc-400 font-bold ml-1 uppercase tracking-tight">
               Generated from business name and locked to avoid URL conflicts.
             </span>
-          </label>
+          </div>
 
-          <div className="grid gap-1 text-sm">
-            <label htmlFor="currency-code">Currency code</label>
+          <div className="grid gap-1.5">
+            <label htmlFor="currency-code" className="text-sm font-bold text-black ml-1">Currency code</label>
             <div className="relative" ref={currencyDropdownRef}>
               <input
                 ref={currencyInputRef}
@@ -421,7 +423,7 @@ function BusinessOnboardingPageContent() {
                   setIsCurrencyOpen(true);
                   setCurrencyQuery(normalizeCurrencyCode(event.target.value));
                 }}
-                className="w-full rounded-md border px-3 py-2 pr-10"
+                className="input-standard pr-10"
                 placeholder="Search currency code"
                 aria-label="Currency code"
                 aria-haspopup="listbox"
@@ -590,38 +592,17 @@ function BusinessOnboardingPageContent() {
               </p>
               <p className="mt-1 text-xs text-gray-500">PNG, JPEG, WEBP</p>
             </div>
-            {logoPreviewUrl ? (
-              <div className="mt-1 flex items-center gap-3">
-                <img
-                  src={logoPreviewUrl}
-                  alt="Business logo preview"
-                  className="h-16 w-16 rounded-md border object-cover"
-                />
-                <button
-                  type="button"
-                  className="rounded-md border px-3 py-1.5 text-xs"
-                  onClick={() => {
-                    setLogoFile(null);
-                    setLogoPreviewUrl(existing?.logoUrl ?? "");
-                  }}
-                >
-                  Remove selection
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-2 flex gap-3">
+          <div className="mt-4 flex flex-col sm:flex-row gap-4">
             <button
               type="submit"
-              className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50"
+              className="btn-primary px-8"
               disabled={submitting}
             >
-              {submitting ? "Saving..." : existing ? "Save profile updates" : "Create profile"}
+              {submitting ? "Saving..." : existing ? "Save updates" : "Create profile"}
             </button>
             <button
               type="button"
-              className="rounded-md border px-4 py-2"
+              className="btn-secondary"
               onClick={() => router.push("/dashboard")}
               disabled={submitting}
             >

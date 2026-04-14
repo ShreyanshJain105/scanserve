@@ -47,7 +47,7 @@ export function BusinessLoginForm({ onSuccess }: BusinessLoginFormProps) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-amber-200 transition focus:ring-2"
+          className="input-standard mt-1"
           placeholder="you@business.com"
         />
       </div>
@@ -58,14 +58,14 @@ export function BusinessLoginForm({ onSuccess }: BusinessLoginFormProps) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-amber-200 transition focus:ring-2"
+          className="input-standard mt-1"
           placeholder="Your password"
         />
       </div>
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+        className="btn-primary w-full mt-2"
       >
         {loading ? "Signing in..." : "Sign in"}
       </button>
@@ -143,7 +143,7 @@ export function BusinessRegisterForm({ onSuccess }: BusinessRegisterFormProps) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-amber-200 transition focus:ring-2"
+          className="input-standard mt-1"
           placeholder="you@business.com"
         />
       </div>
@@ -154,7 +154,7 @@ export function BusinessRegisterForm({ onSuccess }: BusinessRegisterFormProps) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-amber-200 transition focus:ring-2"
+          className="input-standard mt-1"
           placeholder="Create a secure password"
         />
         <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
@@ -175,16 +175,16 @@ export function BusinessRegisterForm({ onSuccess }: BusinessRegisterFormProps) {
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           required
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-amber-200 transition focus:ring-2"
+          className="input-standard mt-1"
           placeholder="Repeat password"
         />
       </div>
       <button
         type="submit"
         disabled={loading || !isStrong}
-        className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+        className="btn-primary w-full mt-2"
       >
-        {loading ? "Creating..." : "Create business account"}
+        {loading ? "Creating..." : "Create account"}
       </button>
     </form>
   );

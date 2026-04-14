@@ -516,21 +516,21 @@ export default function DashboardPage() {
             {blockedReason}
           </div>
         )}
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <header className="flex flex-wrap items-center justify-between gap-6 card-standard p-8">
           <div>
-            <h1 className="text-2xl font-semibold">Business Dashboard</h1>
-            <p className="text-sm text-gray-600 dark:text-slate-300">
-              Manage businesses, archive state, and operations.
+            <h1 className="text-3xl font-extrabold tracking-tight text-black">Dashboard</h1>
+            <p className="mt-1 text-sm text-zinc-600">
+              Manage your businesses, team, and digital services.
             </p>
           </div>
           {isOrgOwner && (
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={() => {
                   if (!guardOrgOwner("Only org owners can add businesses.")) return;
                   router.push("/dashboard/onboarding");
                 }}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:text-slate-200"
+                className="btn-secondary"
               >
                 Add business
               </button>
@@ -543,16 +543,16 @@ export default function DashboardPage() {
             showQuickActions ? "lg:grid-cols-[1fr_320px]" : ""
           }`}
         >
-          <section className="rounded-xl border bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">Your businesses</p>
+          <section className="card-standard p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-black border-l-4 border-amber-400 pl-3">Your businesses</h3>
               {isOrgOwner && (
                 <button
                   onClick={() => {
                     if (!guardOrgOwner("Only org owners can view archived businesses.")) return;
                     setShowArchived((current) => !current);
                   }}
-                  className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium dark:border-slate-700 dark:text-slate-200"
+                  className="btn-ghost text-xs py-1.5"
                 >
                   {showArchived ? "Show active" : "Show archived"}
                 </button>
@@ -563,42 +563,47 @@ export default function DashboardPage() {
                 <button
                   key={business.id}
                   onClick={() => selectBusiness(business.id)}
-                className={`rounded-lg border p-4 text-left transition ${
+                className={`rounded-2xl border-2 p-5 text-left transition-all duration-200 ${
                   selectedBusiness?.id === business.id
                     ? business.status === "archived"
-                      ? "border-2 border-red-300 bg-red-100 dark:border-red-400/60 dark:bg-red-500/10"
-                        : "border-2 border-orange-300 bg-gray-100 dark:border-orange-400/60 dark:bg-slate-800"
+                      ? "border-red-400 bg-red-50"
+                        : "border-black bg-white shadow-md ring-4 ring-black/5"
                     : business.status === "archived"
-                      ? "border-red-200 bg-red-50 hover:bg-red-100/70 dark:border-red-500/40 dark:bg-red-500/5 dark:hover:bg-red-500/10"
-                      : "border-gray-200 bg-white hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      ? "border-red-100 bg-white hover:bg-red-50/50"
+                      : "border-slate-100 bg-white hover:border-slate-300 hover:shadow-sm"
                 }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     {business.logoUrl ? (
                       <img
                         src={business.logoUrl}
                         alt={`${business.name} logo`}
-                        className="h-12 w-12 rounded-md border object-cover dark:border-slate-700"
+                        className="h-14 w-14 rounded-xl border border-slate-100 object-cover shadow-sm"
                       />
                     ) : (
-                      <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-gray-100 text-xs font-semibold text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-50 text-sm font-bold text-slate-400 border border-slate-100">
                         {business.name.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{business.name}</p>
-                      <p className="truncate text-sm text-gray-600 dark:text-slate-400">{business.slug}</p>
+                      <p className="truncate font-bold text-black">{business.name}</p>
+                      <p className="truncate text-xs text-zinc-500 font-medium">/{business.slug}</p>
                     </div>
                   </div>
-                  <span
-                    className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs capitalize ${
-                      business.status === "archived"
-                        ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200"
-                        : "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-300"
-                    }`}
-                  >
-                    {business.status}
-                  </span>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        business.status === "archived"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {business.status}
+                    </span>
+                    {selectedBusiness?.id === business.id && (
+                      <div className="h-2 w-2 rounded-full bg-black animate-pulse" />
+                    )}
+                  </div>
                 </button>
               ))}
               {visibleBusinesses.length === 0 && (
@@ -618,11 +623,11 @@ export default function DashboardPage() {
                       if (!guardBusinessActive()) return;
                       router.push("/dashboard/menu");
                     }}
-                    className="w-full rounded-xl border border-orange-200 bg-gradient-to-br from-amber-200 via-orange-300 to-rose-300 p-5 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-orange-400/40 dark:from-orange-500/20 dark:via-amber-500/10 dark:to-rose-500/20"
+                    className="group w-full rounded-[2rem] border-2 border-amber-400 bg-amber-400 p-6 text-left shadow-xl shadow-amber-400/20 transition-all hover:translate-y-[-4px] hover:shadow-2xl hover:shadow-amber-400/30 active:scale-95"
                   >
-                    <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Manage menu</p>
-                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-                      Edit categories, prices, availability, and images.
+                    <p className="text-2xl font-black text-slate-950">Manage menu</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900 opacity-80">
+                      Edit categories, prices, and images.
                     </p>
                   </button>
                   <button
@@ -631,11 +636,11 @@ export default function DashboardPage() {
                       if (!guardBusinessActive()) return;
                       router.push("/dashboard/tables");
                     }}
-                    className="w-full rounded-xl border border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-100 to-teal-100 p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md dark:border-sky-400/40 dark:from-sky-500/15 dark:via-cyan-500/10 dark:to-emerald-500/10"
+                    className="w-full card-standard p-6 text-left hover:border-black active:scale-95"
                   >
-                    <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">Manage tables and QR</p>
-                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-                      Create tables, rotate codes, and export downloads.
+                    <p className="text-xl font-bold text-black">Tables & QR codes</p>
+                    <p className="mt-1 text-sm text-zinc-500 font-medium">
+                      Create tables and rotate digital codes.
                     </p>
                   </button>
                 </>
