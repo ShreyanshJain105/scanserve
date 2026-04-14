@@ -872,7 +872,7 @@ export default function DashboardMenuPage() {
             }`}
           >
             <div className="space-y-6">
-            <section className="card-standard p-6 bg-black text-white">
+            <section className="card-standard p-6" style={{ background: "linear-gradient(135deg, #1c1c1e 0%, #2a2a2e 100%)", color: "white" }}>
               <h2 className="text-xl font-black tracking-tight">Add Menu Item</h2>
               <p className="text-xs text-white/60 font-medium">Add new dishes to the selected category.</p>
               

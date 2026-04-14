@@ -91,7 +91,7 @@ h4, .h4 { @apply text-lg font-bold; }
 }
 
 .btn-primary {
-  @apply btn bg-black text-white hover:bg-zinc-800 shadow-md hover:shadow-lg;
+  @apply btn bg-zinc-800 text-white hover:bg-zinc-700 shadow-md hover:shadow-lg;
 }
 
 .btn-secondary {

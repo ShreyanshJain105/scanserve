@@ -64,7 +64,7 @@ export default function ExplorePage() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => router.push("/dashboard/org/create")}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
+            className="btn-primary rounded-lg px-5 py-2.5 text-sm font-semibold"
           >
             Create org
           </button>

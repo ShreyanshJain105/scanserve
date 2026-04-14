@@ -36,7 +36,7 @@ export default function HomePage() {
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 href="/register/business"
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white"
+                className="btn-primary rounded-lg px-4 py-2.5 text-sm font-semibold"
               >
                 Start with business signup
               </Link>
@@ -94,7 +94,7 @@ export default function HomePage() {
             {profileAction ? (
               <button
                 onClick={() => router.push(profileAction.href)}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white"
+                className="btn-primary rounded-lg px-4 py-2.5 text-sm font-semibold"
               >
                 {profileAction.label}
               </button>
