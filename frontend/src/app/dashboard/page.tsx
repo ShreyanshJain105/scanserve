@@ -581,7 +581,10 @@ export default function DashboardPage() {
                         className="h-16 w-16 rounded-2xl border border-slate-100 object-cover shadow-md transition-transform group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-black text-xl font-black text-white shadow-lg">
+                      <div
+                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-lg font-black text-white shadow-inner"
+                        style={{ background: `hsl(${(business.name.charCodeAt(0) * 37) % 360}, 55%, 42%)` }}
+                      >
                         {business.name.slice(0, 2).toUpperCase()}
                       </div>
                     )}
@@ -595,14 +598,16 @@ export default function DashboardPage() {
                       className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
                         business.status === "archived"
                           ? "bg-red-100 text-red-600"
+                          : business.status === "approved"
+                          ? "bg-emerald-50 text-emerald-700"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${business.status === 'archived' ? 'bg-red-400' : 'bg-slate-400'}`} />
+                      <span className={`h-1.5 w-1.5 rounded-full ${business.status === 'archived' ? 'bg-red-400' : business.status === 'approved' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                       {business.status}
                     </span>
                     {selectedBusiness?.id === business.id && (
-                      <div className="h-2 w-2 rounded-full bg-black animate-ping" />
+                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
                     )}
                   </div>
                 </button>

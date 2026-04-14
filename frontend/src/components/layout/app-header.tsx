@@ -404,8 +404,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                     type="button"
                     className={`rounded px-2 py-1 text-[11px] ${
                       notifScope === "unread"
-                        ? "bg-black text-white"
-                        : "border border-slate-200 text-slate-700"
+                        ? "bg-zinc-800 text-white"
+                        : "border border-slate-200 text-slate-700 hover:border-slate-400"
                     }`}
                     onClick={() => fetchNotifications({ resetPage: true, scope: "unread" })}
                   >
@@ -415,8 +415,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                     type="button"
                     className={`rounded px-2 py-1 text-[11px] ${
                       notifScope === "all"
-                        ? "bg-black text-white"
-                        : "border border-slate-200 text-slate-700"
+                        ? "bg-zinc-800 text-white"
+                        : "border border-slate-200 text-slate-700 hover:border-slate-400"
                     }`}
                     onClick={() => fetchNotifications({ resetPage: true, scope: "all" })}
                   >
@@ -604,8 +604,8 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
                   href={item.href}
                   className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all ${
                     pathname?.startsWith(item.href)
-                      ? "bg-black text-white shadow-md"
-                      : "text-zinc-600 hover:text-black hover:bg-white/80"
+                      ? "bg-zinc-900 text-white shadow-sm"
+                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
                   }`}
                 >
                   {item.label}
