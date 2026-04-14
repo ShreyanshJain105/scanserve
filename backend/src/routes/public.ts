@@ -799,12 +799,12 @@ router.get(
       }
 
       const [aggregate, grouped] = await prisma.$transaction([
-        reviewModel.aggregate({
+        (reviewModel.aggregate as any)({
           where: where as any,
           _count: { _all: true },
           _avg: { rating: true },
         }),
-        reviewModel.groupBy({
+        (reviewModel.groupBy as any)({
           by: ["rating"],
           where: where as any,
           _count: { _all: true },

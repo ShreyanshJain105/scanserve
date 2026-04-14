@@ -402,7 +402,7 @@ router.patch(
   "/businesses/:id/updates/:updateId/approve",
   asyncHandler(async (req, res) => {
     const update = await prisma.businessUpdateRequest.findFirst({
-      where: { id: req.params.updateId, businessId: req.params.id },
+      where: { id: req.params.updateId as string, businessId: req.params.id as string },
     });
     if (!update) {
       sendError(res, "Update request not found", 404, "UPDATE_NOT_FOUND");
@@ -413,7 +413,7 @@ router.patch(
       return;
     }
 
-    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    const business = await prisma.business.findUnique({ where: { id: req.params.id as string } });
     if (!business) {
       sendError(res, "Business not found", 404, "BUSINESS_NOT_FOUND");
       return;
@@ -462,7 +462,7 @@ router.patch(
     }
 
     const update = await prisma.businessUpdateRequest.findFirst({
-      where: { id: req.params.updateId, businessId: req.params.id },
+      where: { id: req.params.updateId as string, businessId: req.params.id as string },
     });
     if (!update) {
       sendError(res, "Update request not found", 404, "UPDATE_NOT_FOUND");
@@ -473,7 +473,7 @@ router.patch(
       return;
     }
 
-    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    const business = await prisma.business.findUnique({ where: { id: req.params.id as string } });
     if (!business) {
       sendError(res, "Business not found", 404, "BUSINESS_NOT_FOUND");
       return;

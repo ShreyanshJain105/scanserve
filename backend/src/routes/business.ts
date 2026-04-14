@@ -1554,13 +1554,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const inboxId = req.params.inboxId;
     const existing = await prisma.notificationInbox.findFirst({
-      where: { id: inboxId, userId: req.user!.id },
+      where: { id: inboxId as string, userId: req.user!.id },
     });
     if (!existing) {
       sendError(res, "Notification not found", 404, "NOTIFICATION_NOT_FOUND");
       return;
     }
-    await prisma.notificationInbox.delete({ where: { id: inboxId } });
+    await prisma.notificationInbox.delete({ where: { id: inboxId as string } });
     const unreadCount = await prisma.notificationInbox.count({ where: { userId: req.user!.id } });
     sendSuccess(res, { unreadCount });
   })
@@ -2010,7 +2010,7 @@ router.patch(
     }
     const id = req.params.id;
     const existing = await prisma.category.findFirst({
-      where: { id, businessId: req.business!.id },
+      where: { id: id as string, businessId: req.business!.id },
     });
     if (!existing) {
       sendError(res, "Category not found", 404, "CATEGORY_NOT_FOUND");
@@ -2068,7 +2068,7 @@ router.delete(
     if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const id = req.params.id;
     const existing = await prisma.category.findFirst({
-      where: { id, businessId: req.business!.id },
+      where: { id: id as string, businessId: req.business!.id },
     });
     if (!existing) {
       sendError(res, "Category not found", 404, "CATEGORY_NOT_FOUND");
@@ -2190,7 +2190,7 @@ router.patch(
     }
     const id = req.params.id;
     const existing = await prisma.menuItem.findFirst({
-      where: { id, businessId: req.business!.id },
+      where: { id: id as string, businessId: req.business!.id },
     });
     if (!existing) {
       sendError(res, "Menu item not found", 404, "MENU_ITEM_NOT_FOUND");
@@ -2253,7 +2253,7 @@ router.patch(
     }
     const id = req.params.id;
     const existing = await prisma.menuItem.findFirst({
-      where: { id, businessId: req.business!.id },
+      where: { id: id as string, businessId: req.business!.id },
     });
     if (!existing) {
       sendError(res, "Menu item not found", 404, "MENU_ITEM_NOT_FOUND");
@@ -2274,8 +2274,8 @@ router.post(
   asyncHandler(async (req, res) => {
     if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const id = req.params.id;
-    const existing = await prisma.menuItem.findFirst({
-      where: { id, businessId: req.business!.id },
+    const existing: any = await prisma.menuItem.findFirst({
+      where: { id: id as string, businessId: req.business!.id },
       include: { category: { select: { name: true } } },
     });
     if (!existing) {
