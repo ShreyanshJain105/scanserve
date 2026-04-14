@@ -905,7 +905,7 @@ export const fetchWarehouseDashboardWindow = async (
       SELECT ${pgStartUtc} AS start_utc, ${pgEndUtc} AS end_utc
     )
     SELECT
-      (${pgBucket === "hour"
+      (${pgBucket as string === "hour"
         ? Prisma.sql`date_trunc('hour', (created_at AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})`
         : Prisma.sql`date_trunc('day', (created_at AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})`}
         AT TIME ZONE ${timezone}) AS bucket_start,

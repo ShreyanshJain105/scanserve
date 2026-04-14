@@ -1,16 +1,14 @@
 import { logger } from "./utils/logger";
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { PrismaClient } = require("@prisma/client") as { PrismaClient: new (options?: unknown) => unknown };
+import { PrismaClient } from "@prisma/client";
 
 const prismaQueryLoggingEnabled = process.env.PRISMA_LOG_QUERIES === "true";
 const prismaLogs = prismaQueryLoggingEnabled
-  ? [{ emit: "event", level: "query" }, { emit: "stdout", level: "warn" }, { emit: "stdout", level: "error" }]
-  : [{ emit: "stdout", level: "warn" }, { emit: "stdout", level: "error" }];
+  ? [{ emit: "event", level: "query" }, { emit: "stdout", level: "warn" }, { emit: "stdout", level: "error" }] as const
+  : [{ emit: "stdout", level: "warn" }, { emit: "stdout", level: "error" }] as const;
 
 // Single Prisma instance for the API process.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const prisma = new PrismaClient({ log: prismaLogs }) as any;
+export const prisma = new PrismaClient({ log: prismaLogs as any });
 
 if (prismaQueryLoggingEnabled) {
   prisma.$on("query", (event: { query: string; params: string; duration: number }) => {

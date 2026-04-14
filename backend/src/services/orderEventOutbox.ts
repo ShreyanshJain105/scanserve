@@ -118,7 +118,7 @@ const markOutboxFailure = async ({
   });
 };
 
-const publishToQueue = async (events: ReturnType<typeof claimPendingEvents>) => {
+const publishToQueue = async (events: Awaited<ReturnType<typeof claimPendingEvents>>) => {
   if (events.length === 0) return;
   await publishOrderEventsToQueue(
     events.map((event) => ({
