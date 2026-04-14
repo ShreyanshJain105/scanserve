@@ -197,16 +197,16 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
 
   const businessLoginDropdown = (
     <details className="relative" data-dropdown-root>
-      <summary className="cursor-pointer list-none rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+      <summary className="btn-secondary px-3 py-2 cursor-pointer list-none">
         Login
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-44 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="absolute right-0 z-30 mt-2 w-48 card-standard p-1 shadow-lg">
         <Link
           href="/login"
-          className={`block rounded px-2.5 py-2 text-xs ${
+          className={`block rounded-lg px-3 py-2 text-sm ${
             businessUser
-              ? "pointer-events-none text-slate-400"
-              : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+              ? "pointer-events-none text-zinc-400"
+              : "text-black hover:bg-slate-50"
           }`}
         >
           Login as business
@@ -269,13 +269,13 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     <div className="flex items-center gap-2">
       {themeToggleButton}
       <details className="relative" data-dropdown-root>
-        <summary className="cursor-pointer list-none rounded-md border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100">
-          {customerUser.email}
+        <summary className="btn-secondary px-3 py-2 cursor-pointer list-none border-sky-100 bg-sky-50 text-sky-800 dark:bg-sky-900/40 dark:text-sky-100">
+          <span className="max-w-[150px] truncate">{customerUser.email}</span>
         </summary>
-        <div className="absolute left-0 right-0 z-30 mt-1 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="absolute right-0 z-30 mt-1 w-48 card-standard p-1 shadow-lg">
           <Link
             href="/orders"
-            className="block rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="block rounded-lg px-3 py-2 text-left text-sm text-black hover:bg-slate-50"
           >
             View orders
           </Link>
@@ -285,7 +285,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
               void logoutCustomer();
               router.refresh();
             }}
-            className="block w-full rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-black hover:bg-slate-50"
           >
             Logout customer
           </button>
@@ -563,7 +563,7 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
       {businessLoginDropdown}
       <Link
         href="/register/business"
-        className="rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white dark:bg-slate-100 dark:text-slate-900"
+        className="btn-primary"
       >
         Register
       </Link>
@@ -591,21 +591,21 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
       </div>
       <div className="border-t border-slate-200/70 dark:border-slate-800/80">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-center px-6 py-2">
-          <div className="inline-flex rounded-full border border-slate-200 bg-white px-1 py-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="inline-flex rounded-full border border-slate-200 bg-white/50 p-1 shadow-sm backdrop-blur-sm">
             {[
               { label: "Home", href: "/home", visible: true },
               { label: "Explore", href: "/explore", visible: true },
-              { label: "Dashboard", href: "/dashboard", visible: user?.role === "business" },
+              { label: "Dashboard", href: "/dashboard", visible: Boolean(businessUser || user?.role === "business") },
             ]
               .filter((item) => item.visible)
               .map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all ${
                     pathname?.startsWith(item.href)
-                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                      ? "bg-black text-white shadow-md"
+                      : "text-zinc-600 hover:text-black hover:bg-white/80"
                   }`}
                 >
                   {item.label}
