@@ -11,7 +11,7 @@ const prismaLogs = prismaQueryLoggingEnabled
 export const prisma = new PrismaClient({ log: prismaLogs as any });
 
 if (prismaQueryLoggingEnabled) {
-  prisma.$on("query", (event: { query: string; params: string; duration: number }) => {
+  prisma.$on("query", (event: any) => {
     logger.info("db.query", {
       durationMs: event.duration,
       query: event.query,

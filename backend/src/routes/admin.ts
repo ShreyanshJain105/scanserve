@@ -178,13 +178,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const inboxId = req.params.inboxId;
     const existing = await prisma.notificationInbox.findFirst({
-      where: { id: inboxId, userId: req.user!.id },
+      where: { id: inboxId as string, userId: req.user!.id },
     });
     if (!existing) {
       sendError(res, "Notification not found", 404, "NOTIFICATION_NOT_FOUND");
       return;
     }
-    await prisma.notificationInbox.delete({ where: { id: inboxId } });
+    await prisma.notificationInbox.delete({ where: { id: inboxId as string } });
     const unreadCount = await prisma.notificationInbox.count({ where: { userId: req.user!.id } });
     sendSuccess(res, { unreadCount });
   })
@@ -234,7 +234,7 @@ router.patch(
   "/businesses/:id/approve",
   asyncHandler(async (req, res) => {
     const business = await prisma.business.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
     });
 
     if (!business) {
@@ -284,7 +284,7 @@ router.patch(
     }
 
     const business = await prisma.business.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
     });
 
     if (!business) {
@@ -341,7 +341,7 @@ router.patch(
       sendError(res, parsed.error.message, 400, "VALIDATION_ERROR");
       return;
     }
-    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    const business = await prisma.business.findUnique({ where: { id: req.params.id as string } });
     if (!business) {
       sendError(res, "Business not found", 404, "BUSINESS_NOT_FOUND");
       return;
@@ -379,7 +379,7 @@ router.get(
     }
 
     const updates = await prisma.businessUpdateRequest.findMany({
-      where: { businessId: req.params.id, status: statusFilter },
+      where: { businessId: req.params.id as string, status: statusFilter },
       orderBy: { createdAt: "desc" },
     });
 
