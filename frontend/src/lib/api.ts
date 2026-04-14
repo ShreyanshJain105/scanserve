@@ -21,26 +21,7 @@ const getPort = (host: string, protocol: string) => {
 
 const resolveApiBase = () => {
   if (!API_URL) return "";
-  if (API_URL.startsWith("/")) return API_URL;
-  if (typeof window === "undefined") return API_URL;
-
-  try {
-    const apiUrl = new URL(API_URL);
-    const apiHost = apiUrl.host;
-    const currentHost = window.location.host;
-    const apiPort = getPort(apiHost, apiUrl.protocol);
-    const currentPort = getPort(currentHost, window.location.protocol);
-    const samePort = apiPort === currentPort;
-    const sameBaseDomain = getBaseDomain(apiHost) === getBaseDomain(currentHost);
-
-    if (samePort && sameBaseDomain) {
-      return "";
-    }
-  } catch {
-    return API_URL;
-  }
-
-  return API_URL;
+  return API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
 };
 
 export const getApiBase = () => resolveApiBase();
