@@ -564,39 +564,45 @@ export default function DashboardPage() {
                 <button
                   key={business.id}
                   onClick={() => selectBusiness(business.id)}
-                className={`group rounded-3xl border-2 p-6 text-left transition-all duration-300 ${
-                  selectedBusiness?.id === business.id
-                    ? business.status === "archived"
-                      ? "border-red-400 bg-red-50 shadow-inner"
-                        : "border-black bg-white shadow-xl ring-8 ring-black/5 -translate-y-1"
-                    : business.status === "archived"
+                  className={`group relative rounded-3xl border-2 p-5 text-left transition-all duration-300 ${
+                    selectedBusiness?.id === business.id
+                      ? business.status === "archived"
+                        ? "border-red-400 bg-red-50 shadow-inner"
+                        : "border-amber-400 bg-white shadow-xl ring-4 ring-amber-400/20 -translate-y-1"
+                      : business.status === "archived"
                       ? "border-red-100 bg-white hover:bg-red-50/50"
-                      : "border-slate-100 bg-white hover:border-black/20 hover:shadow-lg"
-                }`}
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md"
+                  }`}
                 >
+                  {/* Selected checkmark badge */}
+                  {selectedBusiness?.id === business.id && business.status !== "archived" && (
+                    <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-amber-950 shadow-sm">
+                      ✓
+                    </span>
+                  )}
                   <div className="flex items-center gap-4">
                     {business.logoUrl ? (
                       <img
                         src={business.logoUrl}
                         alt={`${business.name} logo`}
-                        className="h-16 w-16 rounded-2xl border border-slate-100 object-cover shadow-md transition-transform group-hover:scale-105"
+                        className="h-14 w-14 rounded-2xl border border-slate-100 object-cover shadow-md transition-transform group-hover:scale-105"
                       />
                     ) : (
                       <div
-                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-lg font-black text-white shadow-inner"
+                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-black text-white shadow-inner"
                         style={{ background: `hsl(${(business.name.charCodeAt(0) * 37) % 360}, 55%, 42%)` }}
                       >
                         {business.name.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-lg font-black text-black tracking-tight">{business.name}</p>
-                      <p className="truncate text-xs font-bold text-zinc-400 uppercase tracking-widest">/{business.slug}</p>
+                      <p className="truncate text-base font-black tracking-tight text-zinc-900">{business.name}</p>
+                      <p className="truncate text-[11px] font-bold uppercase tracking-widest text-zinc-400">/{business.slug}</p>
                     </div>
                   </div>
-                  <div className="mt-6 flex items-center justify-between">
+                  <div className="mt-4 flex items-center justify-between">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
                         business.status === "archived"
                           ? "bg-red-100 text-red-600"
                           : business.status === "approved"
@@ -608,7 +614,10 @@ export default function DashboardPage() {
                       {business.status}
                     </span>
                     {selectedBusiness?.id === business.id && (
-                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      </span>
                     )}
                   </div>
                 </button>
@@ -632,6 +641,37 @@ export default function DashboardPage() {
               )}
             </div>
           </section>
+
+          {/* Nudge when businesses exist but none selected */}
+          {visibleBusinesses.length > 0 && !selectedBusiness && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <span className="text-base">👆</span>
+              <p className="text-sm font-semibold text-amber-800">
+                Select a business above to see your actions and overview.
+              </p>
+            </div>
+          )}
+
+          {/* Action panel OR no-selection placeholder */}
+          {showQuickActions && !selectedBusiness && visibleBusinesses.length > 0 && (
+            <div className="space-y-3 animate-fade-up">
+              {["Manage menu", "Tables & QR codes", "Invite team", "Manage access"].map((label) => (
+                <div
+                  key={label}
+                  className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 opacity-50 select-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-xl bg-slate-200" />
+                    <div className="space-y-1.5">
+                      <div className="h-3 w-28 rounded-full bg-slate-200" />
+                      <div className="h-2 w-20 rounded-full bg-slate-100" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {showActionPanel && (
             <div className="space-y-3 animate-fade-up stagger-1">
               {canManageMenuAndTables && (
