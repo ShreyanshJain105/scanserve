@@ -37,7 +37,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 
 # Regenerate Prisma Client exactly for the production node_modules layout
-RUN pnpm dlx prisma generate
+RUN pnpm dlx prisma@6 generate
 
 ENV NODE_ENV=production
 EXPOSE 4000
