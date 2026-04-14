@@ -174,8 +174,9 @@ export async function apiFetch<T>(
       credentials: "include",
       headers: Object.keys(refreshHeaders).length ? refreshHeaders : undefined,
     });
-    const refreshBody = await parseResponse<unknown>(refreshed);
-    if (refreshBody.status === 1) {
+    const refreshBody = await parseResponse<{ accessToken: string }>(refreshed);
+    if (refreshBody.status === 1 && refreshBody.data?.accessToken) {
+      setStoredToken(refreshBody.data.accessToken);
       return apiFetch<T>(path, options, { retryOn401: false });
     }
   }

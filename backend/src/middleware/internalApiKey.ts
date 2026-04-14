@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { logger } from "../utils/logger";
 import { prisma } from "../prisma";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -20,7 +20,7 @@ const isPublicPath = (path: string) => {
   return path.startsWith("/api/public/");
 };
 
-export const requireInternalApiKey = asyncHandler(async (
+export const requireInternalApiKey: RequestHandler = asyncHandler(async (
   req: Request,
   res: Response,
   next: NextFunction
