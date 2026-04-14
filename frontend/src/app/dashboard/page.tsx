@@ -518,7 +518,7 @@ export default function DashboardPage() {
         )}
         <header className="flex flex-wrap items-center justify-between gap-6 card-standard p-8 animate-fade-up">
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Organization dashboard</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Organization</p>
             <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-zinc-900">Dashboard</h1>
             <p className="mt-1 text-sm text-zinc-500">
               Manage your businesses, team, and digital services.
