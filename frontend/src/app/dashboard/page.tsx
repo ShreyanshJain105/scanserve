@@ -516,10 +516,11 @@ export default function DashboardPage() {
             {blockedReason}
           </div>
         )}
-        <header className="flex flex-wrap items-center justify-between gap-6 card-standard p-8">
+        <header className="flex flex-wrap items-center justify-between gap-6 card-standard p-8 animate-fade-up">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-black">Dashboard</h1>
-            <p className="mt-1 text-sm text-zinc-600">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Business dashboard</p>
+            <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-zinc-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-zinc-500">
               Manage your businesses, team, and digital services.
             </p>
           </div>
@@ -530,9 +531,9 @@ export default function DashboardPage() {
                   if (!guardOrgOwner("Only org owners can add businesses.")) return;
                   router.push("/dashboard/onboarding");
                 }}
-                className="btn-secondary"
+                className="btn-primary rounded-xl px-5 py-2.5 text-sm"
               >
-                Add business
+                + Add business
               </button>
             </div>
           )}
@@ -613,14 +614,26 @@ export default function DashboardPage() {
                 </button>
               ))}
               {visibleBusinesses.length === 0 && (
-                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500 dark:border-slate-700 dark:text-slate-400">
-                  No businesses to show for this view.
+                <div className="col-span-full flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-10 px-6 text-center">
+                  <span className="text-4xl">🏢</span>
+                  <p className="font-semibold text-zinc-700">No businesses yet</p>
+                  <p className="text-sm text-zinc-400">
+                    {isOrgOwner ? "Add your first business to get started." : "You have not been assigned to any business yet."}
+                  </p>
+                  {isOrgOwner && (
+                    <button
+                      onClick={() => router.push("/dashboard/onboarding")}
+                      className="btn-primary mt-2 rounded-xl px-5 py-2.5 text-sm"
+                    >
+                      + Add a business
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </section>
           {showActionPanel && (
-            <div className="space-y-3">
+            <div className="space-y-3 animate-fade-up stagger-1">
               {canManageMenuAndTables && (
                 <>
                   <button

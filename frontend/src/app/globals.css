@@ -6,29 +6,29 @@
   /* Colors */
   --bg: #f8fafc;
   --surface: #ffffff;
-  --text-main: #000000;
-  --text-muted: #27272a; /* Dark charcoal for hierarchy but still black-ish */
+  --text-main: #0a0a0a;
+  --text-muted: #52525b;
   --border: #e2e8f0;
   --primary: #fbbf24; /* Amber 400 */
   --primary-hover: #f59e0b;
-  --accent: #000000;
-  
+  --accent: #18181b;
+
   /* Spacing & Borders */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --container-px: 1.5rem;
-  
+
   /* Shadows */
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
 html.dark {
   --bg: #09090b;
   --surface: #18181b;
-  --text-main: #ffffff;
+  --text-main: #fafafa;
   --text-muted: #a1a1aa;
   --border: #27272a;
 }
@@ -51,7 +51,7 @@ body {
   background: var(--bg);
   color: var(--text-main);
   font-family: "Inter", "Avenir Next", system-ui, sans-serif;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.25s ease;
 }
 
 /* --- Typography Hierarchy --- */
@@ -60,97 +60,117 @@ h2, .h2 { @apply text-2xl md:text-3xl font-bold tracking-tight; }
 h3, .h3 { @apply text-xl font-bold; }
 h4, .h4 { @apply text-lg font-bold; }
 
-/* Enforce Pure Black Content */
-:root h1, :root h2, :root h3, :root h4, :root p, :root span, :root label, :root li {
-  color: #000000 !important;
+/* --- Micro-animations --- */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.dark h1, .dark h2, .dark h3, .dark h4, .dark p, .dark span, .dark label, .dark li {
-  color: #ffffff !important;
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
-/* Allow utility overrides for intended inverted text */
-:root .text-white, :root .text-slate-100, :root .text-slate-200, :root [class*="text-white"] {
-  color: inherit !important;
-}
+.animate-fade-up   { animation: fade-up 0.35s ease both; }
+.animate-scale-in  { animation: scale-in 0.25s ease both; }
+
+/* Stagger helpers */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
 
 /* --- Shared Components --- */
 
 /* Standard Inputs */
 .input-standard {
-  @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-black 
+  @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-zinc-900
          transition-all duration-200 outline-none
-         placeholder:text-gray-400
-         focus:border-black focus:ring-2 focus:ring-black/5;
+         placeholder:text-zinc-400
+         focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800/10;
 }
 
 /* Standard Buttons */
 .btn {
-  @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold 
-         transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold
+         transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none
+         select-none cursor-pointer;
 }
 
 .btn-primary {
-  @apply btn bg-zinc-800 text-white hover:bg-zinc-700 shadow-md hover:shadow-lg;
+  @apply btn bg-zinc-800 text-white hover:bg-zinc-700 shadow-sm hover:shadow-md;
 }
 
 .btn-secondary {
-  @apply btn bg-white border border-slate-200 text-black hover:bg-slate-50 shadow-sm;
+  @apply btn bg-white border border-slate-200 text-zinc-800 hover:bg-slate-50 hover:border-slate-300 shadow-sm;
 }
 
 .btn-amber {
-  @apply btn bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-400/20 shadow-md;
+  @apply btn bg-amber-400 text-amber-950 hover:bg-amber-300 shadow-sm shadow-amber-400/20;
 }
 
 .btn-ghost {
-  @apply btn text-black hover:bg-slate-100;
+  @apply btn text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100;
 }
 
 .btn-danger {
-  @apply btn bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-200;
+  @apply btn bg-rose-600 text-white hover:bg-rose-700 shadow-sm shadow-rose-200;
 }
 
 .btn-success {
-  @apply btn bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-200;
+  @apply btn bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-200;
 }
 
 .btn-glass {
-  @apply btn bg-white/40 backdrop-blur-md border border-white/20 text-black hover:bg-white/60 shadow-sm transition-all;
+  @apply btn bg-white/50 backdrop-blur-sm border border-white/30 text-zinc-800 hover:bg-white/70 shadow-sm;
 }
 
 .dark .btn-glass {
-  @apply bg-zinc-800/40 border-zinc-700/50 text-white hover:bg-zinc-800/60;
+  @apply bg-zinc-800/50 border-zinc-700/50 text-zinc-100 hover:bg-zinc-800/70;
 }
 
 /* Standard Cards */
 .card-standard {
-  @apply rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200;
+  @apply rounded-2xl border border-slate-200 bg-white shadow-sm
+         transition-all duration-200;
 }
 
 .card-interactive {
-  @apply card-standard hover:shadow-md hover:border-slate-300;
+  @apply card-standard hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5;
 }
 
-/* Modern Effects */
+/* Badges */
+.badge {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide;
+}
+
+.badge-green  { @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200; }
+.badge-amber  { @apply badge bg-amber-50  text-amber-700  border border-amber-200; }
+.badge-red    { @apply badge bg-red-50    text-red-700    border border-red-200; }
+.badge-slate  { @apply badge bg-slate-100 text-slate-600  border border-slate-200; }
+.badge-indigo { @apply badge bg-indigo-50 text-indigo-700 border border-indigo-200; }
+
+/* Modern Glass Effect */
 .glass {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
 
 .dark .glass {
-  background: rgba(9, 9, 11, 0.8);
+  background: rgba(9, 9, 11, 0.82);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-::placeholder {
-  color: #000000 !important;
-  opacity: 0.5 !important;
+/* Focus ring utility */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-zinc-800/20 focus:ring-offset-1;
 }
 
+/* Display font */
 .font-display {
   font-family: inherit;
   @apply font-bold tracking-tight;
