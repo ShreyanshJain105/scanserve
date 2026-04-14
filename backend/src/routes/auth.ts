@@ -26,7 +26,7 @@ const cookieDomainOption = COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {};
 const accessCookieOptions = {
   httpOnly: true,
   secure: isProd,
-  sameSite: "lax" as const,
+  sameSite: isProd ? "none" : "lax" as const,
   path: "/",
   ...cookieDomainOption,
 };
@@ -34,7 +34,7 @@ const accessCookieOptions = {
 const refreshCookieOptions = {
   httpOnly: true,
   secure: isProd,
-  sameSite: "lax" as const,
+  sameSite: isProd ? "none" : "lax" as const,
   path: "/api/auth/refresh",
   ...cookieDomainOption,
 };
