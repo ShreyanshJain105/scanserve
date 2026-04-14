@@ -1893,7 +1893,11 @@ router.post(
       });
 
       sendSuccess(res, { business: serializeBusiness(updated as RawBusiness) });
-    } catch {
+    } catch (error) {
+      logger.error("business.profile.logo.upload_failed", {
+        businessId: business.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       sendError(res, "Image storage failed", 503, "IMAGE_STORAGE_UNAVAILABLE");
       return;
     }

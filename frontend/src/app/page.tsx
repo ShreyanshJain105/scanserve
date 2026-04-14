@@ -47,74 +47,74 @@ export default async function RootPage() {
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-amber-200">
               Operator console
             </div>
-            <h1 className="text-4xl font-semibold leading-tight text-white md:text-5xl">
-              The app built for live service.
+            <h1 className="text-4xl font-bold leading-tight text-white md:text-5xl lg:text-6xl">
+              The app built for <span className="text-amber-400">live service.</span>
             </h1>
-            <p className="max-w-xl text-base text-slate-300">
+            <p className="max-w-xl text-lg text-slate-300">
               Stay focused on tables, orders, and performance with a dashboard designed for
               operators — not customers.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-4 mt-2">
               <Link
                 href="/login"
-                className="rounded-md bg-amber-400 px-5 py-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-300"
+                className="rounded-xl bg-amber-400 px-8 py-4 text-sm font-bold text-slate-950 shadow-lg shadow-amber-400/20 transition-all hover:bg-amber-300 hover:scale-[1.02] active:scale-[0.98]"
               >
                 Sign in to the app
               </Link>
               <Link
                 href={siteHost ? new URL("/home", siteUrl).toString() : "/home"}
-                className="rounded-md border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+                className="rounded-xl border border-slate-700 px-8 py-4 text-sm font-bold text-slate-200 transition-all hover:border-slate-500 hover:bg-slate-900 active:scale-[0.98]"
               >
                 Visit public site
               </Link>
             </div>
-            <div className="mt-2 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Orders</p>
-                <p className="mt-2 text-lg font-semibold text-white">Live status control</p>
+            <div className="mt-4 grid gap-4 text-sm text-slate-300 sm:grid-cols-3">
+              <div className="card-premium p-5 border-slate-800 bg-slate-900/40">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Orders</p>
+                <p className="mt-2 text-base font-bold text-white">Live status control</p>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Operations</p>
-                <p className="mt-2 text-lg font-semibold text-white">Menus + tables</p>
+              <div className="card-premium p-5 border-slate-800 bg-slate-900/40">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Operations</p>
+                <p className="mt-2 text-base font-bold text-white">Menus + tables</p>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Insights</p>
-                <p className="mt-2 text-lg font-semibold text-white">Analytics snapshots</p>
+              <div className="card-premium p-5 border-slate-800 bg-slate-900/40">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Insights</p>
+                <p className="mt-2 text-base font-bold text-white">Analytics snapshots</p>
               </div>
             </div>
           </div>
           <aside className="flex flex-col justify-center">
-            <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-black p-6 shadow-xl">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">App modules</p>
-                <ul className="mt-4 space-y-3 text-sm text-slate-200">
+            <div className="rounded-[2.5rem] border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-black p-8 shadow-2xl">
+              <div className="rounded-3xl border border-white/5 bg-white/5 p-6 backdrop-blur-md">
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">App modules</p>
+                <ul className="mt-6 space-y-4 text-sm text-slate-200">
                   <li className="flex items-center justify-between">
-                    <span>Order management</span>
-                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] text-emerald-200">
+                    <span className="font-medium">Order management</span>
+                    <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
                       Live
                     </span>
                   </li>
                   <li className="flex items-center justify-between">
-                    <span>Menu control</span>
-                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px] text-amber-200">
+                    <span className="font-medium">Menu control</span>
+                    <span className="rounded-full bg-amber-500/10 px-3 py-1 text-[10px] font-bold text-amber-400 border border-amber-500/20">
                       Active
                     </span>
                   </li>
                   <li className="flex items-center justify-between">
-                    <span>Table + QR</span>
-                    <span className="rounded-full bg-slate-700 px-2 py-0.5 text-[11px] text-slate-200">
+                    <span className="font-medium">Table + QR</span>
+                    <span className="rounded-full bg-slate-800 px-3 py-1 text-[10px] font-bold text-slate-300 border border-slate-700">
                       Ready
                     </span>
                   </li>
                   <li className="flex items-center justify-between">
-                    <span>Analytics</span>
-                    <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-200">
+                    <span className="font-medium">Analytics</span>
+                    <span className="rounded-full bg-sky-500/10 px-3 py-1 text-[10px] font-bold text-sky-400 border border-sky-500/20">
                       Insights
                     </span>
                   </li>
                 </ul>
               </div>
-              <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-300">
+              <div className="mt-6 rounded-2xl border border-white/5 bg-white/5 p-5 text-center text-xs font-medium text-slate-400 backdrop-blur-sm">
                 App-only access. Customers never land here.
               </div>
             </div>

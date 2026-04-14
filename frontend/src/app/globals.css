@@ -9,6 +9,7 @@
   --muted: #000000;
   --border: #dbe2ea;
   --accent: #000000;
+  --radius: 12px;
 }
 
 html.dark {
@@ -27,6 +28,7 @@ html,
 body {
   margin: 0;
   padding: 0;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -34,19 +36,55 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  transition: background-color 0.3s ease;
 }
 
-/* Enforce pure black text globally for light mode */
-:root body, 
+/* Enforce pure black text globally for light mode, except for buttons/links with dark backgrounds */
 :root h1, :root h2, :root h3, :root h4, :root h5, :root h6,
-:root p, :root span, :root label, :root input, :root textarea, :root select, :root button,
-:root .text-muted, :root .text-gray-500, :root .text-slate-500 {
+:root p, :root span, :root label, :root .text-muted, :root .text-gray-500, :root .text-slate-500 {
   color: #000000 !important;
+}
+
+/* Specific elements that should NOT be forced to black if they have specific utility classes */
+:root .text-white, :root .text-slate-100, :root .text-slate-200, :root [class*="text-slate-100"], :root [class*="text-white"] {
+  color: inherit !important;
 }
 
 :root ::placeholder {
   color: #000000 !important;
-  opacity: 0.8 !important; /* Slightly transparent black for placeholders */
+  opacity: 0.6 !important;
+}
+
+/* Premium UI Utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.dark .glass {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card-premium {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+}
+
+button:active, a:active {
+  transform: scale(0.97);
 }
 
 .font-display {

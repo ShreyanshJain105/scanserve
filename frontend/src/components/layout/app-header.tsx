@@ -574,15 +574,15 @@ export function AppHeader({ leftMeta, rightSlot, audience = "default" }: AppHead
     <header
       ref={headerRef}
       data-app-header
-      className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/90"
+      className="sticky top-0 z-30 glass transition-all"
     >
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-sm font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-sm font-bold text-amber-800 shadow-sm transition-transform hover:rotate-3 dark:bg-amber-500/20 dark:text-amber-200">
             S2
           </div>
           <div className="min-w-0">
-            <Link href="/home" className="font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+            <Link href="/home" className="font-bold tracking-tight text-slate-900 transition hover:opacity-80 dark:text-slate-100">
               Scan2Serve
             </Link>
           </div>
