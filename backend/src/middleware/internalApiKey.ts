@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../utils/logger";
+import { prisma } from "../prisma";
+import { asyncHandler } from "../utils/asyncHandler";
 
 const PUBLIC_EXACT_PATHS = new Set([
   "/healthz",
@@ -18,7 +20,7 @@ const isPublicPath = (path: string) => {
   return path.startsWith("/api/public/");
 };
 
-export const requireInternalApiKey = (
+export const requireInternalApiKey = asyncHandler(async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -55,6 +57,8 @@ export const requireInternalApiKey = (
     authHeader && authHeader.startsWith(bearerPrefix)
       ? authHeader.slice(bearerPrefix.length).trim()
       : null;
+  
+  const tokenToValidate = providedKey || bearerKey;
   const isJwt = (bearerKey && bearerKey.split(".").length === 3);
 
   if (!tokenToValidate && !isJwt) {
@@ -67,6 +71,13 @@ export const requireInternalApiKey = (
   // If it's a JWT, allow it to pass to the requireAuth middleware
   if (isJwt) {
     return next();
+  }
+
+  if (!tokenToValidate) {
+     return res.status(401).json({
+      status: 0,
+      error: { message: "INTERNAL_API_KEY_REQUIRED" },
+    });
   }
 
   // 1. Check global system key
@@ -89,6 +100,4 @@ export const requireInternalApiKey = (
     status: 0,
     error: { message: "INVALID_INTERNAL_API_KEY" },
   });
-
-  return next();
-};
+});
