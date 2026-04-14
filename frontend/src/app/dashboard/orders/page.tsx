@@ -11,6 +11,34 @@ import { AnalyticsOverview } from "../../../components/dashboard/analytics-overv
 import { ModalDialog } from "../../../components/ui/modal-dialog";
 import type { OrderStatus, PaymentActors } from "@/shared";
 
+type IconProps = {
+  className?: string;
+};
+
+const ChevronUpIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+    <path d="M5 12.5L10 7.5L15 12.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const ChevronDownIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+    <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const PencilIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+    <path d="M13.8 3.2L16.8 6.2L7 16H4V13L13.8 3.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+  </svg>
+);
+
+const TrashIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+    <path d="M4.5 6H15.5M7.2 6V4.5H12.8V6M6.5 6L7 15.5H13L13.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const ORDER_STATUSES: OrderStatus[] = [
   "pending",
   "confirmed",
@@ -769,7 +797,6 @@ export default function DashboardOrdersPage() {
               </button>
             </div>
           )}
-        </section>
         </section>
       </section>
 

@@ -25,7 +25,7 @@ export default function HomePage() {
           <p className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
             Built for fast table service
           </p>
-          <h1 className="font-display mt-4 text-4xl leading-tight text-slate-900 md:text-5xl">
+          <h1 className="font-black mt-4 text-4xl leading-tight text-black md:text-5xl tracking-tighter">
             Beautiful digital menus with QR-ready ordering
           </h1>
           <p className="mt-4 max-w-xl text-base text-slate-600">

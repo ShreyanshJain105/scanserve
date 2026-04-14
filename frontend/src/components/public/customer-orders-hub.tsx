@@ -369,7 +369,7 @@ export default function CustomerOrdersHub({
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Payment
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-slate-900 capitalize">
+                  <p className="mt-2 text-lg font-black text-black capitalize">
                     {detail.order.paymentStatus}
                   </p>
                 </div>
@@ -405,7 +405,7 @@ export default function CustomerOrdersHub({
                         )}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-black text-black">
                       {formatCurrency(
                         (Number(item.unitPrice) * item.quantity).toFixed(2),
                         detail.business?.currencyCode ?? "USD"

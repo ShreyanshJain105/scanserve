@@ -745,7 +745,7 @@ export default function DashboardPage() {
                 {statusLabel}
               </span>
             </div>
-          </div>
+          </section>
 
           <div className={isBlocked ? "pointer-events-none blur-[2px]" : ""}>
             <AnalyticsOverview section="dashboard" showViewMore />
@@ -960,7 +960,6 @@ export default function DashboardPage() {
             )}
           </div>
         </ModalDialog>
-      </section>
       {archiveDialogOpen && selectedBusiness && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900">

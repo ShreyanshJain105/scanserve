@@ -66,7 +66,7 @@ const TrashIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
-const SparkleIcon = ({ className = "h-4 w-4" }: IconProps) => (
+const SparklesIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
     <path d="M10 2.5L11.8 7.1L16.5 8.9L11.8 10.7L10 15.3L8.2 10.7L3.5 8.9L8.2 7.1L10 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
   </svg>
@@ -811,14 +811,6 @@ export default function DashboardMenuPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        setSelectedCategoryId(category.id);
-                      }}
-                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm font-medium transition ${
-                        selectedCategoryId === category.id
-                          ? "border-black bg-slate-50 text-black shadow-sm"
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-black text-black px-1">{category.name}</span>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -888,168 +880,280 @@ export default function DashboardMenuPage() {
                 <div className="grid gap-5 md:grid-cols-[1fr_120px]">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-white/50">Item Name</label>
-                    <div className="flex gap-2">
-                      <input
-                        value={itemName}
-                        onChange={(e) => setItemName(e.target.value)}
-                        placeholder="e.g. Truffle Pasta"
-                        className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 ring-white/10"
-                      />
-                          onClick={handleGenerateEditDescription}
-                          aria-label={`Generate description for ${itemEditDraft.name}`}
-                          title={
-                            generatingEditDescription
-                              ? "Generating description..."
-                              : `Generate description for ${itemEditDraft.name}`
-                          }
-                          disabled={busy || blocked || generatingEditDescription}
-                          className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded border border-indigo-200 bg-indigo-50 text-indigo-700 disabled:opacity-50"
+                      <div className="relative">
+                        <input
+                          value={itemName}
+                          onChange={(e) => setItemName(e.target.value)}
+                          placeholder="e.g. Truffle Pasta..."
+                          className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 ring-white/10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleGenerateCreateDescription()}
+                          disabled={busy || blocked || generatingDescription}
+                          className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-50"
                         >
-                          <SparkleIcon
-                            className={generatingEditDescription ? "h-3.5 w-3.5 animate-pulse" : "h-3.5 w-3.5"}
+                          <SparklesIcon
+                            className={generatingDescription ? "h-3.5 w-3.5 animate-pulse" : "h-3.5 w-3.5"}
                           />
                         </button>
                       </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={saveItemEdit}
-                          disabled={busy || blocked}
-                          className="rounded border px-2 py-1 text-xs"
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-[120px_1fr]">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-white/50">Price</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={itemPrice}
+                          onChange={(e) => setItemPrice(e.target.value)}
+                          className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-white/10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-white/50">Category</label>
+                        <select
+                          value={selectedCategoryId}
+                          onChange={(e) => setSelectedCategoryId(e.target.value)}
+                          className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-white/10"
                         >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingItemId(null);
-                            setItemEditDraft(null);
-                          }}
-                          disabled={busy || blocked}
-                          className="rounded border px-2 py-1 text-xs"
-                        >
-                          Cancel
-                        </button>
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id} className="text-black">
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex items-start gap-4">
-                        <div className="flex w-[88px] shrink-0 flex-col items-center gap-2">
-                          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-                            {item.imageUrl ? (
-                              <img
-                                src={item.imageUrl}
-                                alt={`${item.name} preview`}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex flex-col items-center gap-1 text-slate-500">
-                                <ImageIcon className="h-5 w-5" />
-                                <span className="text-[10px] font-medium">No Image</span>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-white/50">Description</label>
+                      <textarea
+                        value={itemDescription}
+                        onChange={(e) => setItemDescription(e.target.value)}
+                        placeholder="Describe this dish..."
+                        rows={2}
+                        className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 ring-white/10 resize-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-white/50">Dietary Tags</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {DIETARY_TAGS.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() =>
+                              setItemTags((prev) =>
+                                prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                              )
+                            }
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                              itemTags.includes(tag)
+                                ? "border-white/40 bg-white/20 text-white"
+                                : "border-white/10 bg-white/5 text-white/50 hover:bg-white/10"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {itemSuggestions.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40">AI Suggestions</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {itemSuggestions.map((s) => (
+                            <button
+                              key={s.label}
+                              type="button"
+                              onClick={() => setItemName(s.label)}
+                              className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/60 hover:bg-white/10"
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={busy || blocked || !itemName.trim()}
+                      className="btn-primary w-full py-3 disabled:opacity-40"
+                    >
+                      {busy ? "Adding..." : "Add Item"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              <div className="space-y-3">
+                {filteredItems.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="group rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:border-slate-200 hover:shadow-md"
+                  >
+                    {editingItemId === item.id && itemEditDraft ? (
+                      <div className="space-y-3">
+                        <div className="grid gap-3 md:grid-cols-[1fr_120px]">
+                          <input
+                            value={itemEditDraft.name}
+                            onChange={(e) => setItemEditDraft((prev) => prev ? { ...prev, name: e.target.value } : prev)}
+                            className="input-standard"
+                            placeholder="Item name"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={itemEditDraft.price}
+                            onChange={(e) => setItemEditDraft((prev) => prev ? { ...prev, price: e.target.value } : prev)}
+                            className="input-standard"
+                          />
+                        </div>
+                        <textarea
+                          value={itemEditDraft.description}
+                          onChange={(e) => setItemEditDraft((prev) => prev ? { ...prev, description: e.target.value } : prev)}
+                          rows={2}
+                          placeholder="Description..."
+                          className="input-standard w-full resize-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleGenerateEditDescription()}
+                            disabled={busy || blocked || generatingEditDescription}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                          >
+                            <SparklesIcon className={generatingEditDescription ? "h-3.5 w-3.5 animate-pulse" : "h-3.5 w-3.5"} />
+                            AI Description
+                          </button>
+                          <div className="ml-auto flex gap-2">
+                            <button onClick={saveItemEdit} disabled={busy || blocked} className="btn-primary px-4 py-1.5 text-xs">Save</button>
+                            <button onClick={() => { setEditingItemId(null); setItemEditDraft(null); }} disabled={busy} className="btn-glass px-4 py-1.5 text-xs">Cancel</button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start gap-4">
+                          <div className="flex w-[88px] shrink-0 flex-col items-center gap-2">
+                            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={`${item.name} preview`}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center gap-1 text-slate-500">
+                                  <ImageIcon className="h-5 w-5" />
+                                  <span className="text-[10px] font-medium">No Image</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleUploadImage(item)}
+                                disabled={busy || blocked || uploadingItemId === item.id}
+                                aria-label={`Upload image for ${item.name}`}
+                                title={`Upload image for ${item.name}`}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:border-slate-400 disabled:opacity-40"
+                              >
+                                <ImageIcon
+                                  className={
+                                    uploadingItemId === item.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"
+                                  }
+                                />
+                              </button>
+                              <button
+                                onClick={() => void handleGenerateAiImage(item)}
+                                disabled={busy || blocked || generatingImageItemId === item.id}
+                                aria-label={`Generate AI image for ${item.name}`}
+                                title={`Generate AI image for ${item.name}`}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-400 disabled:opacity-40"
+                              >
+                                <SparklesIcon
+                                  className={
+                                    generatingImageItemId === item.id
+                                      ? "h-4 w-4 animate-pulse"
+                                      : "h-4 w-4"
+                                  }
+                                />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-black text-black">{item.name}</p>
+                            <p className="text-sm font-semibold text-slate-500">{formatPrice(item.price)}</p>
+                            {item.description && (
+                              <p className="mt-1 max-w-xl text-sm text-slate-500">{item.description}</p>
+                            )}
+                            {!!item.dietaryTags.length && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {item.dietaryTags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
                               </div>
                             )}
                           </div>
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => handleUploadImage(item)}
-                              disabled={busy || blocked || uploadingItemId === item.id}
-                              aria-label={`Upload image for ${item.name}`}
-                              title={`Upload image for ${item.name}`}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:border-slate-400 disabled:opacity-40"
-                            >
-                              <ImageIcon
-                                className={
-                                  uploadingItemId === item.id ? "h-4 w-4 animate-pulse" : "h-4 w-4"
-                                }
-                              />
-                            </button>
-                            <button
-                              onClick={() => void handleGenerateAiImage(item)}
-                              disabled={busy || blocked || generatingImageItemId === item.id}
-                              aria-label={`Generate AI image for ${item.name}`}
-                              title={`Generate AI image for ${item.name}`}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-400 disabled:opacity-40"
-                            >
-                              <SparkleIcon
-                                className={
-                                  generatingImageItemId === item.id
-                                    ? "h-4 w-4 animate-pulse"
-                                    : "h-4 w-4"
-                                }
-                              />
-                            </button>
-                          </div>
                         </div>
-                        <div className="min-w-[170px]">
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-gray-600">{formatPrice(item.price)}</p>
-                          {item.description && (
-                            <p className="mt-1 max-w-xl text-sm text-slate-500">{item.description}</p>
-                          )}
-                          {!!item.dietaryTags.length && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {item.dietaryTags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        <div className="mt-3 flex items-center gap-1.5 border-t border-slate-50 pt-3">
+                          <button
+                            onClick={() => reorderItem(item, -1)}
+                            disabled={busy || blocked || idx === 0}
+                            aria-label={`Move item ${item.name} up`}
+                            title={`Move ${item.name} up`}
+                            className="btn-glass p-1.5"
+                          >
+                            <ChevronUpIcon />
+                          </button>
+                          <button
+                            onClick={() => reorderItem(item, 1)}
+                            disabled={busy || blocked || idx === filteredItems.length - 1}
+                            aria-label={`Move item ${item.name} down`}
+                            title={`Move ${item.name} down`}
+                            className="btn-glass p-1.5"
+                          >
+                            <ChevronDownIcon />
+                          </button>
+                          <button
+                            onClick={() => startItemEdit(item)}
+                            disabled={busy || blocked}
+                            aria-label={`Edit item ${item.name}`}
+                            title={`Edit ${item.name}`}
+                            className="btn-glass p-1.5"
+                          >
+                            <PencilIcon />
+                          </button>
+                          <button
+                            onClick={() => requestDeleteItem(item.id)}
+                            disabled={busy || blocked}
+                            aria-label={`Delete item ${item.name}`}
+                            title={`Delete ${item.name}`}
+                            className="rounded-md border border-red-200 bg-white p-1.5 text-red-600 hover:border-red-400 hover:text-red-700 disabled:opacity-40"
+                          >
+                            <TrashIcon />
+                          </button>
+                          <button
+                            onClick={() => toggleAvailability(item)}
+                            disabled={busy || blocked}
+                            className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold text-white ${
+                              item.isAvailable ? "bg-emerald-600" : "bg-slate-400"
+                            }`}
+                          >
+                            {item.isAvailable ? "Available" : "Unavailable"}
+                          </button>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => reorderItem(item, -1)}
-                          disabled={busy || blocked || idx === 0}
-                          aria-label={`Move item ${item.name} up`}
-                          title={`Move ${item.name} up`}
-                          className="btn-glass p-1.5"
-                        >
-                          <ChevronUpIcon />
-                        </button>
-                        <button
-                          onClick={() => reorderItem(item, 1)}
-                          disabled={busy || blocked || idx === filteredItems.length - 1}
-                          aria-label={`Move item ${item.name} down`}
-                          title={`Move ${item.name} down`}
-                          className="btn-glass p-1.5"
-                        >
-                          <ChevronDownIcon />
-                        </button>
-                        <button
-                          onClick={() => startItemEdit(item)}
-                          disabled={busy || blocked}
-                          aria-label={`Edit item ${item.name}`}
-                          title={`Edit ${item.name}`}
-                          className="btn-glass p-1.5"
-                        >
-                          <PencilIcon />
-                        </button>
-                        <button
-                          onClick={() => requestDeleteItem(item.id)}
-                          disabled={busy || blocked}
-                          aria-label={`Delete item ${item.name}`}
-                          title={`Delete ${item.name}`}
-                          className="rounded-md border border-red-200 bg-white p-1.5 text-red-600 hover:border-red-400 hover:text-red-700 disabled:opacity-40"
-                        >
-                          <TrashIcon />
-                        </button>
-                        <button
-                          onClick={() => toggleAvailability(item)}
-                          disabled={busy || blocked}
-                          className={`rounded px-2 py-1 text-xs text-white ${
-                            item.isAvailable ? "bg-green-600" : "bg-gray-500"
-                          }`}
-                        >
-                          {item.isAvailable ? "Available" : "Unavailable"}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                      </>
+                    )}
+                  </div>
+                ))}
               {!filteredItems.length && (
                 <p className="text-sm text-gray-600">
                   {hasCategories ? "No items in selected category." : "No categories yet."}
@@ -1079,7 +1183,8 @@ export default function DashboardMenuPage() {
               </div>
             </div>
           </div>
-          </section>
+        </div>
+      </section>
         </div>
       </section>
       <ModalDialog
