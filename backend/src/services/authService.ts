@@ -59,7 +59,7 @@ export const mintRefreshToken = async (userId: string, scope: RefreshScope = "bu
   const tokenHash = hashRefreshToken(plain);
   const expiresAt = addDays(REFRESH_TOKEN_TTL_DAYS);
 
-  const record = await getRefreshModel(scope).create({
+  const record = await (getRefreshModel(scope) as any).create({
     data:
       scope === "customer"
         ? { customerUserId: userId, tokenHash, expiresAt }
@@ -74,7 +74,7 @@ export const rotateRefreshToken = async (
   scope: RefreshScope = "business"
 ) => {
   const incomingHash = hashRefreshToken(incomingToken);
-  const stored = await getRefreshModel(scope).findUnique({
+  const stored = await (getRefreshModel(scope) as any).findUnique({
     where: { tokenHash: incomingHash },
   });
 
@@ -86,7 +86,7 @@ export const rotateRefreshToken = async (
     throw new Error("Invalid refresh token");
   }
 
-  await getRefreshModel(scope).update({
+  await (getRefreshModel(scope) as any).update({
     where: { id: stored.id },
     data: { revokedAt: new Date() },
   });
@@ -102,7 +102,7 @@ export const revokeRefreshToken = async (
 ) => {
   if (!token) return;
   const tokenHash = hashRefreshToken(token);
-  await getRefreshModel(scope).updateMany({
+  await (getRefreshModel(scope) as any).updateMany({
     where: { tokenHash, revokedAt: null },
     data: { revokedAt: new Date() },
   });

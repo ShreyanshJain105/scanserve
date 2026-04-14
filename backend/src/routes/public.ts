@@ -102,8 +102,8 @@ router.get(
       return;
     }
 
-    let qrCode = await prisma.qrCode.findUnique({
-      where: { uniqueCode: qrToken },
+    let qrCode: any = await prisma.qrCode.findUnique({
+      where: { uniqueCode: qrToken as string },
       include: {
         business: {
           select: {
@@ -125,9 +125,9 @@ router.get(
 
     let isGraceToken = false;
     if (!qrCode) {
-      const rotation = await prisma.qrCodeRotation.findFirst({
+      const rotation: any = await prisma.qrCodeRotation.findFirst({
         where: {
-          oldToken: qrToken,
+          oldToken: qrToken as string,
           graceExpiresAt: { gt: new Date() },
         },
         orderBy: { createdAt: "desc" },
@@ -395,8 +395,8 @@ router.post(
       sendError(res, "Customer login required", 401, "CUSTOMER_AUTH_REQUIRED");
       return;
     }
-    const order = await prisma.order.findFirst({
-      where: { id: req.params.id, customerUserId: customer.id },
+    const order: any = await prisma.order.findFirst({
+      where: { id: req.params.id as string, customerUserId: customer.id },
       include: {
         business: { select: { currencyCode: true, name: true } },
       },
@@ -468,7 +468,7 @@ router.post(
     }
 
     const order = await prisma.order.findFirst({
-      where: { id: req.params.id, customerUserId: customer.id },
+      where: { id: req.params.id as string, customerUserId: customer.id },
       select: {
         id: true,
         createdAt: true,
@@ -545,8 +545,8 @@ router.get(
       sendError(res, "Customer login required", 401, "CUSTOMER_AUTH_REQUIRED");
       return;
     }
-    const order = await prisma.order.findFirst({
-      where: { id: req.params.id, customerUserId: customer.id },
+    const order: any = await prisma.order.findFirst({
+      where: { id: req.params.id as string, customerUserId: customer.id },
       include: {
         items: { include: { menuItem: { select: { name: true } } } },
         business: { select: { name: true, currencyCode: true } },
@@ -683,7 +683,7 @@ router.post(
       return;
     }
     const review = await reviewModel.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       select: { id: true, businessId: true },
     });
     if (!review) {
@@ -781,11 +781,11 @@ router.get(
 
     if (!responsePayload) {
       const cutoff = getReviewCutoff();
-      const where: Prisma.ReviewWhereInput = {
+      const where = {
         OR: [{ businessId }, { order: { businessId } }],
         ...(ratingFilter ? { rating: ratingFilter } : {}),
         ...(scope === "recent" ? { createdAt: { gte: cutoff } } : {}),
-      };
+      } as any;
 
       const orderBy: Prisma.ReviewOrderByWithRelationInput[] =
         scope === "recent"
@@ -948,7 +948,7 @@ router.get(
     const qrToken = req.query.token as string | undefined;
 
     const business = await prisma.business.findUnique({
-      where: { slug },
+      where: { slug: slug as string },
       select: {
         id: true,
         name: true,

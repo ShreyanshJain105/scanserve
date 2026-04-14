@@ -32,7 +32,7 @@ export const enqueueOrderEventOutbox = async (params: {
       eventType: params.eventType,
       orderId: params.orderId,
       businessId: params.businessId,
-      payload: params.payload,
+      payload: params.payload as Prisma.InputJsonValue,
       eventCreatedAt: params.eventCreatedAt,
       status: "pending",
       nextAttemptAt: new Date(),

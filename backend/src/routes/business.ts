@@ -3031,7 +3031,7 @@ router.patch(
     }
 
     const existing = await prisma.order.findFirst({
-      where: { id: req.params.id, businessId: req.business!.id },
+      where: { id: req.params.id as string, businessId: req.business!.id },
     });
     if (!existing) {
       sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
@@ -3081,7 +3081,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
     const order = await prisma.order.findFirst({
-      where: { id: req.params.id, businessId: req.business!.id },
+      where: { id: req.params.id as string, businessId: req.business!.id },
     });
     if (!order) {
       sendError(res, "Order not found", 404, "ORDER_NOT_FOUND");
@@ -3136,7 +3136,7 @@ router.patch(
     }
 
     const order = await prisma.order.findFirst({
-      where: { id: req.params.id, businessId: req.business!.id },
+      where: { id: req.params.id as string, businessId: req.business!.id },
       select: { id: true, createdAt: true },
     });
     if (!order) {
