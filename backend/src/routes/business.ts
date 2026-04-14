@@ -2338,8 +2338,8 @@ router.post(
     }
 
     const id = req.params.id;
-    const existing = await prisma.menuItem.findFirst({
-      where: { id, businessId: req.business!.id },
+    const existing: any = await prisma.menuItem.findFirst({
+      where: { id: id as string, businessId: req.business!.id },
       include: { category: { select: { name: true } } },
     });
     if (!existing) {
@@ -2409,7 +2409,7 @@ router.delete(
     if (!requireBusinessRole(req, res, ["owner", "manager"])) return;
     const id = req.params.id;
     const existing = await prisma.menuItem.findFirst({
-      where: { id, businessId: req.business!.id },
+      where: { id: id as string, businessId: req.business!.id },
     });
     if (!existing) {
       sendError(res, "Menu item not found", 404, "MENU_ITEM_NOT_FOUND");
@@ -2620,7 +2620,7 @@ router.patch(
     }
 
     const updated = await prisma.table.updateMany({
-      where: { id: tableId, businessId: req.business!.id },
+      where: { id: tableId as string, businessId: req.business!.id },
       data: {
         ...(parsed.data.label !== undefined ? { label: parsed.data.label } : {}),
         ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
@@ -2633,7 +2633,7 @@ router.patch(
     }
 
     const table = await prisma.table.findFirst({
-      where: { id: tableId, businessId: req.business!.id },
+      where: { id: tableId as string, businessId: req.business!.id },
       include: { qrCode: true },
     });
     if (!table) {
@@ -2668,7 +2668,7 @@ router.post(
     }
 
     const table = await prisma.table.findFirst({
-      where: { id: tableId, businessId: req.business!.id },
+      where: { id: tableId as string, businessId: req.business!.id },
     });
 
     if (!table) {
@@ -2758,7 +2758,7 @@ router.get(
 
     const qrCode = await prisma.qrCode.findFirst({
       where: {
-        tableId,
+        tableId: tableId as string,
         businessId: req.business!.id,
       },
     });
@@ -2799,8 +2799,8 @@ router.get(
       return;
     }
     const tableId = req.params.tableId;
-    const table = await prisma.table.findFirst({
-      where: { id: tableId, businessId: req.business!.id },
+    const table: any = await prisma.table.findFirst({
+      where: { id: tableId as string, businessId: req.business!.id },
       include: {
         qrCode: true,
         business: { select: { slug: true } },
@@ -2996,7 +2996,7 @@ router.get(
   asyncHandler(async (req, res) => {
     if (!requireBusinessRole(req, res, ["owner", "manager", "staff"])) return;
     const order = await prisma.order.findFirst({
-      where: { id: req.params.id, businessId: req.business!.id },
+      where: { id: req.params.id as string, businessId: req.business!.id },
       include: {
         table: { select: { id: true, tableNumber: true, label: true } },
         items: { include: { menuItem: { select: { name: true } } } },

@@ -800,13 +800,13 @@ router.get(
 
       const [aggregate, grouped] = await prisma.$transaction([
         reviewModel.aggregate({
-          where,
+          where: where as any,
           _count: { _all: true },
           _avg: { rating: true },
         }),
         reviewModel.groupBy({
           by: ["rating"],
-          where,
+          where: where as any,
           _count: { _all: true },
         }),
       ]);
@@ -823,8 +823,8 @@ router.get(
       });
 
       const pgFetchLimit = scope === "all" ? page * limit : limit;
-      const pgReviews = await reviewModel.findMany({
-        where,
+      const pgReviews: any = await reviewModel.findMany({
+        where: where as any,
         orderBy,
         take: pgFetchLimit,
         skip: scope === "recent" ? (page - 1) * limit : undefined,
