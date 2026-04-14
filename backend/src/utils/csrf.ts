@@ -12,7 +12,7 @@ const cookieDomainOption = COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {};
 export const csrfCookieOptions = {
   httpOnly: false,
   secure: isProd,
-  sameSite: isProd ? "none" : ("lax" as const),
+  sameSite: isProd ? ("none" as const) : ("lax" as const),
   path: "/",
   ...cookieDomainOption,
 };
