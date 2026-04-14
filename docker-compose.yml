@@ -68,11 +68,10 @@ services:
     image: ${PNPM_NODE_IMAGE:-node:20-alpine}
     working_dir: /app
     env_file:
-      - ./apps/api/.env
+      - ./backend/.env
     volumes:
-      - ./:/app
+      - ./backend:/app
       - api-node-modules:/app/node_modules
-      - api-app-node-modules:/app/apps/api/node_modules
       - api-pnpm-store:/pnpm-store
     environment:
       NODE_ENV: development
@@ -88,7 +87,7 @@ services:
       CLICKHOUSE_DATABASE: scan2serve
       REDIS_URL: redis://redis:6379
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api db:migrate:deploy && pnpm --filter @scan2serve/api db:generate && pnpm --filter @scan2serve/api db:seed && pnpm --filter @scan2serve/api clickhouse:users && pnpm --filter @scan2serve/api clickhouse:bootstrap && pnpm --filter @scan2serve/api db:seed:sample && pnpm --filter @scan2serve/api dev"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm db:migrate:deploy && pnpm db:generate && pnpm db:seed && pnpm clickhouse:users && pnpm clickhouse:bootstrap && pnpm db:seed:sample && pnpm dev"
     depends_on:
       db:
         condition: service_healthy
@@ -109,12 +108,11 @@ services:
     image: ${PNPM_NODE_IMAGE:-node:20-alpine}
     working_dir: /app
     env_file:
-      - ./apps/web/.env
+      - ./frontend/.env
     volumes:
-      - ./:/app
+      - ./frontend:/app
       - web-node-modules:/app/node_modules
-      - web-app-node-modules:/app/apps/web/node_modules
-      - web-next-cache:/app/apps/web/.next
+      - web-next-cache:/app/.next
       - web-pnpm-store:/pnpm-store
     environment:
       NODE_ENV: development
@@ -124,7 +122,7 @@ services:
       COREPACK_HOME: /pnpm-store/corepack
       API_INTERNAL_URL: http://api:4000
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && cd /app/apps/web && pnpm exec next dev --hostname 0.0.0.0 --port 3000"
+      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm dev --hostname 0.0.0.0 --port 3000"
     depends_on:
       api:
         condition: service_healthy
@@ -140,7 +138,7 @@ services:
     volumes:
       - ./gateway/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     env_file:
-      - ./apps/api/.env
+      - ./backend/.env
     ports:
       - "3000:80"
     depends_on:
@@ -206,8 +204,8 @@ services:
     volumes:
       - ./:/app
       - test-node-modules:/app/node_modules
-      - test-api-node-modules:/app/apps/api/node_modules
-      - test-web-node-modules:/app/apps/web/node_modules
+      - test-api-node-modules:/app/backend/node_modules
+      - test-web-node-modules:/app/frontend/node_modules
       - test-pnpm-store:/pnpm-store
     environment:
       NODE_ENV: test
@@ -216,7 +214,7 @@ services:
       PNPM_STORE_PATH: /pnpm-store
       COREPACK_HOME: /pnpm-store/corepack
     command: >
-      sh -c "corepack enable && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm --filter @scan2serve/api test && pnpm --filter @scan2serve/web test"
+      sh -c "corepack enable && cd backend && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm test && cd ../frontend && pnpm install --no-frozen-lockfile --store-dir /pnpm-store && pnpm test"
     depends_on:
       db:
         condition: service_healthy

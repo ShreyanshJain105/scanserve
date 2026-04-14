@@ -4,30 +4,14 @@
   "private": true,
   "description": "Digital menu platform with QR code ordering for restaurants",
   "scripts": {
-    "dev": "pnpm --parallel -r run dev",
-    "dev:web": "pnpm --filter @scan2serve/web dev",
-    "dev:api": "pnpm --filter @scan2serve/api dev",
-    "build": "pnpm -r run build",
-    "lint": "pnpm -r run lint",
-    "clean": "pnpm -r run clean"
+    "dev:backend": "cd backend && pnpm dev",
+    "dev:frontend": "cd frontend && pnpm dev",
+    "build:backend": "cd backend && pnpm build",
+    "build:frontend": "cd frontend && pnpm build",
+    "install:all": "cd backend && pnpm install && cd ../frontend && pnpm install"
   },
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=9.0.0"
-  },
-  "devDependencies": {
-    "eslint": "^8.57.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "prettier": "^3.3.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma",
-      "esbuild",
-      "sharp"
-    ]
   }
 }
